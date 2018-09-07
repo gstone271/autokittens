@@ -330,6 +330,13 @@ makeCraft = (craft, amountNeeded, reserved) => {
         craftAll(craft);
     }
 }
+getWinterCatnipProduction = (isCold) => {
+    //calcResourcePerTick always uses the current weather--adjust this away
+    var currentWeather = game.calendar.getWeatherMod();
+    var targetTotalWeather = isCold ? -.9 : -.75;
+    var adjustedSeason = { modifiers: { catnip: targetTotalWeather - currentWeather } }
+    return game.calcResourcePerTick("catnip", adjustedSeason);
+}
 
 /************** 
  * Queueables
