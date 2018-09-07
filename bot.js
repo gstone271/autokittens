@@ -67,6 +67,7 @@ findPriorities = (queue, reserved) => {
 }
 //TODO don't use the ratio for upgrades--particularly, photolithography will be delayed
 //--when all resources are close to full, allow them to become completely full
+//--don't include resources that can't be crafted yet
 haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(price.name) >= price.val + (reserved[price.name] || 0))
 canAfford = (prices, reserved) => prices.every(price => getResourceOwned(price.name) - (reserved[price.name] || 0) >= price.val);
 getAdditionalNeeded = (prices, reserved) => prices.map(price => ({ name: price.name, val: (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name))})).filter(price => price.val > 0);
@@ -121,7 +122,7 @@ mainLoop = () => {
 
 additionalActions = [
     () => $('#observeBtn').click(),
-    () => { if (state.autoHunt) if (getResourceOwned("catpower") * 1.2 > getResourceMax("catpower") && $('a:contains("Send hunters")')[0]) { withLeader("Manager", () => $('a:contains("Send hunters")')[0].click())} },
+    () => { if (state.autoHunt) if (getResourceOwned("catpower") * 1.2 > getResourceMax("catpower") && getResourceOwned("catpower") >= 100) { withLeader("Manager", () => $('a:contains("Send hunters")')[0].click())} },
     () => {
         if (state.populationIncrease > 0 && getTabButtonNumber(tabNumbers.Town).text().includes("(")) {
             withTab("Town", () => {
@@ -175,7 +176,7 @@ craftMap = [
 doAutoCraft = () => {
     craftMap.forEach(craft => {
         if (craft.auto) {
-            var maxCrafts = 10; //don't expect to need this many clicks, prevent something bad
+            var maxCrafts = 10; //don't expect to need this many clicks, prevent something bad          
             while (getCraftPrices(craft.craft).every(price => shouldAutoCraft(price.name, price.val)) && maxCrafts--) { 
                 craftOne(craft.craft);
             }
@@ -204,15 +205,14 @@ makeCraft = (craft, amountNeeded, reserved) => {
                 //iterate in increasing order; find largest
                 var craftTimes = Math.round($(button).text() / craftRatio) || Infinity;
                 if (idx == 0 || craftTimes <= timesToCraft) {
-                    if (craftTimes === 0) console.error("Miscalculated crafting (should be impossible!)");
+                    if (craftTimes === Infinity) console.error("Miscalculated crafting (should be impossible!)");
                     targetButton = button; 
                     targetCraftTimes = craftTimes;
                 }
             });
             if (!targetButton) {
-                console.error("Unable to craft " + craft);
-                console.error("Need: " + JSON.stringify(prices));
-                console.error("Have: " + JSON.stringify(prices.map(price => ({name: price.name, val: getResourceOwned(price.name)}))));
+                //button hasn't shown up yet (we just crafted one of the requirements)
+                return;
             }
             targetButton.click();
             timesToCraft -= targetCraftTimes;
@@ -632,4 +632,5 @@ early game needs:
 --first hunting (get efficiency)
 --try harder to get rid of ivory??
 add help menu
+organize code (but it has to be one file :/)
 */
