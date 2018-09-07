@@ -11,6 +11,7 @@ loadString = string => {
     parsed.queue = [];
     state = parsed;
     reloadQueue(rawQueue);
+    initialize();
 }
 exportSave = () => JSON.stringify(state);
 importSave = loadString;
@@ -33,6 +34,11 @@ loadDefaults = () => {
     if (!state.tradeTimer) state.tradeTimer = 0;
     if (!state.speed) state.speed = 1;
     if (!state.queue) state.queue = [];
+    initialize();
+}
+initialize = () => {
+    setSpeed(state.speed)
+    setRunning(state.running)
 }
 
 flattenArr = arr => arr.reduce((acc, val) => acc.concat(val), []); //from Mozilla docs
@@ -682,11 +688,10 @@ skip = name => { next = disable(name); enable(name); }
 if (window.state) {
     //if we've updated class behavior, get the new behavior
     reloadQueue(state.queue);
+    initialize();
 } else {
     load();
 }
-setSpeed(state.speed)
-setRunning(state.running)
 log("Autokittens loaded")
 /*
 todo:
