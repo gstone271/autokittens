@@ -683,7 +683,6 @@ toggleEnabled = (name, tab, panel) => {
         enable(name, tab, panel);
     }
 }
-skip = name => { next = disable(name); enable(name); }
 //initialize
 if (window.state) {
     //if we've updated class behavior, get the new behavior
