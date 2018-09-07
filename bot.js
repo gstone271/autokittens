@@ -65,7 +65,7 @@ findPriorities = (queue, reserved) => {
     craftChainUnvailaibleResources.forEach(res => newReservedResources[res] = Infinity);
     return [{bld: found, reserved: reserved, viable: viable}].concat(findPriorities(queue.slice(1, queue.length), newReservedResources));
 }
-//TODO don't use the ratio for upgrades--particularly, photolithography will be delayed
+//TODO don't use this for upgrades--particularly, photolithography will be delayed
 //--when all resources are close to full, allow them to become completely full
 //--don't include resources that can't be crafted yet
 haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(price.name) >= price.val + (reserved[price.name] || 0))
@@ -162,7 +162,7 @@ findCraftButtonValues = (craft, craftRatio) => findCraftButtons(craft).toArray()
 });
 getSafeStorage = res => getResourceMax(res) - state.ticksPerLoop * getEffectiveResourcePerTick(res, true);
 getEffectiveResourcePerTick = (res, bestCase) => {
-    var resourcePerTick = game.getResourcePerTick(res, true);
+    var resourcePerTick = game.getResourcePerTick(unFixResourceTitle(res), true);
     //todo: doesn't account for metaphysics upgrades
     if (res === "science" || res === "starchart" && game.science.get("astronomy").researched) {
         var astronomicalEventChance = bestCase ? 1 : Math.min((25 / 10000) + game.getEffect("starEventChance"), 1);
