@@ -754,8 +754,14 @@ buy script (-> genetic algorithm)
 make sure not to run out of furs
 trade calculations -> needsResource function
 --try not to have full gold
+faith reset without transcending
 improve performance at high speeds
 --api level (none, some, all)
+improve interface
+--buy quantity: 0, 1/2, 1, 2, infinity
+--1/2: when none of your craft chain is reserved, become normal and go to end of queue
+--2: queued twice
+--infinity: automatically top of queue (queue with other infinities)
 early game needs:
 --starvation
 ----allows aggressive catnip -> wood conversion
