@@ -695,7 +695,21 @@ buy script (-> genetic algorithm)
 ----separate state and config variables
 ----job assignment in queue
 ----goals: concrete, moon, eludium, beyond
+----big queue of jobs, techs, upgrades
+------techs and upgrades built from (queue slots since unlock, isBought)
 --strategy viability
+----exclude useless techs
+--run scoring
+----10pt per science, building type
+----5pt per kitten
+----2pt per upgrade
+----1pt per building
+----1pt per %faith bonus
+----2000pt if moon +1pt/day early
+--record run
+----everything bought
+----timing of technologies
+----timing of kittens milestones
 make sure not to run out of furs
 trade calculations -> needsResource function
 --try not to have full gold
