@@ -225,6 +225,7 @@ housingMap = {
     Hut: 2,
     "Log House": 1,
     Mansion: 1,
+    "Space Station": 2,
 }
 
 findButton = name => $('span:contains("' + name + '")').parents("div.btn")
@@ -315,7 +316,10 @@ function Science(name, tab, panel) {
     this.panel = panel;
     this.once = tab !== "Space" || this.getData().noStackable;
 }
-Science.prototype.buy = function() { withLeader("Scientist", () => withTab(this.tab, () => findButton(this.name).click())); } //don't actually need scientist for Space
+Science.prototype.buy = function() { 
+    withLeader("Scientist", () => withTab(this.tab, () => findButton(this.name).click()));
+    state.populationIncrease += housingMap[this.name] || 0;
+} //don't actually need scientist for Space
 Science.prototype.getData = function() { return scienceData[this.tab].filter(data => data.label === this.name)[0]; }
 Science.prototype.getPrices = function() { 
     var data = this.getData(); 
@@ -617,6 +621,7 @@ buy script (-> genetic algorithm)
 calculate crafting/storage exactly, ensure craft target isn't full (chain forwards)
 make sure not to run out of furs
 trade calculations -> needsResource function
+--try not to have full gold
 don't get stuck on rare resources (calculate time to enough; only reserve that much time - 5 min?)
 improve performance at high speeds
 --api level (none, some, all)
@@ -627,4 +632,5 @@ early game needs:
 --first leader
 --first hunting (get efficiency)
 --try harder to get rid of ivory??
+add help menu
 */
