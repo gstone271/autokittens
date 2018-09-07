@@ -125,7 +125,15 @@ buyPrioritiesQueue = (queue) => {
     var bought = tryBuy(priorities);
     return updateQueue(queue, bought);
 }
-mainLoop = () => { 
+mainLoop = () => {
+    if (game.bld.get("field").val === 0 && getResourceOwned("catnip") < 10) {
+        withTab("Bonfire", () => {
+            var maxClicks = 10;
+            while (getResourceOwned("catnip") < 10 && maxClicks--) {
+                findButton("Gather catnip").click()
+            }
+        });
+    }
     if (state.autoSteel) craftAll("steel")
     //todo make trades try harder to do more
     if (isResourceFull("gold")) state.queue.filter(bld => bld.constructor.name === "Trade" && bld.isEnabled()).forEach(bld => promote(bld.name));
@@ -728,6 +736,7 @@ early game needs:
 --first hunting (get efficiency)
 --first crafting
 --try harder to get rid of ivory??
+--smelter management (handle negative production)
 add help menu
 organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
