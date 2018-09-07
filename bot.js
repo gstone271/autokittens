@@ -62,9 +62,9 @@ findPriorities = (queue, reserved) => {
     //amount to reserve, if you will have ticks production
     var getEnoughForTicks = (price, ticks) => Math.max(0, price.val - (ticks * getEffectiveResourcePerTick(price.name, false, reserved) || 0))
     var unaffordablePrices = prices.filter(price => !canAffordOne(price));
-    var ticksNeeded = Math.max(...unaffordablePrices.map(getTicksToEnough));
+    var ticksNeeded = Math.max(0, Math.max(...unaffordablePrices.map(getTicksToEnough)) - reserveBufferTime);
     //assumes the price is unaffordable
-    var isLimitingResource = price => getTicksToEnough(price) >= ticksNeeded - reserveBufferTime;
+    var isLimitingResource = price => getTicksToEnough(price) >= ticksNeeded;
 
     var rawUnavailableResources = unaffordablePrices.filter(isLimitingResource).map(price => price.name);
     var craftChainUnvailaibleResources = flattenArr(rawUnavailableResources.map(getCraftChain));
