@@ -2,8 +2,12 @@
 if (window.stopLoop) stopLoop();
 $("#botInfo").remove()
 $('#gamePageContainer').append($('<div id="botInfo" style="position: absolute; bottom: 50px; right: 10px;">'))
-    $("#botSettings").remove()
-    $('#gamePageContainer').append($('<div id="botSettings" style="position: absolute; top: 50px; right: 10px;"><div id="botOn" onclick="event.preventDefault(); toggleRunning()" style="margin-bottom: 5px"></div><div id="timeSetting" onclick="event.preventDefault(); speedUp();" oncontextmenu="event.preventDefault(); slowDown();"></div></div>'))
+$("#botSettings").remove()
+$('#gamePageContainer').append($('<div id="botSettings" style="position: absolute; top: 50px; right: 10px;"><div id="botOn" onclick="event.preventDefault(); toggleRunning()" style="margin-bottom: 5px"></div><div id="timeSetting" onclick="event.preventDefault(); speedUp();" oncontextmenu="event.preventDefault(); slowDown();"></div></div>'))
+
+/************** 
+ * Save/Load
+**************/
 save = () => { localStorage.setItem("autokittens.state", exportSave()); console.log("Bot state saved"); }
 loadString = string => {
     var parsed = JSON.parse(string);
@@ -37,8 +41,12 @@ loadDefaults = () => {
     initialize();
 }
 initialize = () => {
-    setSpeed(state.speed)
-    setRunning(state.running)
+    setSpeed(state.speed);
+}
+if (!game.console.realSave) game.console.realSave = game.console.save;
+game.console.save = (data) => {
+    save();
+    game.console.realSave(data);
 }
 
 flattenArr = arr => arr.reduce((acc, val) => acc.concat(val), []); //from Mozilla docs
@@ -55,6 +63,9 @@ arrayToObject = (array, keyField) => //https://medium.com/dailyjs/rewriting-java
 
 log = (msg, quiet) => { console.log(msg); if (!quiet) game.msg(msg); }
 
+/************** 
+ * Queue Logic
+**************/
 reserveBufferTime = game.rate * 60 * 5; //5 minutes: reserve enough of non-limiting resources to be this far ahead of the limiting resource
 findPriorities = (queue, reserved) => {
     if (queue.length == 0) return [];
@@ -125,6 +136,10 @@ buyPrioritiesQueue = (queue) => {
     var bought = tryBuy(priorities);
     return updateQueue(queue, bought);
 }
+
+/************** 
+ * Main Loop
+**************/
 mainLoop = () => {
     if (game.bld.get("field").val === 0 && getResourceOwned("catnip") < 10) {
         withTab("Bonfire", () => {
@@ -143,7 +158,6 @@ mainLoop = () => {
     updateManagementButtons();
     updateSpeedText();
 }
-
 additionalActions = [
     () => $('#observeBtn').click(),
     () => { 
@@ -164,6 +178,9 @@ additionalActions = [
 ]
 if (!window.botDebug) botDebug = {};
 
+/************** 
+ * Crafting
+**************/
 getResourceOwned = name => game.resPool.resources.find(res => res.title === name).value
 getResourceMax = name => game.resPool.resources.find(res => res.title === name).maxValue || Infinity
 getResourceShortTitle = longName => game.workshop.crafts.find(row => row.label === longName).name;
@@ -314,6 +331,9 @@ makeCraft = (craft, amountNeeded, reserved) => {
     }
 }
 
+/************** 
+ * Queueables
+**************/
 housingMap = {
     Hut: 2,
     "Log House": 1,
@@ -507,6 +527,36 @@ function HoldFestival(name, tab, panel) {
     this.isEnabled = () => game.calendar.festivalDays === 0;
 }
 
+/************** 
+ * Queue Management
+**************/
+disable = name => state.queue = state.queue.filter(bld => !(bld.name === name));
+findQueue = name => state.queue.filter(bld => bld.name === name)[0];
+isEnabled = name => state.queue.filter(bld => bld.name === name).length
+//not used yet
+promote = name => { var item = findQueue(name); disable(name); state.queue.unshift(item); }
+enable = (name, tab, panel) => { 
+    var type;
+    if (specialBuys[name]) type = specialBuys[name];
+    else if (tab === "Bonfire") type = Building;
+    else if (panel === "Crafting") type = Craft;
+    else if (scienceData[tab]) type = Science;
+    else if (tab === "Trade") type = Trade;
+    else if (religionData[panel]) type = Religion;
+    else console.error(tab + " tab not supported yet!");
+    state.queue.push(new type(name, tab, panel));
+}
+toggleEnabled = (name, tab, panel) => { 
+    if (isEnabled(name)) { 
+        disable(name);
+    } else {
+        enable(name, tab, panel);
+    }
+}
+
+/************** 
+ * Tabs
+**************/
 tabNumbers = { Bonfire: 1, Town: 2 } //these have changing names, but fixed position
 openTab = name => tabNumbers[name] ? openTabNumber(tabNumbers[name]) : openTabName(name);
 openTabName = name => $('a.tab:contains("' + name + '")')[0].click()
@@ -565,7 +615,9 @@ getActiveTab = () => {
     return activeTab.text();
 }
 
-
+/************** 
+ * Interface
+**************/
 ignoredButtons = ["Gather catnip", "Refine catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Send explorers", "Tempus Stasit", "Tempus Fugit"]
 stateButtons = {
     "Send hunters": "autoHunt",
@@ -616,7 +668,9 @@ updateManagementButtons = () => {
     $("p.botManage").each((idx, elem) => updateButton(elem, tabCache));
 }
 
-
+/************** 
+ * Speed
+**************/
 baseDelay = 2000;
 updateSpeedText = () => $("#timeSetting").html("Speed: " + state.speed + "x" + (state.speed > 30 ? " <br />(right click<br />to lower)" : ""));
 setSpeed = spd => { 
@@ -626,18 +680,16 @@ setSpeed = spd => {
         state.delay = Math.max(baseDelay / spd, 200);
         state.highPerformance = spd > 1;
         state.ticksPerLoop = Math.ceil(state.speed * 200 / state.delay);
-        if (state.running) startLoop();
-    } 
+    }
+    setRunning(state.running);
 }
 speedUp = () => setSpeed(state.speed * 2);
 slowDown = () => setSpeed(state.speed / 2);
 speed = 1;
 if (!game.realUpdateModel) game.realUpdateModel = game.updateModel;
-if (!game.realGetRateUI) game.realGetRateUI = game.getRateUI
 game.updateModel = () => {
     for (var i = 0; i < state.speed; i++) { 
         if (i !== 0) {
-            //todo: once bloodrizer fixes temporal calendar, this will make calendar too fast with temporal flux
             game.calendar.tick();
             //might be going so fast you would miss astro events
             if (game.calendar.observeBtn) game.calendar.observeHandler();
@@ -645,15 +697,13 @@ game.updateModel = () => {
         game.realUpdateModel(); 
     }
 }
-//todo: this makes the calendar too fast
+//this makes the UI display the right /sec values but makes the calendar too fast
+//if (!game.realGetRateUI) game.realGetRateUI = game.getRateUI
 //game.getRateUI = () => state.speed * game.realGetRateUI();
 
-if (!game.console.realSave) game.console.realSave = game.console.save;
-game.console.save = (data) => {
-    save();
-    game.console.realSave(data);
-}
-
+/************** 
+ * Running
+**************/
 toggleRunning = () => setRunning(!state.running);
 setRunning = newRunning => {
     state.running = newRunning;
@@ -664,34 +714,13 @@ setRunning = newRunning => {
     }
     $("#botOn").text("Bot: " + (newRunning ? "on" : "off"));
 }
-
 loopHandle = 0;
 stopLoop = () => clearInterval(loopHandle);
 startLoop = () => { stopLoop(); loopHandle = setInterval(mainLoop, state.delay); mainLoop(); }
-disable = name => state.queue = state.queue.filter(bld => !(bld.name === name));
-findQueue = name => state.queue.filter(bld => bld.name === name)[0];
-isEnabled = name => state.queue.filter(bld => bld.name === name).length
-promote = name => { var item = findQueue(name); disable(name); state.queue.unshift(item); }
-toggleEnabledBuilding = name => { if (isEnabled(name)) disable(name); else addEnableBuilding(name); }
-enable = (name, tab, panel) => { 
-    var type;
-    if (specialBuys[name]) type = specialBuys[name];
-    else if (tab === "Bonfire") type = Building;
-    else if (panel === "Crafting") type = Craft;
-    else if (scienceData[tab]) type = Science;
-    else if (tab === "Trade") type = Trade;
-    else if (religionData[panel]) type = Religion;
-    else console.error(tab + " tab not supported yet!");
-    state.queue.push(new type(name, tab, panel));
-}
-toggleEnabled = (name, tab, panel) => { 
-    if (isEnabled(name)) { 
-        disable(name);
-    } else {
-        enable(name, tab, panel);
-    }
-}
-//initialize
+
+/************** 
+ * Initialize
+**************/
 if (window.state) {
     //if we've updated class behavior, get the new behavior
     reloadQueue(state.queue);
