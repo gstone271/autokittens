@@ -184,6 +184,7 @@ if (!window.botDebug) botDebug = {};
 getResourceOwned = name => game.resPool.resources.find(res => res.title === name).value
 getResourceMax = name => game.resPool.resources.find(res => res.title === name).maxValue || Infinity
 getResourceShortTitle = longName => game.workshop.crafts.find(row => row.label === longName).name;
+getResourceLongTitle = name => game.workshop.crafts.find(row => row.name === name).label;
 resourceTitleCache = arrayToObject(game.resPool.resources, "name");
 resourceNameCache = arrayToObject(game.resPool.resources, "title");
 fixResourceTitle = resInternalName => resourceTitleCache[resInternalName].title;
@@ -192,7 +193,14 @@ fixPriceTitle = price => ({ val: price.val, name: fixResourceTitle(price.name) }
 getCraftPrices = craft => { return game.workshop.getCraft(unFixResourceTitle(craft)).prices.map(fixPriceTitle) }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
 findCraftAllButton = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("all")')[0]
-craftAll = name => { var button = findCraftAllButton(name); if (button) button.click(); }
+craftAll = name => {
+    if (getResourceOwned(name) === 0) {
+        console.log("First time crafting " + getResourceLongTitle(name))
+        withTab("Workshop", () => findButton(getResourceLongTitle(name)).click())
+    }
+    var button = findCraftAllButton(name); 
+    if (button) button.click(); 
+}
 findCraftButtons = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("+")');
 findCraftOneButton = (name) => findCraftButtons(name).first()[0]
 craftOne = name => { var button = findCraftOneButton(name); if (button) button.click(); }
