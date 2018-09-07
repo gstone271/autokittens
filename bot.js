@@ -570,7 +570,7 @@ updateButton = (elem, tab) => {
         $(elem).text("");
     } else {
         var condition;
-        if (stateButtons[item]) {
+        if (stateButtons[item] && tab !== "Science") {
             condition = state[stateButtons[item]];
         } else if (tab === "Town" && !specialBuys[item]) {
             condition = state.defaultJob === item;
@@ -587,7 +587,7 @@ buttonEvent = elem => {
     var tab = getActiveTab();
     var panel = getPanelTitle(elem);
     if (tab === "Trade") item = panel;
-    if (stateButtons[item]) {
+    if (stateButtons[item] && tab !== "Science") {
         state[stateButtons[item]] = !state[stateButtons[item]];
     } else if (panel === "Jobs") {
         state.defaultJob = item;
@@ -726,4 +726,5 @@ early game needs:
 --try harder to get rid of ivory??
 add help menu
 organize code (but it has to be one file :/)
+reservations seems still not correct (crafting too early)
 */
