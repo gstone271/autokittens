@@ -205,7 +205,7 @@ doAutoCraft = () => {
 }
 findCraft = targetCraft => craftMap.filter(convert => convert.craft === targetCraft && !convert.noChain)
 isCraft = targetCraft => findCraft(targetCraft).length
-getCraftChain = targetCraft => flattenArr(findCraft(targetCraft).map(convert => flattenArr(getCraftPrices(convert.craft).map(price => price.name).map(getCraftChain)))).concat(targetCraft) //todo remove duplicates if needed
+getCraftChain = targetCraft => flattenArr(findCraft(targetCraft).map(convert => flattenArr(getCraftPrices(convert.craft).map(price => price.name).map(getCraftChain)))).concat(targetCraft) //blueprint lists science twice but that's fine
 getCraftRatio = res => game.getResCraftRatio({ name: res }) + 1;
 makeCraft = (craft, amountNeeded, reserved) => {
     var craftRatio = getCraftRatio(craft);
@@ -628,7 +628,9 @@ log("Autokittens loaded")
 todo:
 buy script (-> genetic algorithm)
 --master plan mode
---add by name
+----separate state and config variables
+----job assignment in queue
+----goals: concrete, moon, eludium, beyond
 --strategy viability
 make sure not to run out of furs
 trade calculations -> needsResource function
@@ -642,6 +644,7 @@ early game needs:
 --job management
 --first leader
 --first hunting (get efficiency)
+--first crafting
 --try harder to get rid of ivory??
 add help menu
 organize code (but it has to be one file :/)
