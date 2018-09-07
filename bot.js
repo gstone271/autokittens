@@ -4,7 +4,7 @@ $("#botInfo").remove()
 $('#gamePageContainer').append($('<div id="botInfo" style="position: absolute; bottom: 50px; right: 10px;">'))
     $("#botSettings").remove()
     $('#gamePageContainer').append($('<div id="botSettings" style="position: absolute; top: 50px; right: 10px;"><div id="botOn" onclick="event.preventDefault(); toggleRunning()" style="margin-bottom: 5px"></div><div id="timeSetting" onclick="event.preventDefault(); speedUp();" oncontextmenu="event.preventDefault(); slowDown();"></div></div>'))
-save = () => { localStorage.setItem("autokittens.state", JSON.stringify(state)); console.log("Bot state saved"); }
+save = () => { localStorage.setItem("autokittens.state", exportSave()); console.log("Bot state saved"); }
 loadString = string => {
     var parsed = JSON.parse(string);
     var rawQueue = parsed.queue;
@@ -12,6 +12,8 @@ loadString = string => {
     state = parsed;
     reloadQueue(rawQueue);
 }
+exportSave = () => JSON.stringify(state);
+importSave = loadString;
 reloadQueue = queue => {
     state.queue = [];
     queue.forEach(item => enable(item.name, item.tab, item.panel));
