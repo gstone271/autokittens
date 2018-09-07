@@ -49,19 +49,29 @@ arrayToObject = (array, keyField) => //https://medium.com/dailyjs/rewriting-java
 
 log = (msg, quiet) => { console.log(msg); if (!quiet) game.msg(msg); }
 
-
+reserveBufferTime = game.rate * 60 * 5; //5 minutes: reserve enough of non-limiting resources to be this far ahead of the limiting resource
 findPriorities = (queue, reserved) => {
     if (queue.length == 0) return [];
     var found = queue[0];
     var prices = found.getPrices();
     if (!found.isEnabled() || !haveEnoughStorage(prices, reserved)) return findPriorities(queue.slice(1, queue.length), reserved);
     var viable = prices.every(price => reserved[price.name] !== Infinity);
-    var canAfford = price => getResourceOwned(price.name) - (reserved[price.name] || 0) > price.val;
-    var rawUnavailableResources = prices.filter(price => !canAfford(price)).map(price => price.name);
+    var canAffordOne = price => getResourceOwned(price.name) - (reserved[price.name] || 0) > price.val;
+    var getTicksToEnough = price => //ticks until you have enough. May be infinite or negative
+        (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name)) / getEffectiveResourcePerTick(price.name, false, reserved);
+    //amount to reserve, if you will have ticks production
+    var getEnoughForTicks = (price, ticks) => Math.max(0, price.val - (ticks * getEffectiveResourcePerTick(price.name, false, reserved) || 0))
+    var unaffordablePrices = prices.filter(price => !canAffordOne(price));
+    var ticksNeeded = Math.max(...unaffordablePrices.map(getTicksToEnough));
+    //assumes the price is unaffordable
+    var isLimitingResource = price => getTicksToEnough(price) >= ticksNeeded - reserveBufferTime;
+
+    var rawUnavailableResources = unaffordablePrices.filter(isLimitingResource).map(price => price.name);
     var craftChainUnvailaibleResources = flattenArr(rawUnavailableResources.map(getCraftChain));
-    var availableResources = prices.filter(canAfford);
+
+    var availableResources = prices.filter(price => canAffordOne(price) || !isLimitingResource(price));
     var newReservedResources = Object.assign({}, reserved);
-    availableResources.forEach(price => newReservedResources[price.name] = (newReservedResources[price.name] || 0) + price.val);
+    availableResources.forEach(price => newReservedResources[price.name] = (newReservedResources[price.name] || 0) + getEnoughForTicks(price, ticksNeeded));
     craftChainUnvailaibleResources.forEach(res => newReservedResources[res] = Infinity);
     return [{bld: found, reserved: reserved, viable: viable}].concat(findPriorities(queue.slice(1, queue.length), newReservedResources));
 }
@@ -160,8 +170,12 @@ findCraftButtonValues = (craft, craftRatio) => findCraftButtons(craft).toArray()
     var craftAmount = craftTimes * craftRatio
     return {button: button, times: craftTimes, amount: craftAmount};
 });
-getSafeStorage = res => getResourceMax(res) - state.ticksPerLoop * getEffectiveResourcePerTick(res, true);
-getEffectiveResourcePerTick = (res, bestCase) => {
+getSafeStorage = res => {
+    var max = getResourceMax(res);
+    return max === Infinity ? max : max - state.ticksPerLoop * getEffectiveResourcePerTick(res, true, {});
+}
+//todo factor in crafting?????
+getEffectiveResourcePerTick = (res, bestCase, reserved) => {
     var resourcePerTick = game.getResourcePerTick(unFixResourceTitle(res), true);
     //todo: doesn't account for metaphysics upgrades
     if (res === "science" || res === "starchart" && game.science.get("astronomy").researched) {
@@ -188,6 +202,24 @@ getEffectiveResourcePerTick = (res, bestCase) => {
         resourcePerTick += eventsPerTick * valuePerEvent;
     }
     //don't bother with the other possible events; they don't have capacities
+    if (res === "steel" && state.autoSteel || isCraft(res)) {
+        //once we're willing to chain craft catnip this will be wrong due to seasons
+        //don't worry about it for now
+        var prices = getCraftPrices(res);
+        /* want to just say if reserved is not Infinity
+         * , but that wouldn't account for resources we expect to have production on
+         * TODO This might be wrong in the case where you have a bunch of things limited 
+         * on different rare resources, not reserving a shared common resources;
+         * the common resource might be overspent
+         */
+        if (res === "steel" || prices.every(price => !reserved[price.name])) {
+            //special case steel: we always craft it
+            resourcePerTick += getCraftRatio(res) * Math.min(...prices.map(price => 
+                getEffectiveResourcePerTick(price.name, bestCase, reserved) / price.val
+            ))
+        }
+    }
+    //todo production from trade???? maybe just blueprints based on gold income?? needs more consistent trading
     return resourcePerTick;
 }
 isResourceFull = res => getResourceOwned(res) > getSafeStorage(res);
@@ -667,7 +699,6 @@ buy script (-> genetic algorithm)
 make sure not to run out of furs
 trade calculations -> needsResource function
 --try not to have full gold
-don't get stuck on rare resources (calculate time to enough; only reserve that much time - 5 min?)
 improve performance at high speeds
 --api level (none, some, all)
 early game needs:
