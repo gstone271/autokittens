@@ -385,6 +385,7 @@ getWinterCatnipStockNeeded = isCold => {
         return Math.max(0, -getWinterCatnipProduction(isCold) * ticksPerSeason() - getExpectedCatnipBeforeWinter())
     }
 }
+//this might need to be slightly more in case you trade, etc
 getFursStockNeeded = () => {
     var catpowerPerSec = game.getResourcePerTick("manpower", true);
     if (catpowerPerSec <= 0) {
@@ -446,9 +447,11 @@ Trade.prototype.buy = function(reserved) { if (state.highPerformance || state.tr
     if (!canAfford(prices, reserved)) console.error(reserved);
     if (state.highPerformance) {
         var yieldResTotal = null;
-        while (canAfford(prices, reserved) && this.needProduct(1)) {
+        var amt = 0;
+        while (canAfford(prices, reserved) && this.needProduct(1) && amt < 1000) {
             prices.forEach(price => game.resPool.addResEvent(price.name, -price.val));
             yieldResTotal = game.diplomacy.tradeInternal(game.diplomacy.races.find(race => race.title === this.panel), true, yieldResTotal);
+            amt++;
         }
 		game.diplomacy.gainTradeRes(yieldResTotal, amt);
     } else {
