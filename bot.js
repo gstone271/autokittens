@@ -355,12 +355,35 @@ makeCraft = (craft, amountNeeded, reserved) => {
         craftAll(craft);
     }
 }
-getWinterCatnipProduction = (isCold) => {
+
+/************** 
+ * Starvation
+**************/
+//todo: all of this is wrong in accelerated time
+//but the calendar speed is also bugged in accelerated time, wait for fix
+getWinterCatnipProduction = isCold => {
+    return getSeasonalCatnipProduction(isCold ? .1 : .25);
+}
+getSeasonalCatnipProduction = weatherMod => {
     //calcResourcePerTick always uses the current weather--adjust this away
     var currentWeather = game.calendar.getWeatherMod();
-    var targetTotalWeather = isCold ? .1 : .25;
-    var adjustedSeason = { modifiers: { catnip: targetTotalWeather - currentWeather } }
+    var adjustedSeason = { modifiers: { catnip: weatherMod - currentWeather } }
     return game.calcResourcePerTick("catnip", adjustedSeason) + game.getResourcePerTickConvertion("catnip");
+}
+ticksPerSeason = () => 100 / game.calendar.dayPerTick;
+ticksLeftInSeason = () => (100 - game.calendar.day) / game.calendar.dayPerTick;
+getExpectedCatnipBeforeWinter = () => {
+    if (game.calendar.season === 3) return 0;
+    return game.getResourcePerTick("catnip", true) * ticksLeftInSeason()
+        + (2 - game.calendar.season) * getSeasonalCatnipProduction(1) * ticksPerSeason();
+}
+//todo: warn when you don't have enough catnip
+getWinterCatnipStockNeeded = isCold => {
+    if (game.calendar.season === 3) {
+        return Math.max(0, -game.getResourcePerTick("catnip", true) * ticksLeftInSeason())
+    } else {
+        return Math.max(0, -getWinterCatnipProduction(isCold) * ticksPerSeason() - getExpectedCatnipBeforeWinter())
+    }
 }
 
 /************** 
