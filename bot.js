@@ -557,6 +557,7 @@ function HoldFestival(name, tab, panel) {
     this.buy = () => withTab(this.tab, () => findButton(this.name).click()),
     this.getPrices = () => ([{ name: "catpower", val: 1500 }, { name: "culture", val: 5000 }, { name: "parchment", val: 2500 }]);
     this.isEnabled = () => game.calendar.festivalDays === 0;
+    this.quiet = true;
 }
 
 /************** 
@@ -797,6 +798,12 @@ improve interface
 early game needs:
 --starvation
 ----allows aggressive catnip -> wood conversion
+----get catnip stock required to survive winter
+------after some year, survive cold winter
+------reserve this amount of catnip before buys
+--------we can also reserve furs this way
+----------amount = fur consumption * time to max catpower
+----housing requires catnip equal to the increased stock required
 --job management
 --first leader
 ----promote leader
