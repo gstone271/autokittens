@@ -146,7 +146,7 @@ updateQueue = (queue, bought) => {
     return queue.filter(bld => !bought.includes(bld)).concat(bought.filter(bld => !bld.once));
 }
 buyPrioritiesQueue = (queue) => {
-    var priorities = findPriorities(queue, {});
+    var priorities = findPriorities(queue, {catnip: getWinterCatnipStockNeeded(true), furs: getFursStockNeeded()});
     botDebug.priorities = priorities;
     $("#botInfo").html("Up next: <br />" + priorities.filter(plan => plan.viable).map(plan => plan.bld.name).join("<br />"));
     var bought = tryBuy(priorities);
@@ -282,7 +282,7 @@ isResourceFull = res => getResourceOwned(res) > getSafeStorage(res);
 haveEnoughCraft = (res, amount) => getResourceMax(res) === Infinity && !state.queue.map(bld => bld.getPrices()).concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched).map(tech => tech.prices)).some(prices => getResourceOwned(res) - amount < getPrice(prices, res)) && (res !== "furs" || getResourceOwned(res) - amount > 500)
 shouldAutoCraft = (res, amount) => isResourceFull(res) || haveEnoughCraft(res, amount)
 craftMap = [
-    { craft: "wood", auto: true, noChain: true },
+    { craft: "wood", auto: true },
     { craft: "beam", auto: true },
     { craft: "slab", auto: true },
     { craft: "plate", auto: true },
@@ -384,6 +384,13 @@ getWinterCatnipStockNeeded = isCold => {
     } else {
         return Math.max(0, -getWinterCatnipProduction(isCold) * ticksPerSeason() - getExpectedCatnipBeforeWinter())
     }
+}
+getFursStockNeeded = () => {
+    var catpowerPerSec = game.getResourcePerTick("manpower", true);
+    if (catpowerPerSec <= 0) {
+        return game.getResourcePerTick("furs", true) >= 0 ? 0 : Infinity;
+    }
+    return Math.max(0, -game.getResourcePerTick("furs", true) * (getResourceMax("catpower") / catpowerPerSec))
 }
 
 /************** 
@@ -813,6 +820,7 @@ trade calculations -> needsResource function
 faith reset without transcending
 improve performance at high speeds
 --api level (none, some, all)
+remove craftMap
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
 --1/2: when none of your craft chain is reserved, become normal and go to end of queue
@@ -820,12 +828,7 @@ improve interface
 --infinity: automatically top of queue (queue with other infinities)
 early game needs:
 --starvation
-----allows aggressive catnip -> wood conversion
-----get catnip stock required to survive winter
-------after some year, survive cold winter
-------reserve this amount of catnip before buys
---------we can also reserve furs this way
-----------amount = fur consumption * time to max catpower
+----after some year, survive cold winter
 ----housing requires catnip equal to the increased stock required
 --job management
 --first leader
