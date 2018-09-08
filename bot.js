@@ -817,7 +817,6 @@ buy script (-> genetic algorithm)
 ----everything bought
 ----timing of technologies
 ----timing of kittens milestones
-make sure not to run out of furs
 trade calculations -> needsResource function
 --try not to have full gold
 faith reset without transcending
@@ -833,6 +832,8 @@ early game needs:
 --starvation
 ----after some year, survive cold winter
 ----housing requires catnip equal to the increased stock required
+------only if no farming yet
+----autoassign farmers to survive
 --job management
 --first leader
 ----promote leader
