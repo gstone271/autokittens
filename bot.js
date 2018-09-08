@@ -417,8 +417,8 @@ Trade.prototype.buy = function(reserved) { if (state.highPerformance || state.tr
     if (state.highPerformance) {
         var yieldResTotal = null;
         while (canAfford(prices, reserved) && this.needProduct(1)) {
-            prices.forEach(price => this.game.resPool.addResEvent(price.name, -price.val));
-            yieldResTotal = game.diplomacy.tradeInternal(this.panel, true, yieldResTotal);
+            prices.forEach(price => game.resPool.addResEvent(price.name, -price.val));
+            yieldResTotal = game.diplomacy.tradeInternal(game.diplomacy.races.find(race => race.title === this.panel), true, yieldResTotal);
         }
 		game.diplomacy.gainTradeRes(yieldResTotal, amt);
     } else {
