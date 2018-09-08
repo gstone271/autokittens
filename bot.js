@@ -6,6 +6,23 @@ $("#botSettings").remove()
 $('#gamePageContainer').append($('<div id="botSettings" style="position: absolute; top: 50px; right: 10px;"><div id="botOn" onclick="event.preventDefault(); toggleRunning()" style="margin-bottom: 5px"></div><div id="timeSetting" onclick="event.preventDefault(); speedUp();" oncontextmenu="event.preventDefault(); slowDown();"></div></div>'))
 
 /************** 
+ * Utilities
+**************/
+flattenArr = arr => arr.reduce((acc, val) => acc.concat(val), []); //from Mozilla docs
+function getOwnText(el) { //https://stackoverflow.com/a/21249659/1914005
+    return $(el).contents().map(function () {
+        return this.nodeType == 3 && $.trim(this.nodeValue) ? $.trim(this.nodeValue) : undefined;
+    }).get().join('')
+}
+arrayToObject = (array, keyField) => //https://medium.com/dailyjs/rewriting-javascript-converting-an-array-of-objects-to-an-object-ec579cafbfc7
+   array.reduce((obj, item) => {
+     obj[item[keyField]] = item
+     return obj
+   }, {})
+
+log = (msg, quiet) => { console.log(msg); if (!quiet) game.msg(msg); }
+
+/************** 
  * Save/Load
 **************/
 save = () => { localStorage.setItem("autokittens.state", exportSave()); console.log("Bot state saved"); }
@@ -48,20 +65,6 @@ game.console.save = (data) => {
     save();
     game.console.realSave(data);
 }
-
-flattenArr = arr => arr.reduce((acc, val) => acc.concat(val), []); //from Mozilla docs
-function getOwnText(el) { //https://stackoverflow.com/a/21249659/1914005
-    return $(el).contents().map(function () {
-        return this.nodeType == 3 && $.trim(this.nodeValue) ? $.trim(this.nodeValue) : undefined;
-    }).get().join('')
-}
-arrayToObject = (array, keyField) => //https://medium.com/dailyjs/rewriting-javascript-converting-an-array-of-objects-to-an-object-ec579cafbfc7
-   array.reduce((obj, item) => {
-     obj[item[keyField]] = item
-     return obj
-   }, {})
-
-log = (msg, quiet) => { console.log(msg); if (!quiet) game.msg(msg); }
 
 /************** 
  * Queue Logic
@@ -209,22 +212,33 @@ fixPriceTitle = price => ({ val: price.val, name: fixResourceTitle(price.name) }
 getCraftPrices = craft => { return game.workshop.getCraft(unFixResourceTitle(craft)).prices.map(fixPriceTitle) }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
 findCraftAllButton = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("all")')[0]
+craftFirstTime = name => {
+    var longTitle = getResourceLongTitle(name);
+    log("First time crafting " + longTitle, true)
+    withTab("Workshop", () => findButton(longTitle).click())
+}
 craftAll = name => {
     if (getResourceOwned(name) === 0) {
-        console.log("First time crafting " + getResourceLongTitle(name))
-        withTab("Workshop", () => findButton(getResourceLongTitle(name)).click())
+        craftFirstTime(name);
     }
     var button = findCraftAllButton(name); 
     if (button) button.click(); 
 }
 findCraftButtons = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("+")');
-findCraftOneButton = (name) => findCraftButtons(name).first()[0]
-craftOne = name => { var button = findCraftOneButton(name); if (button) button.click(); }
-findCraftButtonValues = (craft, craftRatio) => findCraftButtons(craft).toArray().map((button) => {
-    var craftTimes = Math.round($(button).text() / craftRatio);
-    var craftAmount = craftTimes * craftRatio
-    return {button: button, times: craftTimes, amount: craftAmount};
-});
+findCraftButtonValues = (craft, craftRatio) => {
+    if (craft === "wood" && game.bld.get("workshop").val === 0) {
+        return {click: () => withTab("Bonfire", () => findButton("Refine catnip").click()), times: 1, amount: craftRatio}
+    } else if (getResourceOwned(craft) === 0) {
+        return {click: () => craftFirstTime(craft), times: 1, amount: craftRatio}
+    } else {
+        return findCraftButtons(craft).toArray().map((button) => {
+            var craftTimes = Math.round($(button).text() / craftRatio);
+            var craftAmount = craftTimes * craftRatio
+            return {click: button.click.bind(button), times: craftTimes, amount: craftAmount};
+        });
+    }
+}
+craftOne = name => { var button = findCraftButtonValues(name, getCraftRatio(name))[0]; if (button) button.click(); }
 getSafeStorage = res => {
     var max = getResourceMax(res);
     return max === Infinity ? max : max - state.ticksPerLoop * getEffectiveResourcePerTick(res, true, {});
@@ -276,6 +290,7 @@ getEffectiveResourcePerTick = (res, bestCase, reserved) => {
         }
     }
     //todo production from trade???? maybe just blueprints based on gold income?? needs more consistent trading
+    //todo production from hunting?
     return resourcePerTick;
 }
 isResourceFull = res => getResourceOwned(res) > getSafeStorage(res);
@@ -347,7 +362,7 @@ makeCraft = (craft, amountNeeded, reserved) => {
             var targetButton = craftButtons.reduce((smallerButton, biggerButton) => 
                 biggerButton.times < timesToCraft ? biggerButton : smallerButton
             )
-            targetButton.button.click();
+            targetButton.click();
             timesToCraft -= targetButton.times;
             maxClicks--;
         }
