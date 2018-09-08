@@ -358,9 +358,9 @@ makeCraft = (craft, amountNeeded, reserved) => {
 getWinterCatnipProduction = (isCold) => {
     //calcResourcePerTick always uses the current weather--adjust this away
     var currentWeather = game.calendar.getWeatherMod();
-    var targetTotalWeather = isCold ? -.9 : -.75;
+    var targetTotalWeather = isCold ? .1 : .25;
     var adjustedSeason = { modifiers: { catnip: targetTotalWeather - currentWeather } }
-    return game.calcResourcePerTick("catnip", adjustedSeason);
+    return game.calcResourcePerTick("catnip", adjustedSeason) + game.getResourcePerTickConvertion("catnip");
 }
 
 /************** 
