@@ -72,25 +72,41 @@ findPriorities = (queue, reserved) => {
     var found = queue[0];
     var prices = found.getPrices();
     if (!found.isEnabled() || !haveEnoughStorage(prices, reserved)) return findPriorities(queue.slice(1, queue.length), reserved);
-    var viable = prices.every(price => reserved[price.name] !== Infinity);
+    var viable = prices.every(price => (reserved[price.name] || 0) <= getResourceOwned(price.name));
     var canAffordOne = price => getResourceOwned(price.name) - (reserved[price.name] || 0) > price.val;
     var getTicksToEnough = price => //ticks until you have enough. May be infinite or negative
         (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name)) / getEffectiveResourcePerTick(price.name, false, reserved);
-    //amount to reserve, if you will have ticks production
-    var getEnoughForTicks = (price, ticks) => Math.max(0, price.val - (ticks * getEffectiveResourcePerTick(price.name, false, reserved) || 0))
     var unaffordablePrices = prices.filter(price => !canAffordOne(price));
+    //todo: this isn't correct for repeat prices (eg steel + gear). but the reserveBufferTime helps
     var ticksNeeded = Math.max(0, Math.max(...unaffordablePrices.map(getTicksToEnough)) - reserveBufferTime);
     //assumes the price is unaffordable
     var isLimitingResource = price => getTicksToEnough(price) >= ticksNeeded;
+    //if the resource is craftable, need to figure out which of its components is limiting
+    //ticksNeeded is ok
+    var getIngredientsNeeded = price => (isCraft(price.name) ? multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)) ) : [])
 
-    var rawUnavailableResources = unaffordablePrices.filter(isLimitingResource).map(price => price.name);
-    var craftChainUnvailaibleResources = flattenArr(rawUnavailableResources.map(getCraftChain));
-
-    var availableResources = prices.filter(price => canAffordOne(price) || !isLimitingResource(price));
-    var newReservedResources = Object.assign({}, reserved);
-    availableResources.forEach(price => newReservedResources[price.name] = (newReservedResources[price.name] || 0) + getEnoughForTicks(price, ticksNeeded));
-    craftChainUnvailaibleResources.forEach(res => newReservedResources[res] = Infinity);
-    return [{bld: found, reserved: reserved, viable: viable}].concat(findPriorities(queue.slice(1, queue.length), newReservedResources));
+    var newReserved = Object.assign({}, reserved);
+    //amount to reserve, if you will have ticks production
+    var getEnoughForTicks = (price, ticks) => Math.max(0, (newReserved[price.name] || 0) + price.val - (ticks * getEffectiveResourcePerTick(price.name, false, newReserved) || 0))
+    var reserveNonLimiting = price => newReserved[price.name] = (newReserved[price.name] || 0) + getEnoughForTicks(price, ticksNeeded);
+    var reserveLimiting = price => newReserved[price.name] = (newReserved[price.name] || 0) + price.val;
+    prices.filter(canAffordOne).forEach(reserveNonLimiting);
+    //don't reserve infinity?
+    var getShortage = price => ({ name: price.name, val: Math.max(0, (newReserved[price.name] || 0) - getResourceOwned(price.name) + price.val) })
+    var shortages = unaffordablePrices;
+    var maxDepth = 10;
+    while (shortages.length) {
+        if (!maxDepth--) {
+            //if the game ever lets you craft scaffold back into catnip...
+            console.error("Infinite loop finding shortages:")
+            console.error(shortages)
+            break;
+        }
+        shortages.filter(isLimitingResource).forEach(reserveLimiting);
+        shortages.filter(price => !isLimitingResource(price)).forEach(reserveNonLimiting);
+        shortages = flattenArr(shortages.map(getIngredientsNeeded)).map(getShortage);
+    }
+    return [{bld: found, reserved: reserved, viable: viable}].concat(findPriorities(queue.slice(1, queue.length), newReserved));
 }
 //TODO don't use this for upgrades--particularly, photolithography will be delayed
 //--when all resources are close to full, allow them to become completely full
@@ -245,8 +261,9 @@ getEffectiveResourcePerTick = (res, bestCase, reserved) => {
         //once we're willing to chain craft catnip this will be wrong due to seasons
         //don't worry about it for now
         var prices = getCraftPrices(res);
-        /* want to just say if reserved is not Infinity
+        /* want to just say if reserved is less than current
          * , but that wouldn't account for resources we expect to have production on
+         * maybe note the amount of ticks of production reserved?
          * TODO This might be wrong in the case where you have a bunch of things limited 
          * on different rare resources, not reserving a shared common resources;
          * the common resource might be overspent
