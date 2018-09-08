@@ -55,6 +55,7 @@ loadDefaults = () => {
     if (!state.tradeTimer) state.tradeTimer = 0;
     if (!state.speed) state.speed = 1;
     if (!state.queue) state.queue = [];
+    if (!state.ticks) state.ticks = game.ticks;
     initialize();
 }
 initialize = () => {
@@ -176,6 +177,9 @@ mainLoop = () => {
     additionalActions.forEach(action => action());
     updateManagementButtons();
     updateSpeedText();
+    var ticksPassed = game.ticks - state.ticks;
+    if (ticksPassed !== state.ticksPerLoop) console.log(ticksPassed + " ticks passed (expected " + state.ticksPerLoop + ")")
+    state.ticks = game.ticks;
 }
 additionalActions = [
     () => $('#observeBtn').click(),
@@ -332,8 +336,8 @@ doAutoCraft = () => {
                         craftOne("beam");
                     }
                 }
-                if (getResourceOwned(craft.craft) >= getResourceMax(craft.craft)) console.log("Warning: " + craft.craft + " full (did the bot lag?)")
-                targetButton.button.click();
+                getCraftPrices(craft.craft).filter(price => getResourceOwned(price.name) >= getResourceMax(price.name)).forEach(price => console.log("Warning: " + price.name + " full (did the bot lag?)"))
+                targetButton.click();
             }
         }
     });
@@ -760,7 +764,9 @@ setSpeed = spd => {
         updateSpeedText();
         state.delay = Math.max(baseDelay / spd, 200);
         state.highPerformance = spd > 1;
-        state.ticksPerLoop = Math.ceil(state.speed * 200 / state.delay);
+        var millisPerLoop = state.delay;
+        var millisPerTick = 1000 / (game.rate * state.speed);
+        state.ticksPerLoop = Math.ceil(millisPerLoop / millisPerTick);
     }
     setRunning(state.running);
 }
@@ -838,6 +844,7 @@ faith reset without transcending
 improve performance at high speeds
 --api level (none, some, all)
 remove craftMap
+energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
 --1/2: when none of your craft chain is reserved, become normal and go to end of queue
