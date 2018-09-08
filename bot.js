@@ -323,7 +323,7 @@ doAutoCraft = () => {
         }
     });
 }
-findCraft = targetCraft => craftMap.filter(convert => convert.craft === targetCraft && !convert.noChain)
+findCraft = targetCraft => craftMap.filter(convert => convert.craft === targetCraft)
 isCraft = targetCraft => findCraft(targetCraft).length
 getCraftChain = targetCraft => flattenArr(findCraft(targetCraft).map(convert => flattenArr(getCraftPrices(convert.craft).map(price => price.name).map(getCraftChain)))).concat(targetCraft) //blueprint lists science twice but that's fine
 getCraftRatio = res => game.getResCraftRatio({ name: res }) + 1;
