@@ -713,7 +713,7 @@ specialBuys = {
     "Transcend": Transcend,
     "Praise the sun!": PraiseSun,
 }
-getManagedItem = manageButton => $(manageButton).parent().find("span").first().text().replace(/(\(|\[)[^\])]*(\)|\])/, "").trim();
+getManagedItem = manageButton => $(manageButton).parent().find("span").first().text().replace(/(\(|\[)[^\])]*(\)|\])/g, "").trim();
 getPanelTitle = elem => getOwnText($(elem).parents('.panelContainer').children('.title')).trim();
 updateButton = (elem, tab) => {
     var item = getManagedItem(elem);
