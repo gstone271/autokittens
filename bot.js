@@ -810,6 +810,8 @@ game.updateModel = () => {
     for (var i = 0; i < state.speed; i++) { 
         if (i !== 0) {
             game.calendar.tick();
+            //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
+            game.ticks++;
             //might be going so fast you would miss astro events
             if (game.calendar.observeBtn) game.calendar.observeHandler();
         }
