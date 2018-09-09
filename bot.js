@@ -416,6 +416,8 @@ getExpectedCatnipBeforeWinter = () => {
 //todo: warn when you don't have enough catnip
 getWinterCatnipStockNeeded = (isCold, additionalConsumption) => {
     if (!additionalConsumption) additionalConsumption = 0;
+    //we could base this off actual kitten capacity, but if the kittens have already starved we might just need to let them starve
+    additionalConsumption += state.populationIncrease * -game.village.catnipPerKitten;
     if (game.calendar.season === 3) {
         return Math.max(0, -(game.getResourcePerTick("catnip", true) - additionalConsumption) * ticksLeftInSeason())
     } else {
