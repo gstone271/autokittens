@@ -231,9 +231,9 @@ craftAll = name => {
 findCraftButtons = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("+")');
 findCraftButtonValues = (craft, craftRatio) => {
     if (craft === "wood" && game.bld.get("workshop").val === 0) {
-        return {click: () => withTab("Bonfire", () => findButton("Refine catnip").click()), times: 1, amount: craftRatio}
+        return [{click: () => withTab("Bonfire", () => findButton("Refine catnip").click()), times: 1, amount: craftRatio}]
     } else if (getResourceOwned(craft) === 0) {
-        return {click: () => craftFirstTime(craft), times: 1, amount: craftRatio}
+        return [{click: () => craftFirstTime(craft), times: 1, amount: craftRatio}]
     } else {
         return findCraftButtons(craft).toArray().map((button) => {
             var craftTimes = Math.round($(button).text() / craftRatio);
@@ -856,6 +856,7 @@ early game needs:
 ----housing requires catnip equal to the increased stock required
 ------only if no farming yet
 ----autoassign farmers to survive
+----in the event of starvation, reassign kittens
 --job management
 --first leader
 ----promote leader
