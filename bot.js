@@ -463,7 +463,7 @@ function Craft(name, tab, panel) {
 }
 Craft.prototype.buy = function() { craftOne(this.resName); }
 Craft.prototype.getPrices = function() { return getCraftPrices(this.resName); }
-Craft.prototype.isEnabled = function() { return true; }
+Craft.prototype.isEnabled = function() { return game.bld.get("workshop").val || this.resName === "wood"; }
 
 tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains("Send caravan")').click()
 getTradeButtons = race => $('div.panelContainer:contains("' + race + '") div.btnContent').children(":visible")
@@ -658,19 +658,28 @@ toggleEnabled = (name, tab, panel) => {
  * Tabs
 **************/
 tabNumbers = { Bonfire: 1, Town: 2 } //these have changing names, but fixed position
-openTab = name => tabNumbers[name] ? openTabNumber(tabNumbers[name]) : openTabName(name);
-openTabName = name => $('a.tab:contains("' + name + '")')[0].click()
-getTabButtonNumber = tabNumber => $('a.tab:nth-of-type(' + tabNumber + ')');
-openTabNumber = tabNumber => getTabButtonNumber(tabNumber)[0].click();
+openTab = name => {
+    var tabButton = tabNumbers[name] ? getTabButtonByNumber(tabNumbers[name]) : getTabButtonByName(name);
+    if (tabButton.length) {
+        tabButton[0].click();
+        return true;
+    } else {
+        console.error("Unable to open tab " + name)
+        return false;
+    }
+}
+getTabButtonByName = name => $('a.tab:contains("' + name + '")');
+getTabButtonByNumber = tabNumber => $('a.tab:nth-of-type(' + tabNumber + ')');
 withTab = (tab, op) => {
     var oldTab = $('a.tab.activeTab')[0];
     var oldScroll = $("#midColumn").scrollTop();
-    openTab(tab);
-    try {
-        op();
-    } finally {
-        oldTab.click(); //possibly no-op
-        $("#midColumn").scrollTop(oldScroll);
+    if (openTab(tab)) {
+        try {
+            op();
+        } finally {
+            oldTab.click(); //possibly no-op
+            $("#midColumn").scrollTop(oldScroll);
+        }
     }
 }
 highPerformanceSetLeader = newLeader => {
