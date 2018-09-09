@@ -66,6 +66,7 @@ game.console.save = (data) => {
     save();
     game.console.realSave(data);
 }
+wipeBotSave = () => localStorage.removeItem("autokittens.state");
 
 /************** 
  * Queue Logic
@@ -189,7 +190,7 @@ additionalActions = [
         }
     },
     () => {
-        if (state.populationIncrease > 0 && getTabButtonNumber(tabNumbers.Town).text().includes("(")) {
+        if (state.populationIncrease > 0 && getTabButtonByNumber(tabNumbers.Town).text().includes("(")) {
             withTab("Town", () => {
                 findButton(state.defaultJob).click();
                 log("Assigned new kitten to " + state.defaultJob);
@@ -727,7 +728,7 @@ getActiveTab = () => {
 /************** 
  * Interface
 **************/
-ignoredButtons = ["Gather catnip", "Refine catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Send explorers", "Tempus Stasit", "Tempus Fugit"]
+ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Send explorers", "Tempus Stasit", "Tempus Fugit"]
 stateButtons = {
     "Send hunters": "autoHunt",
     "Steel": "autoSteel",
@@ -736,6 +737,8 @@ specialBuys = {
     "Hold Festival": HoldFestival,
     "Transcend": Transcend,
     "Praise the sun!": PraiseSun,
+    //allow refine catnip from Bonfire
+    "Refine Catnip": Craft,
 }
 getManagedItem = manageButton => $(manageButton).parent().find("span").first().text().replace(/(\(|\[)[^\])]*(\)|\])/g, "").trim();
 getPanelTitle = elem => getOwnText($(elem).parents('.panelContainer').children('.title')).trim();
@@ -751,6 +754,9 @@ updateButton = (elem, tab) => {
             condition = state.defaultJob === item;
         } else if (tab === "Trade") {
             condition = isEnabled(getPanelTitle(elem));
+        //Bonfire page refine button has a lowercase c
+        } else if (item === "Refine catnip") {
+            condition = isEnabled("Refine Catnip");
         } else {
             condition = isEnabled(item);
         }
@@ -762,6 +768,8 @@ buttonEvent = elem => {
     var tab = getActiveTab();
     var panel = getPanelTitle(elem);
     if (tab === "Trade") item = panel;
+    //Bonfire page refine button has a lowercase c
+    if (item === "Refine catnip") item = "Refine Catnip";
     if (stateButtons[item] && tab !== "Science") {
         state[stateButtons[item]] = !state[stateButtons[item]];
     } else if (panel === "Jobs") {
@@ -849,6 +857,10 @@ buy script (-> genetic algorithm)
 ----goals: concrete, moon, eludium, beyond
 ----big queue of jobs, techs, upgrades
 ------techs and upgrades built from (queue slots since unlock, isBought)
+----handle queued items whose resources have no production
+------require effective production > 0 || enough supply already
+--------might need to improve effective production calculation
+----------ensure craftables have enough storage
 --strategy viability
 ----exclude useless techs
 --run scoring
