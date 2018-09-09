@@ -15,6 +15,7 @@ addBot = () => {
         }
         console.log("Adding bot")
         document.body.appendChild(botScript);
+        window.usingBotStarter = true;
         botAdded = true;
     }
     if (botAdded) {

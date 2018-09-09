@@ -67,6 +67,22 @@ game.console.save = (data) => {
     game.console.realSave(data);
 }
 wipeBotSave = () => localStorage.removeItem("autokittens.state");
+if (!game.real_wipe) game.real_wipe = game._wipe;
+game._wipe = () => {
+    if (window.usingBotStarter) {
+        //based on _wipe code
+		game.timer.scheduleEvent(dojo.hitch(this, function() {
+            wipeBotSave();
+            delete(LCstorage["com.nuclearunicorn.kittengame.savedata"]);
+            //don't bother wiping the language setting
+            console.log("Reloading parent page")
+            window.parent.location.reload();
+        }));
+    } else {
+        wipeBotSave();
+        game.real_wipe();
+    }
+}
 
 /************** 
  * Queue Logic
