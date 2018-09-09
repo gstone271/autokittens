@@ -397,12 +397,16 @@ getExpectedCatnipBeforeWinter = () => {
         + (2 - game.calendar.season) * getSeasonalCatnipProduction(1) * ticksPerSeason();
 }
 //todo: warn when you don't have enough catnip
-getWinterCatnipStockNeeded = isCold => {
+getWinterCatnipStockNeeded = (isCold, additionalConsumption) => {
+    if (!additionalConsumption) additionalConsumption = 0;
     if (game.calendar.season === 3) {
-        return Math.max(0, -game.getResourcePerTick("catnip", true) * ticksLeftInSeason())
+        return Math.max(0, -(game.getResourcePerTick("catnip", true) - additionalConsumption) * ticksLeftInSeason())
     } else {
-        return Math.max(0, -getWinterCatnipProduction(isCold) * ticksPerSeason() - getExpectedCatnipBeforeWinter())
+        return Math.max(0, -(getWinterCatnipProduction(isCold) - additionalConsumption) * ticksPerSeason() - getExpectedCatnipBeforeWinter())
     }
+}
+getAdditionalCatnipNeeded = populationIncrease => {
+    return getWinterCatnipStockNeeded(true, populationIncrease * -game.village.catnipPerKitten) - getWinterCatnipStockNeeded(true, 0)
 }
 //this might need to be slightly more in case you trade, etc
 getFursStockNeeded = () => {
@@ -437,8 +441,19 @@ Building.prototype.buy = function() {
     withTab("Bonfire", () => findButton(this.name).click());
     state.populationIncrease += housingMap[this.name] || 0;
 }
-Building.prototype.getPrices = function() { return game.bld.getPrices(this.internalName).map(fixPriceTitle); }
-Building.prototype.isEnabled = function() { return true; }
+Building.prototype.getRealPrices = function() { 
+    return game.bld.getPrices(this.internalName).map(fixPriceTitle);
+}
+Building.prototype.getPrices = function() { 
+    var prices = this.getRealPrices();
+    if (housingMap[this.name] && !game.science.get("agriculture").researched) {
+        prices = prices.concat({name: "catnip", val: getAdditionalCatnipNeeded(true, housingMap[this.name])});
+    }
+    return prices;
+}
+Building.prototype.isEnabled = function() {
+    return game.bld.get(this.internalName).unlocked;
+}
 
 function Craft(name, tab, panel) {
     this.name = name;
