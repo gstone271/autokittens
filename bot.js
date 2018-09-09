@@ -329,7 +329,7 @@ craftMap = [
     { craft: "blueprint", auto: true },
     { craft: "gear"},
     { craft: "megalith" },
-    { craft: "alloy" },
+    { craft: "alloy", auto: true },
     { craft: "concrete" },
     { craft: "kerosene", auto: true },
     { craft: "eludium", auto: true }, //todo handle the first craft
