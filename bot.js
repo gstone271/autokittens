@@ -108,6 +108,7 @@ loadDefaults = () => {
     if (!state.previousHistories) state.previousHistories = [];
     if (!state.numKittens) state.numKittens = game.village.sim.getKittens();
     if (!state.desiredApi) state.desiredApi = 0;
+    if (!window.botDebug) botDebug = {};
 }
 initialize = () => {
     state.ticks = game.ticks;
@@ -271,10 +272,9 @@ additionalActions = [
     },
     () => state.tradeTimer++,
 ]
-if (!window.botDebug) botDebug = {};
 
 /************** 
- * Crafting
+ * Resources
 **************/
 getResourceOwned = name => game.resPool.resources.find(res => res.title === name).value
 getResourceMax = name => game.resPool.resources.find(res => res.title === name).maxValue || Infinity
@@ -285,8 +285,6 @@ resourceNameCache = arrayToObject(game.resPool.resources, "title");
 fixResourceTitle = resInternalName => resourceTitleCache[resInternalName].title;
 unFixResourceTitle = name => resourceNameCache[name].name;
 fixPriceTitle = price => ({ val: price.val, name: fixResourceTitle(price.name) });
-getCraftPrices = craft => { return game.workshop.getCraft(unFixResourceTitle(craft)).prices.map(fixPriceTitle) }
-multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
 //TODO calculate if resource production is zero (getEffectiveProduction -- make sure all events are ok)
 //TODO if res is full and its crafts are not demanded but its conversion components are, shutoff conversion to res (and disable production of more conversion?)
 getTotalDemand = res => {
@@ -304,39 +302,6 @@ getTotalDemand = res => {
         .map(price => price.val)
         .reduce((acc, item) => acc + item, 0)
 }
-findCraftAllButton = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("all")')[0]
-craftFirstTime = name => {
-    if (canAfford(getCraftPrices(name), {})) {
-        withTab("Workshop", () => {
-            var longTitle = getResourceLongTitle(name);
-            log("First time crafting " + longTitle, true);
-            findButton(longTitle).click();
-        })
-    }
-}
-craftAll = name => {
-    var button = findCraftButtonValues(name, 1).pop(); 
-    if (button) button.click(); 
-}
-findCraftButtons = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("+")');
-findCraftButtonValues = (craft, craftRatio) => {
-    if (!canCraft(craft)) {
-        return [];
-    } else if (craft === "wood" && game.bld.get("workshop").val === 0) {
-        return [{click: () => withTab("Bonfire", () => findButton("Refine catnip").click()), times: 1, amount: craftRatio}]
-    } else if (getResourceOwned(craft) === 0) {
-        return [{click: () => craftFirstTime(craft), times: 1, amount: craftRatio}]
-    } else {
-        var craftAllButton = findCraftAllButton(craft);
-        var craftAllTimes = Math.min(...getCraftPrices(craft).map(price => Math.floor(getResourceOwned(price.name) / price.val)));
-        return findCraftButtons(craft).toArray().map((button) => {
-            var craftTimes = Math.round($(button).text() / craftRatio);
-            var craftAmount = craftTimes * craftRatio
-            return {click: button.click.bind(button), times: craftTimes, amount: craftAmount};
-        }).concat(craftAllButton ? {click: () => craftAllButton.click(), times: craftAllTimes, amount: craftAllTimes * craftRatio } : []);
-    }
-}
-craftOne = name => { var button = findCraftButtonValues(name, getCraftRatio(name))[0]; if (button) button.click(); }
 getSafeStorage = res => {
     var max = getResourceMax(res);
     return max === Infinity ? max : max - state.ticksPerLoop * getEffectiveResourcePerTick(res, true, {});
@@ -392,6 +357,45 @@ getEffectiveResourcePerTick = (res, bestCase, reserved) => {
     return resourcePerTick;
 }
 isResourceFull = res => getResourceOwned(res) > getSafeStorage(res);
+
+/************** 
+ * Crafting
+**************/
+getCraftPrices = craft => { return game.workshop.getCraft(unFixResourceTitle(craft)).prices.map(fixPriceTitle) }
+multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
+findCraftAllButton = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("all")')[0]
+craftFirstTime = name => {
+    if (canAfford(getCraftPrices(name), {})) {
+        withTab("Workshop", () => {
+            var longTitle = getResourceLongTitle(name);
+            log("First time crafting " + longTitle, true);
+            findButton(longTitle).click();
+        })
+    }
+}
+craftAll = name => {
+    var button = findCraftButtonValues(name, 1).pop(); 
+    if (button) button.click(); 
+}
+findCraftButtons = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("+")');
+findCraftButtonValues = (craft, craftRatio) => {
+    if (!canCraft(craft)) {
+        return [];
+    } else if (craft === "wood" && game.bld.get("workshop").val === 0) {
+        return [{click: () => withTab("Bonfire", () => findButton("Refine catnip").click()), times: 1, amount: craftRatio}]
+    } else if (getResourceOwned(craft) === 0) {
+        return [{click: () => craftFirstTime(craft), times: 1, amount: craftRatio}]
+    } else {
+        var craftAllButton = findCraftAllButton(craft);
+        var craftAllTimes = Math.min(...getCraftPrices(craft).map(price => Math.floor(getResourceOwned(price.name) / price.val)));
+        return findCraftButtons(craft).toArray().map((button) => {
+            var craftTimes = Math.round($(button).text() / craftRatio);
+            var craftAmount = craftTimes * craftRatio
+            return {click: button.click.bind(button), times: craftTimes, amount: craftAmount};
+        }).concat(craftAllButton ? {click: () => craftAllButton.click(), times: craftAllTimes, amount: craftAllTimes * craftRatio } : []);
+    }
+}
+craftOne = name => { var button = findCraftButtonValues(name, getCraftRatio(name))[0]; if (button) button.click(); }
 haveEnoughCraft = (res, amount) => getResourceMax(res) === Infinity && !state.queue.map(bld => bld.getPrices()).concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched).map(tech => tech.prices)).some(prices => getResourceOwned(res) - amount < getPrice(prices, res)) && (res !== "furs" || getResourceOwned(res) - amount > 500)
 shouldAutoCraft = (res, amount) => isResourceFull(res) || haveEnoughCraft(res, amount)
 craftMap = [
