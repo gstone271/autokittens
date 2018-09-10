@@ -306,12 +306,13 @@ findCraftButtonValues = (craft, craftRatio) => {
     } else if (getResourceOwned(craft) === 0) {
         return [{click: () => craftFirstTime(craft), times: 1, amount: craftRatio}]
     } else {
+        var craftAllButton = findCraftAllButton(craft);
         var craftAllTimes = Math.min(...getCraftPrices(craft).map(price => Math.floor(getResourceOwned(price.name) / price.val)));
         return findCraftButtons(craft).toArray().map((button) => {
             var craftTimes = Math.round($(button).text() / craftRatio);
             var craftAmount = craftTimes * craftRatio
             return {click: button.click.bind(button), times: craftTimes, amount: craftAmount};
-        }).concat({click: () => findCraftAllButton(craft).click(), times: craftAllTimes, amount: craftAllTimes * craftRatio });
+        }).concat(craftAllButton ? {click: () => craftAllButton.click(), times: craftAllTimes, amount: craftAllTimes * craftRatio } : []);
     }
 }
 craftOne = name => { var button = findCraftButtonValues(name, getCraftRatio(name))[0]; if (button) button.click(); }
