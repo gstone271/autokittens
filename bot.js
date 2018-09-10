@@ -367,7 +367,7 @@ findCraftAllButton = (name) => $('div.res-row:contains("' + name + '") div.craft
 craftFirstTime = name => {
     if (canAfford(getCraftPrices(name), {})) {
         withTab("Workshop", () => {
-            var longTitle = getResourceLongTitle(name);
+            var longTitle = getResourceLongTitle(unFixResourceTitle(name));
             log("First time crafting " + longTitle, true);
             findButton(longTitle).click();
         })
@@ -379,7 +379,7 @@ craftAll = name => {
 }
 findCraftButtons = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("+")');
 findCraftButtonValues = (craft, craftRatio) => {
-    if (!canCraft(craft)) {
+    if (!canCraft(unFixResourceTitle(craft))) {
         return [];
     } else if (craft === "wood" && game.bld.get("workshop").val === 0) {
         return [{click: () => withTab("Bonfire", () => findButton("Refine catnip").click()), times: 1, amount: craftRatio}]
@@ -396,7 +396,15 @@ findCraftButtonValues = (craft, craftRatio) => {
     }
 }
 craftOne = name => { var button = findCraftButtonValues(name, getCraftRatio(name))[0]; if (button) button.click(); }
-haveEnoughCraft = (res, amount) => getResourceMax(res) === Infinity && !state.queue.map(bld => bld.getPrices()).concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched).map(tech => tech.prices)).some(prices => getResourceOwned(res) - amount < getPrice(prices, res)) && (res !== "furs" || getResourceOwned(res) - amount > 500)
+haveEnoughCraft = (res, amount) => {
+    return getResourceMax(res) === Infinity 
+        && !state.queue.map(bld => bld.getPrices())
+            .concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched)
+            .map(tech => tech.prices))
+            .some(prices => getResourceOwned(res) - amount < getPrice(prices, res))
+        //TODO use the reservations in the queue instead
+        && (res !== "furs" || getResourceOwned(res) - amount > 500)
+}
 shouldAutoCraft = (res, amount) => isResourceFull(res) || haveEnoughCraft(res, amount)
 //parchment is needed to spend culture and science autocrafting
 autoCrafts = game.workshop.crafts.filter(craft => craft.prices.some(price => getResourceMax(fixResourceTitle(price.name)) < Infinity || craft.name === "parchment"))
@@ -1086,6 +1094,7 @@ trade calculations -> needsResource function
 faith reset without transcending
 improve performance at high speeds
 --run bot in the game update function
+simplify resource name/title usage
 energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
