@@ -36,8 +36,7 @@ addLog = item => {
     item.day = roundedDay + 100 * game.calendar.season;
     state.history.push(item);
 }
-//TODO (for trades especially) return the number bought
-logBuy = bld => addLog({ name: bld.name, type: "Buy", buy: bld});
+logBuy = (bld, numBought) => addLog({ name: bld.name, type: "Buy", buy: bld, num: numBought});
 logKitten = (numKittens, job) => addLog({ name: numKittens + " Kittens", type: "Kitten", kittens: numKittens, job: job});
 logReset = () => addLog({ name: "Reset", type: "Reset", kittens: game.village.sim.getKittens()});
 rotateLogs = () => {
@@ -207,10 +206,11 @@ tryBuy = (priorities) => {
             additionalNeeded.filter(price => isCraft(price.name)).filter(price => price.val < Infinity).forEach(price => makeCraft(price.name, price.val, reserved));
         }
         if (canAfford(prices, reserved)) {
-            var success = bld.buy(reserved) !== null; //undefined -> success
-            if (success) {
+            var numBought = bld.buy(reserved);
+            if (numBought === undefined) numBought = 1;
+            if (numBought) {
                 if (!bld.silent) log("Buying " + bld.name, bld.quiet);
-                logBuy(bld);
+                logBuy(bld, numBought);
                 bought = bought.concat([bld]);
                 //unreserve resources -- makes trading not have as many log entries
                 prices.forEach(price => reservationsBought[price.name] = (reservationsBought[price.name] || 0) + price.val);
@@ -610,38 +610,42 @@ function Trade(name, tab, panel) {
     this.quiet = true;
 }
 Trade.prototype.buy = function(reserved) {
-    if (state.highPerformance || state.tradeTimer >= 10 || getResourceOwned("catpower") * 1.2 > getResourceMax("catpower")) { 
+    var quantityTraded = 0;
+    if (state.highPerformance || state.tradeTimer >= 10 || getResourceOwned("catpower") * 1.2 > getResourceMax("catpower")) {
         withLeader("Merchant", () => withTab("Trade", () => {
-    var maxClicks = 10;
-    var prices = this.getPrices();
-    if (!canAfford(prices, reserved)) console.error(reserved);
-    if (state.highPerformance) {
-        var yieldResTotal = null;
-        var amt = 0;
-        while (canAfford(prices, reserved) && this.needProduct(1) && amt < 1000) {
-            prices.forEach(price => game.resPool.addResEvent(price.name, -price.val));
-            yieldResTotal = game.diplomacy.tradeInternal(game.diplomacy.races.find(race => race.title === this.panel), true, yieldResTotal);
-            amt++;
-        }
-		game.diplomacy.gainTradeRes(yieldResTotal, amt);
-    } else {
-        while (maxClicks > 0 && canAfford(prices, reserved) && this.needProduct(1)) {
-            var allQuantity = Math.floor(Math.min(...prices.map(price => getResourceOwned(price.name) / price.val)));
-            buttons = getTradeButtons(this.panel).toArray().map((elem) => {
-                text = $(elem).text();
-                return {
-                    button: elem,
-                    quantity: text === "Send caravan" ? 1 : text === "all" ? allQuantity : text.replace("x", "") * 1
+            var maxClicks = 10;
+            var prices = this.getPrices();
+            if (!canAfford(prices, reserved)) console.error(reserved);
+            if (state.highPerformance) {
+                var yieldResTotal = null;
+                while (canAfford(prices, reserved) && this.needProduct(1) && quantityTraded < 1000) {
+                    prices.forEach(price => game.resPool.addResEvent(price.name, -price.val));
+                    yieldResTotal = game.diplomacy.tradeInternal(game.diplomacy.races.find(race => race.title === this.panel), true, yieldResTotal);
+                    quantityTraded++;
                 }
-            });
-            affordableButtons = buttons.filter((button) => canAfford(multiplyPrices(prices, button.quantity), reserved) && this.needProduct(button.quantity)); //always nonempty
-            maxBy(affordableButtons, button => button.quantity).button.click();
-            maxClicks--;
-        }
-    }
-    state.tradeTimer = 0;
+                game.diplomacy.gainTradeRes(yieldResTotal, quantityTraded);
+            } else {
+                while (maxClicks > 0 && canAfford(prices, reserved) && this.needProduct(1)) {
+                    var allQuantity = Math.floor(Math.min(...prices.map(price => getResourceOwned(price.name) / price.val)));
+                    buttons = getTradeButtons(this.panel).toArray().map((elem) => {
+                        text = $(elem).text();
+                        return {
+                            button: elem,
+                            quantity: text === "Send caravan" ? 1 : text === "all" ? allQuantity : text.replace("x", "") * 1
+                        }
+                    });
+                    affordableButtons = buttons.filter((button) => canAfford(multiplyPrices(prices, button.quantity), reserved) && this.needProduct(button.quantity)); //always nonempty
+                    targetButton = maxBy(affordableButtons, button => button.quantity);
+                    targetButton.button.click();
+                    quantityTraded += targetButton.quantity;
+                    maxClicks--;
+                }
+            }
+            state.tradeTimer = 0;
         }))
-    } else return null;}
+    }
+    return quantityTraded;
+}
 Trade.prototype.getPrices = function() { return [{name: "catpower", val: 50}, {name: "gold", val: 15}].concat(getTradeData(this.panel).buys); }
 Trade.prototype.needProduct = function(quantity) {
     return getTradeData(this.panel).sells.every(sell => getResourceOwned(sell.name) * 1.2 + sell.value * (1 + sell.delta/2) * (1 + game.diplomacy.getTradeRatio()) * quantity < getResourceMax(sell.name));
@@ -711,7 +715,7 @@ Religion.prototype.buy = function() {
     } else {
         doBuy();
     }
-    if (waitForTears) return null; //a hack, really
+    if (waitForTears) return 0;
 }
 Religion.prototype.getRealPrices = function() { 
     var data = this.getData();
