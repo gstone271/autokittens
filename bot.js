@@ -398,52 +398,37 @@ findCraftButtonValues = (craft, craftRatio) => {
 craftOne = name => { var button = findCraftButtonValues(name, getCraftRatio(name))[0]; if (button) button.click(); }
 haveEnoughCraft = (res, amount) => getResourceMax(res) === Infinity && !state.queue.map(bld => bld.getPrices()).concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched).map(tech => tech.prices)).some(prices => getResourceOwned(res) - amount < getPrice(prices, res)) && (res !== "furs" || getResourceOwned(res) - amount > 500)
 shouldAutoCraft = (res, amount) => isResourceFull(res) || haveEnoughCraft(res, amount)
-craftMap = [
-    { craft: "wood", auto: true },
-    { craft: "beam", auto: true },
-    { craft: "slab", auto: true },
-    { craft: "plate", auto: true },
-    { craft: "scaffold" },
-    { craft: "parchment", auto: true },
-    { craft: "manuscript", auto: true },
-    { craft: "compendium", auto: true },
-    { craft: "blueprint", auto: true },
-    { craft: "gear"},
-    { craft: "megalith" },
-    { craft: "alloy", auto: true },
-    { craft: "concrete" },
-    { craft: "kerosene", auto: true },
-    { craft: "eludium", auto: true },
-]
+autoCrafts = game.workshop.crafts.filter(craft => craft.prices.some(price => getResourceMax(fixResourceTitle(price.name)) < Infinity))
 doAutoCraft = () => {
-    craftMap.forEach(craft => {
-        if (craft.auto && canCraft(unFixResourceTitle(craft.craft))) {
+    autoCrafts.forEach(craft => {
+        if (canCraft(craft.name)) {
+            var name = fixResourceTitle(craft.name)
             var maxCrafts = 10; //don't expect to need this many clicks, prevent something bad
-            var craftRatio = getCraftRatio(craft.craft);
-            while (getCraftPrices(craft.craft).every(price => shouldAutoCraft(price.name, price.val)) && maxCrafts--) {
-                var craftButtons = findCraftButtonValues(craft.craft, craftRatio);
+            var craftRatio = getCraftRatio(name);
+            while (craft.prices.every(price => shouldAutoCraft(price.name, price.val)) && maxCrafts--) {
+                var craftButtons = findCraftButtonValues(name, craftRatio);
                 var targetButton = craftButtons[0]
                 if (!targetButton) {
                     //button hasn't shown up yet (we just crafted one of the requirements)
                     break;
                 }
-                if (craft.craft === "wood") {
+                if (name === "wood") {
                     //special case: only craftable resource where the craft target has a max capacity
                     var maxBeamCrafts = 10; //also useful in case we try to autocraft catnip before we have a workshop
-                    while (getResourceOwned(craft.craft) + targetButton.amount > getResourceMax(craft.craft) && maxBeamCrafts--) {
+                    while (getResourceOwned(name) + targetButton.amount > getResourceMax(name) && maxBeamCrafts--) {
                         craftOne("beam");
                     }
                 }
-                getCraftPrices(craft.craft).filter(price => getResourceOwned(price.name) >= getResourceMax(price.name)).forEach(price => console.log("Warning: " + price.name + " full (did the bot lag?)"))
+                craft.prices.filter(price => getResourceOwned(price.name) >= getResourceMax(price.name)).forEach(price => console.log("Warning: " + price.name + " full (did the bot lag?)"))
                 targetButton.click();
             }
         }
     });
 }
-findCraft = targetCraft => craftMap.filter(convert => convert.craft === targetCraft)
+findCraft = targetCraft => game.workshop.crafts.filter(convert => convert.name === targetCraft)
 isCraft = targetCraft => findCraft(targetCraft).length
 canCraft = resInternalName => game.workshop.getCraft(resInternalName).unlocked && (game.bld.get("workshop").val || resInternalName === "wood");
-getCraftChain = targetCraft => flattenArr(findCraft(targetCraft).map(convert => flattenArr(getCraftPrices(convert.craft).map(price => price.name).map(getCraftChain)))).concat(targetCraft) //blueprint lists science twice but that's fine
+getCraftChain = targetCraft => flattenArr(findCraft(targetCraft).map(convert => flattenArr(convert.prices.map(price => price.name).map(getCraftChain)))).concat(targetCraft) //blueprint lists science twice but that's fine
 getCraftRatio = res => game.getResCraftRatio({ name: res }) + 1;
 makeCraft = (craft, amountNeeded, reserved) => {
     var craftRatio = getCraftRatio(craft);
@@ -1103,7 +1088,6 @@ trade calculations -> needsResource function
 faith reset without transcending
 improve performance at high speeds
 --run bot in the game update function
-remove craftMap
 energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
