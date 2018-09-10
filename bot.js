@@ -107,6 +107,7 @@ loadDefaults = () => {
     if (!state.history) state.history = [];
     if (!state.previousHistories) state.previousHistories = [];
     if (!state.numKittens) state.numKittens = game.village.sim.getKittens();
+    if (!state.desiredApi) state.desiredApi = 0;
 }
 initialize = () => {
     state.ticks = game.ticks;
@@ -632,12 +633,12 @@ function Trade(name, tab, panel) {
 }
 Trade.prototype.buy = function(reserved) {
     var quantityTraded = 0;
-    if (state.highPerformance || state.tradeTimer >= 10 || getResourceOwned("catpower") * 1.2 > getResourceMax("catpower")) {
+    if (state.api >= 1 || state.tradeTimer >= 10 || getResourceOwned("catpower") * 1.2 > getResourceMax("catpower")) {
         withLeader("Merchant", () => withTab("Trade", () => {
             var maxClicks = 10;
             var prices = this.getPrices();
             if (!canAfford(prices, reserved)) console.error(reserved);
-            if (state.highPerformance) {
+            if (state.api >= 1) {
                 var yieldResTotal = null;
                 while (canAfford(prices, reserved) && this.needProduct(1) && quantityTraded < 1000) {
                     prices.forEach(price => game.resPool.addResEvent(price.name, -price.val));
@@ -861,7 +862,7 @@ highPerformanceSetLeader = newLeader => {
 withLeader = (leaderType, op) => {
     if (!game.workshop.get("register").researched) {
         op();
-    } else if (state.highPerformance) {
+    } else if (state.api >= 1) {
         var oldLeader = game.village.leader;
         var newLeader = game.village.sim.kittens.find(kitten => kitten.trait.title === leaderType);
         if (newLeader) {
@@ -892,6 +893,51 @@ getActiveTab = () => {
     var index = $('a.tab').index(activeTab)
     if (index < 2) return Object.keys(tabNumbers).find(tab => tabNumbers[tab] === (index + 1));
     return activeTab.text();
+}
+
+/************** 
+ * Speed
+**************/
+baseDelay = 2000;
+setSpeed = spd => {
+    if (spd >= 1) {
+        state.speed = spd;
+        state.delay = Math.max(baseDelay / spd, 200);
+        updateApiLevel();
+        var millisPerLoop = state.delay;
+        var millisPerTick = 1000 / (game.rate * state.speed);
+        state.ticksPerLoop = Math.ceil(millisPerLoop / millisPerTick);
+    }
+    setRunning(state.running);
+}
+speedUp = () => setSpeed(state.speed * 2);
+slowDown = () => setSpeed(state.speed / 2);
+if (!game.realUpdateModel) game.realUpdateModel = game.updateModel;
+game.updateModel = () => {
+    for (var i = 0; i < state.speed; i++) { 
+        if (i !== 0) {
+            game.calendar.tick();
+            //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
+            game.ticks++;
+            //might be going so fast you would miss astro events
+            if (game.calendar.observeBtn) game.calendar.observeHandler();
+        }
+        game.realUpdateModel(); 
+    }
+}
+//this makes the UI display the right /sec values but makes the calendar too fast
+//if (!game.realGetRateUI) game.realGetRateUI = game.getRateUI
+//game.getRateUI = () => state.speed * game.realGetRateUI();
+setDesiredApiLevel = level => {
+    if (level >= 0 && level <= 1) {
+        state.desiredApi = level;
+        updateApiLevel();
+    }
+}
+moreApi = () => setDesiredApiLevel(state.api + 1);
+lessApi = () => setDesiredApiLevel(state.api - 1);
+updateApiLevel = () => {
+    state.api = Math.max(state.desiredApi, state.speed > 1 ? 1 : 0);
 }
 
 /************** 
@@ -965,6 +1011,12 @@ settingsMenu = [
         leftClick: speedUp,
         rightClick: slowDown,
         getHtml: () => "Speed: " + state.speed + "x" + (state.speed > 30 ? " <br />(right click<br />to lower)" : "")
+    },
+    {
+        name: "apiLevel",
+        leftClick: moreApi,
+        rightClick: lessApi,
+        getHtml: () => "API: " + (state.desiredApi ? "some" : state.api ? "(some)" : "none")
     }
 ];
 createSettingsMenu = () => {
@@ -987,41 +1039,6 @@ createSettingsMenu = () => {
 updateSettingsMenu = () => {
     settingsMenu.forEach(item => $('#' + item.name).html(item.getHtml()));
 }
-
-/************** 
- * Speed
-**************/
-baseDelay = 2000;
-setSpeed = spd => {
-    if (spd >= 1) {
-        state.speed = spd;
-        state.delay = Math.max(baseDelay / spd, 200);
-        state.highPerformance = spd > 1;
-        var millisPerLoop = state.delay;
-        var millisPerTick = 1000 / (game.rate * state.speed);
-        state.ticksPerLoop = Math.ceil(millisPerLoop / millisPerTick);
-    }
-    setRunning(state.running);
-}
-speedUp = () => setSpeed(state.speed * 2);
-slowDown = () => setSpeed(state.speed / 2);
-speed = 1;
-if (!game.realUpdateModel) game.realUpdateModel = game.updateModel;
-game.updateModel = () => {
-    for (var i = 0; i < state.speed; i++) { 
-        if (i !== 0) {
-            game.calendar.tick();
-            //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
-            game.ticks++;
-            //might be going so fast you would miss astro events
-            if (game.calendar.observeBtn) game.calendar.observeHandler();
-        }
-        game.realUpdateModel(); 
-    }
-}
-//this makes the UI display the right /sec values but makes the calendar too fast
-//if (!game.realGetRateUI) game.realGetRateUI = game.getRateUI
-//game.getRateUI = () => state.speed * game.realGetRateUI();
 
 /************** 
  * Running
@@ -1081,7 +1098,6 @@ trade calculations -> needsResource function
 --try not to have full gold
 faith reset without transcending
 improve performance at high speeds
---api level (none, some, all)
 --run bot in the game update function
 remove craftMap
 energy calculations
