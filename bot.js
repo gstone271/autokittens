@@ -25,7 +25,42 @@ maxBy = (arr, fun) => {
     //we could reduce the number of iterations by one but it doesn't matter
     return arr.find(item => fun(item) === maxValue);
 }
+
+/************** 
+ * Logging
+**************/
 log = (msg, quiet) => { console.log(msg); if (!quiet) game.msg(msg); }
+addLog = item => {
+    item.year = game.calendar.year;
+    var roundedDay = Math.round(game.calendar.day * 100) / 100
+    item.day = roundedDay + 100 * game.calendar.season;
+    state.history.push(item);
+}
+//TODO (for trades especially) return the number bought
+logBuy = bld => addLog({ name: bld.name, type: "Buy", buy: bld});
+logKitten = numKittens => addLog({ name: numKittens + " Kittens", type: "Kitten", kittens: numKittens});
+logReset = () => addLog({ name: "Reset", type: "Reset", kittens: game.village.sim.getKittens()});
+rotateLogs = () => {
+    state.previousHistories.push(state.history);
+    state.history = [];
+}
+if (!game.realResetAutomatic) game.realResetAutomatic = game.resetAutomatic;
+game.resetAutomatic = () => {
+    logReset();
+    rotateLogs();
+    state.queue = []; //todo reload master plan
+    if (window.usingBotStarter) {
+        //based on resetAutomatic code
+		game.timer.scheduleEvent(dojo.hitch(this, function() {
+            game._resetInternal();
+            game.mobileSaveOnPause = false;
+            console.log("Reloading parent page")
+            window.parent.location.reload();
+        }));
+    } else {
+        game.realResetAutomatic();
+    }
+}
 
 /************** 
  * Save/Load
@@ -37,10 +72,13 @@ loadString = string => {
     parsed.queue = [];
     state = parsed;
     reloadQueue(rawQueue);
-    initialize();
 }
 exportSave = () => JSON.stringify(state);
-importSave = loadString;
+importSave = saveString => {
+    loadString(saveString);
+    loadDefaults();
+    initialize();
+}
 reloadQueue = queue => {
     state.queue = [];
     queue.forEach(item => enable(item.name, item.tab, item.panel));
@@ -49,9 +87,9 @@ load = () => {
     data = localStorage.getItem("autokittens.state");
     if (data) {
         loadString(data);
-    } else {
-        loadDefaults();
     }
+        loadDefaults();
+    initialize();
 }
 loadDefaults = () => {
     if (!window.state) state = {};
@@ -61,14 +99,15 @@ loadDefaults = () => {
     if (!state.speed) state.speed = 1;
     if (!state.queue) state.queue = [];
     if (!state.ticks) state.ticks = game.ticks;
-    initialize();
+    if (!state.history) state.history = [];
+    if (!state.previousHistories) state.previousHistories = [];
 }
 initialize = () => {
     setSpeed(state.speed);
 }
 if (!game.console.realSave) game.console.realSave = game.console.save;
 game.console.save = (data) => {
-    save();
+    save(); ''
     game.console.realSave(data);
 }
 wipeBotSave = () => localStorage.removeItem("autokittens.state");
@@ -78,6 +117,7 @@ game._wipe = () => {
         //based on _wipe code
 		game.timer.scheduleEvent(dojo.hitch(this, function() {
             wipeBotSave();
+            game.mobileSaveOnPause = false;
             delete(LCstorage["com.nuclearunicorn.kittengame.savedata"]);
             //don't bother wiping the language setting
             console.log("Reloading parent page")
@@ -160,6 +200,7 @@ tryBuy = (priorities) => {
             var success = bld.buy(reserved) !== null; //undefined -> success
             if (success) {
                 if (!bld.silent) log("Buying " + bld.name, bld.quiet);
+                logBuy(bld);
                 bought = bought.concat([bld]);
                 //unreserve resources -- makes trading not have as many log entries
                 prices.forEach(price => reservationsBought[price.name] = (reservationsBought[price.name] || 0) + price.val);
@@ -919,6 +960,7 @@ startLoop = () => { stopLoop(); loopHandle = setInterval(mainLoop, state.delay);
  * Initialize
 **************/
 if (window.state) {
+    loadDefaults();
     //if we've updated class behavior, get the new behavior
     reloadQueue(state.queue);
     initialize();
@@ -957,6 +999,7 @@ trade calculations -> needsResource function
 faith reset without transcending
 improve performance at high speeds
 --api level (none, some, all)
+--run bot in the game update function
 remove craftMap
 energy calculations
 improve interface
