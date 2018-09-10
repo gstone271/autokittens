@@ -306,9 +306,13 @@ getTotalDemand = res => {
 }
 findCraftAllButton = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("all")')[0]
 craftFirstTime = name => {
-    var longTitle = getResourceLongTitle(name);
-    log("First time crafting " + longTitle, true)
-    withTab("Workshop", () => findButton(longTitle).click())
+    if (canAfford(getCraftPrices(name), {})) {
+        withTab("Workshop", () => {
+            var longTitle = getResourceLongTitle(name);
+            log("First time crafting " + longTitle, true);
+            findButton(longTitle).click();
+        })
+    }
 }
 craftAll = name => {
     var button = findCraftButtonValues(name, 1).pop(); 
