@@ -244,7 +244,7 @@ mainLoop = () => {
     doAutoCraft();
     additionalActions.forEach(action => action());
     updateManagementButtons();
-    updateSpeedText();
+    updateSettingsMenu();
     var ticksPassed = game.ticks - state.ticks;
     if (ticksPassed !== state.ticksPerLoop) console.log(ticksPassed + " ticks passed (expected " + state.ticksPerLoop + ")")
     state.ticks = game.ticks;
@@ -932,6 +932,22 @@ updateApiLevel = () => {
 }
 
 /************** 
+ * Running
+**************/
+toggleRunning = () => setRunning(!state.running);
+setRunning = newRunning => {
+    state.running = newRunning;
+    if (state.running) {
+        startLoop();
+    } else {
+        stopLoop();
+    }
+}
+loopHandle = 0;
+stopLoop = () => clearInterval(loopHandle);
+startLoop = () => { stopLoop(); loopHandle = setInterval(mainLoop, state.delay); mainLoop(); }
+
+/************** 
  * Interface
 **************/
 ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit"]
@@ -1030,22 +1046,6 @@ createSettingsMenu = () => {
 updateSettingsMenu = () => {
     settingsMenu.forEach(item => $('#' + item.name).html(item.getHtml()));
 }
-
-/************** 
- * Running
-**************/
-toggleRunning = () => setRunning(!state.running);
-setRunning = newRunning => {
-    state.running = newRunning;
-    if (state.running) {
-        startLoop();
-    } else {
-        stopLoop();
-    }
-}
-loopHandle = 0;
-stopLoop = () => clearInterval(loopHandle);
-startLoop = () => { stopLoop(); loopHandle = setInterval(mainLoop, state.delay); mainLoop(); }
 
 /************** 
  * Initialize
