@@ -335,7 +335,7 @@ craftMap = [
 ]
 doAutoCraft = () => {
     craftMap.forEach(craft => {
-        if (craft.auto) {
+        if (craft.auto && canCraft(unFixResourceTitle(craft.craft))) {
             var maxCrafts = 10; //don't expect to need this many clicks, prevent something bad
             var craftRatio = getCraftRatio(craft.craft);
             while (getCraftPrices(craft.craft).every(price => shouldAutoCraft(price.name, price.val)) && maxCrafts--) {
@@ -360,6 +360,7 @@ doAutoCraft = () => {
 }
 findCraft = targetCraft => craftMap.filter(convert => convert.craft === targetCraft)
 isCraft = targetCraft => findCraft(targetCraft).length
+canCraft = resInternalName => game.workshop.getCraft(resInternalName).unlocked && (game.bld.get("workshop").val || resInternalName === "wood");
 getCraftChain = targetCraft => flattenArr(findCraft(targetCraft).map(convert => flattenArr(getCraftPrices(convert.craft).map(price => price.name).map(getCraftChain)))).concat(targetCraft) //blueprint lists science twice but that's fine
 getCraftRatio = res => game.getResCraftRatio({ name: res }) + 1;
 makeCraft = (craft, amountNeeded, reserved) => {
@@ -537,7 +538,7 @@ function Craft(name, tab, panel) {
 }
 Craft.prototype.buy = function() { craftOne(this.resName); }
 Craft.prototype.getPrices = function() { return getCraftPrices(this.resName); }
-Craft.prototype.isEnabled = function() { return game.bld.get("workshop").val || this.resName === "wood"; }
+Craft.prototype.isEnabled = function() { return canCraft(this.resName); }
 
 tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains("Send caravan")').click()
 getTradeButtons = race => $('div.panelContainer:contains("' + race + '") div.btnContent').children(":visible")
@@ -549,7 +550,9 @@ function Trade(name, tab, panel) {
     this.panel = panel;
     this.quiet = true;
 }
-Trade.prototype.buy = function(reserved) { if (state.highPerformance || state.tradeTimer >= 10 || getResourceOwned("catpower") * 1.2 > getResourceMax("catpower")) { withLeader("Merchant", () => withTab("Trade", () => {
+Trade.prototype.buy = function(reserved) {
+    if (state.highPerformance || state.tradeTimer >= 10 || getResourceOwned("catpower") * 1.2 > getResourceMax("catpower")) { 
+        withLeader("Merchant", () => withTab("Trade", () => {
     var maxClicks = 10;
     var prices = this.getPrices();
     if (!canAfford(prices, reserved)) console.error(reserved);
@@ -578,7 +581,8 @@ Trade.prototype.buy = function(reserved) { if (state.highPerformance || state.tr
         }
     }
     state.tradeTimer = 0;
-}))} else return null;}
+        }))
+    } else return null;}
 Trade.prototype.getPrices = function() { return [{name: "catpower", val: 50}, {name: "gold", val: 15}].concat(getTradeData(this.panel).buys); }
 Trade.prototype.needProduct = function(quantity) {
     return getTradeData(this.panel).sells.every(sell => getResourceOwned(sell.name) * 1.2 + sell.value * (1 + sell.delta/2) * (1 + game.diplomacy.getTradeRatio()) * quantity < getResourceMax(sell.name));
