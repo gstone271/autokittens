@@ -805,7 +805,7 @@ disable = name => state.queue = state.queue.filter(bld => !(bld.name === name));
 findQueue = name => state.queue.filter(bld => bld.name === name)[0];
 isEnabled = name => state.queue.filter(bld => bld.name === name).length
 //not used yet
-promote = name => { var item = findQueue(name); disable(name); state.queue.unshift(item); }
+promote = name => { var item = findQueue(name); disable(name); if (item) state.queue.unshift(item); }
 enable = (name, tab, panel) => { 
     var type;
     if (specialBuys[name]) type = specialBuys[name];
@@ -1065,12 +1065,15 @@ early game needs:
 --starvation
 ----after some year, survive cold winter
 --job management
+----if no academies yet, manage jobs based entirely on queue
+----set next job based on highest need in queue (measured in ticks)?
+----unassign scholars when useless (reassign?)
 --first leader
 ----promote leader
 --first hunting (get efficiency)
---first crafting
 --try harder to get rid of ivory??
 --smelter management (handle negative production)
+--wood/catnip efficiency
 add help menu
 organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
