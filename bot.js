@@ -118,7 +118,7 @@ initialize = () => {
 }
 if (!game.console.realSave) game.console.realSave = game.console.save;
 game.console.save = (data) => {
-    save(); ''
+    save();
     game.console.realSave(data);
 }
 wipeBotSave = () => localStorage.removeItem("autokittens.state");
@@ -292,24 +292,24 @@ craftFirstTime = name => {
     withTab("Workshop", () => findButton(longTitle).click())
 }
 craftAll = name => {
-    if (getResourceOwned(name) === 0) {
-        craftFirstTime(name);
-    }
-    var button = findCraftAllButton(name); 
+    var button = findCraftButtonValues(name, 1).pop(); 
     if (button) button.click(); 
 }
 findCraftButtons = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("+")');
 findCraftButtonValues = (craft, craftRatio) => {
-    if (craft === "wood" && game.bld.get("workshop").val === 0) {
+    if (!canCraft(craft)) {
+        return [];
+    } else if (craft === "wood" && game.bld.get("workshop").val === 0) {
         return [{click: () => withTab("Bonfire", () => findButton("Refine catnip").click()), times: 1, amount: craftRatio}]
     } else if (getResourceOwned(craft) === 0) {
         return [{click: () => craftFirstTime(craft), times: 1, amount: craftRatio}]
     } else {
+        var craftAllTimes = Math.min(...getCraftPrices(craft).map(price => Math.floor(getResourceOwned(price.name) / price.val)));
         return findCraftButtons(craft).toArray().map((button) => {
             var craftTimes = Math.round($(button).text() / craftRatio);
             var craftAmount = craftTimes * craftRatio
             return {click: button.click.bind(button), times: craftTimes, amount: craftAmount};
-        });
+        }).concat({click: () => findCraftAllButton(craft).click(), times: craftAllTimes, amount: craftAllTimes * craftRatio });
     }
 }
 craftOne = name => { var button = findCraftButtonValues(name, getCraftRatio(name))[0]; if (button) button.click(); }
