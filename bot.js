@@ -9,17 +9,22 @@ $('#gamePageContainer').append($('<div id="botSettings" style="position: absolut
  * Utilities
 **************/
 flattenArr = arr => arr.reduce((acc, val) => acc.concat(val), []); //from Mozilla docs
-function getOwnText(el) { //https://stackoverflow.com/a/21249659/1914005
+getOwnText = el => { //https://stackoverflow.com/a/21249659/1914005
     return $(el).contents().map(function () {
         return this.nodeType == 3 && $.trim(this.nodeValue) ? $.trim(this.nodeValue) : undefined;
     }).get().join('')
 }
-arrayToObject = (array, keyField) => //https://medium.com/dailyjs/rewriting-javascript-converting-an-array-of-objects-to-an-object-ec579cafbfc7
-   array.reduce((obj, item) => {
+arrayToObject = (array, keyField) => {//https://medium.com/dailyjs/rewriting-javascript-converting-an-array-of-objects-to-an-object-ec579cafbfc7
+   return array.reduce((obj, item) => {
      obj[item[keyField]] = item
      return obj
    }, {})
-
+}
+maxBy = (arr, fun) => {
+    var maxValue = Math.max(...arr.map(fun));
+    //we could reduce the number of iterations by one but it doesn't matter
+    return arr.find(item => fun(item) === maxValue);
+}
 log = (msg, quiet) => { console.log(msg); if (!quiet) game.msg(msg); }
 
 /************** 
@@ -178,14 +183,8 @@ buyPrioritiesQueue = (queue) => {
  * Main Loop
 **************/
 mainLoop = () => {
-    if (game.bld.get("field").val === 0 && getResourceOwned("catnip") < 10) {
-        withTab("Bonfire", () => {
-            var maxClicks = 10;
-            while (getResourceOwned("catnip") < 10 && maxClicks--) {
-                findButton("Gather catnip").click()
-            }
-        });
-    }
+    gatherIntialCatnip();
+    preventStarvation();
     if (state.autoSteel) craftAll("steel")
     //todo make trades try harder to do more
     if (isResourceFull("gold")) state.queue.filter(bld => bld.constructor.name === "Trade" && bld.isEnabled()).forEach(bld => promote(bld.name));
@@ -332,7 +331,7 @@ craftMap = [
     { craft: "alloy", auto: true },
     { craft: "concrete" },
     { craft: "kerosene", auto: true },
-    { craft: "eludium", auto: true }, //todo handle the first craft
+    { craft: "eludium", auto: true },
 ]
 doAutoCraft = () => {
     craftMap.forEach(craft => {
@@ -435,6 +434,62 @@ getFursStockNeeded = () => {
     }
     return Math.max(0, -game.getResourcePerTick("furs", true) * (getResourceMax("catpower") / catpowerPerSec))
 }
+gatherIntialCatnip = () => {
+    if (game.bld.get("field").val === 0 && getResourceOwned("catnip") < 10) {
+        withTab("Bonfire", () => {
+            var maxClicks = 10;
+            while (getResourceOwned("catnip") < 10 && maxClicks--) {
+                findButton("Gather catnip").click()
+            }
+        });
+    }
+}
+preventStarvation = () => {
+    if (getResourceOwned("catnip") < getWinterCatnipStockNeeded(false) && game.science.get("agriculture").researched) {
+        log("Making a farmer to prevent starvation (needed " + game.getDisplayValueExt(getWinterCatnipStockNeeded(false)) + " catnip)")
+        switchToJob("farmer");
+    }
+}
+
+/************** 
+ * Jobs
+**************/
+getJobCounts = () => {
+    return game.village.jobs.map(job => ({
+        name: job.name, 
+        val: game.village.sim.kittens.filter(kitten => kitten.job === job.name).length
+    }));
+}
+getJobLongName = jobName => game.village.jobs.find(job => job.name === jobName).title;
+getJobButton = jobName => findButton(getJobLongName(jobName));
+//decrease button uses en dash (–), not hyphen (-)
+decreaseJob = jobName => getJobButton(jobName).find('a:contains("[–]")')[0].click();
+//when we decrease a job, other job big buttons don't become immediately enabled; instead click the +
+increaseJob = jobName => getJobButton(jobName).find('a:contains("[+]")')[0].click();
+switchToJob = jobName => {
+    if (game.village.jobs.find(job => job.name === jobName).unlocked) {
+        withTab("Town", () => {
+            if (game.village.isFreeKittens() && state.populationIncrease) {
+                state.populationIncrease--; //we overrode the normal new job
+            }
+            if (!game.village.isFreeKittens()) {
+                var mostCommonJob = maxBy(getJobCounts().filter(job => job.name !== jobName), job => job.val);
+                if (mostCommonJob.val > 0) {
+                    decreaseJob(mostCommonJob.name);
+                }
+            }
+            if (game.village.isFreeKittens()) {
+                increaseJob(jobName);
+                if (game.workshop.get("register").researched) {
+                    findButton("Manage Jobs").click();
+                }
+            }
+        });
+    } else {
+        console.error("Job " + jobName + " not unlocked yet!");
+    }
+}
+
 
 /************** 
  * Queueables
@@ -518,8 +573,7 @@ Trade.prototype.buy = function(reserved) { if (state.highPerformance || state.tr
                 }
             });
             affordableButtons = buttons.filter((button) => canAfford(multiplyPrices(prices, button.quantity), reserved) && this.needProduct(button.quantity)); //always nonempty
-            var maxQuantity = Math.max(...affordableButtons.map(button => button.quantity));
-            affordableButtons.filter(button => button.quantity === maxQuantity)[0].button.click();
+            maxBy(affordableButtons, button => button.quantity).button.click();
             maxClicks--;
         }
     }
@@ -909,10 +963,6 @@ improve interface
 early game needs:
 --starvation
 ----after some year, survive cold winter
-----housing requires catnip equal to the increased stock required
-------only if no farming yet
-----autoassign farmers to survive
-----in the event of starvation, reassign kittens
 --job management
 --first leader
 ----promote leader
