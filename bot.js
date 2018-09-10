@@ -407,7 +407,9 @@ haveEnoughCraft = (res, amount) => {
 }
 shouldAutoCraft = (res, amount) => isResourceFull(res) || haveEnoughCraft(res, amount)
 //parchment is needed to spend culture and science autocrafting
-autoCrafts = game.workshop.crafts.filter(craft => craft.prices.some(price => getResourceMax(fixResourceTitle(price.name)) < Infinity || craft.name === "parchment"))
+autoCrafts = game.workshop.crafts
+    .map(craft => ({name: craft.name, prices: craft.prices.map(fixPriceTitle)}))
+    .filter(craft => craft.prices.some(price => getResourceMax(price.name) < Infinity || craft.name === "parchment"))
 doAutoCraft = () => {
     autoCrafts.forEach(craft => {
         if (canCraft(craft.name)) {
@@ -446,7 +448,10 @@ makeCraft = (craft, amountNeeded, reserved) => {
     var totalPrices = multiplyPrices(prices, timesToCraft);
     var additionalNeeded = getAdditionalNeeded(totalPrices, reserved);
     if (additionalNeeded.length) {
-        additionalNeeded.filter(price => isCraft(price.name)).filter(price => price.val < Infinity).forEach(price => makeCraft(price.name, price.val, reserved));
+        additionalNeeded
+            .filter(price => isCraft(price.name))
+            .filter(price => price.val < Infinity)
+            .forEach(price => makeCraft(price.name, price.val, reserved));
     }
     if (canAfford(totalPrices, reserved)) {
         var maxClicks = 20;
@@ -616,8 +621,8 @@ function Craft(name, tab, panel) {
     this.panel = panel;
     this.resName = getResourceShortTitle(name);
 }
-Craft.prototype.buy = function() { craftOne(this.resName); }
-Craft.prototype.getPrices = function() { return getCraftPrices(this.resName); }
+Craft.prototype.buy = function() { craftOne(fixResourceTitle(this.resName)); }
+Craft.prototype.getPrices = function() { return getCraftPrices(fixResourceTitle(this.resName)); }
 Craft.prototype.isEnabled = function() { return canCraft(this.resName); }
 
 tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains("Send caravan")').click()
