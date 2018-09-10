@@ -778,10 +778,19 @@ function HoldFestival(name, tab, panel) {
     this.name = name;
     this.tab = tab;
     this.panel = panel;
-    this.buy = () => withTab(this.tab, () => findButton(this.name).click()),
+    this.buy = () => withTab(this.tab, () => findButton(this.name).click());
     this.getPrices = () => ([{ name: "catpower", val: 1500 }, { name: "culture", val: 5000 }, { name: "parchment", val: 2500 }]);
     this.isEnabled = () => game.calendar.festivalDays === 0;
     this.quiet = true;
+}
+function SendExplorers(name, tab, panel) {
+    this.name = name;
+    this.tab = tab;
+    this.panel = panel;
+    this.buy = () => withTab(this.tab, () => findButton(this.name).click());
+    this.getPrices = () => ([{ name: "catpower", val: 1000 }]);
+    this.isEnabled = () => true; //TODO detect when new races are available
+    this.once = true;
 }
 
 /************** 
@@ -884,7 +893,7 @@ getActiveTab = () => {
 /************** 
  * Interface
 **************/
-ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Send explorers", "Tempus Stasit", "Tempus Fugit"]
+ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit"]
 stateButtons = {
     "Send hunters": "autoHunt",
     "Steel": "autoSteel",
@@ -895,6 +904,7 @@ specialBuys = {
     "Praise the sun!": PraiseSun,
     //allow refine catnip from Bonfire
     "Refine Catnip": Craft,
+    "Send explorers": SendExplorers,
 }
 getManagedItem = manageButton => $(manageButton).parent().find("span").first().text().replace(/(\(|\[)[^\])]*(\)|\])/g, "").trim();
 getPanelTitle = elem => getOwnText($(elem).parents('.panelContainer').children('.title')).trim();
@@ -908,7 +918,7 @@ updateButton = (elem, tab) => {
             condition = state[stateButtons[item]];
         } else if (tab === "Town" && !specialBuys[item]) {
             condition = state.defaultJob === item;
-        } else if (tab === "Trade") {
+        } else if (tab === "Trade" && !specialBuys[item]) {
             condition = isEnabled(getPanelTitle(elem));
         //Bonfire page refine button has a lowercase c
         } else if (item === "Refine catnip") {
@@ -923,7 +933,7 @@ buttonEvent = elem => {
     var item = getManagedItem(elem);
     var tab = getActiveTab();
     var panel = getPanelTitle(elem);
-    if (tab === "Trade") item = panel;
+    if (tab === "Trade" && !specialBuys[item]) item = panel;
     //Bonfire page refine button has a lowercase c
     if (item === "Refine catnip") item = "Refine Catnip";
     if (stateButtons[item] && tab !== "Science") {
