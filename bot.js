@@ -398,7 +398,8 @@ findCraftButtonValues = (craft, craftRatio) => {
 craftOne = name => { var button = findCraftButtonValues(name, getCraftRatio(name))[0]; if (button) button.click(); }
 haveEnoughCraft = (res, amount) => getResourceMax(res) === Infinity && !state.queue.map(bld => bld.getPrices()).concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched).map(tech => tech.prices)).some(prices => getResourceOwned(res) - amount < getPrice(prices, res)) && (res !== "furs" || getResourceOwned(res) - amount > 500)
 shouldAutoCraft = (res, amount) => isResourceFull(res) || haveEnoughCraft(res, amount)
-autoCrafts = game.workshop.crafts.filter(craft => craft.prices.some(price => getResourceMax(fixResourceTitle(price.name)) < Infinity))
+//parchment is needed to spend culture and science autocrafting
+autoCrafts = game.workshop.crafts.filter(craft => craft.prices.some(price => getResourceMax(fixResourceTitle(price.name)) < Infinity || craft.name === "parchment"))
 doAutoCraft = () => {
     autoCrafts.forEach(craft => {
         if (canCraft(craft.name)) {
