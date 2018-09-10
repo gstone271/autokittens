@@ -1079,10 +1079,6 @@ buy script (-> genetic algorithm)
 ----1pt per building
 ----1pt per %faith bonus
 ----2000pt if moon +1pt/day early
---record run
-----everything bought
-----timing of technologies
-----timing of kittens milestones
 trade calculations -> needsResource function
 --try not to have full gold
 faith reset without transcending
@@ -1094,6 +1090,7 @@ improve interface
 --1/2: when none of your craft chain is reserved, become normal and go to end of queue
 --2: queued twice
 --infinity: automatically top of queue (queue with other infinities)
+reserve ivory like furs
 early game needs:
 --starvation
 ----after some year, survive cold winter
