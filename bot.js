@@ -276,14 +276,14 @@ additionalActions = [
 /************** 
  * Resources
 **************/
-getResourceOwned = name => game.resPool.resources.find(res => res.title === name).value
-getResourceMax = name => game.resPool.resources.find(res => res.title === name).maxValue || Infinity
+getResourceOwned = resTitle => game.resPool.resources.find(res => res.title === resTitle).value
+getResourceMax = resTitle => game.resPool.resources.find(res => res.title === resTitle).maxValue || Infinity
 getResourceShortTitle = longName => game.workshop.crafts.find(row => row.label === longName).name;
-getResourceLongTitle = name => game.workshop.crafts.find(row => row.name === name).label;
+getResourceLongTitle = resInternalName => game.workshop.crafts.find(row => row.name === resInternalName).label;
 resourceTitleCache = arrayToObject(game.resPool.resources, "name");
 resourceNameCache = arrayToObject(game.resPool.resources, "title");
 fixResourceTitle = resInternalName => resourceTitleCache[resInternalName].title;
-unFixResourceTitle = name => resourceNameCache[name].name;
+getResourceInternalName = resTitle => resourceNameCache[resTitle].name;
 fixPriceTitle = price => ({ val: price.val, name: fixResourceTitle(price.name) });
 //TODO calculate if resource production is zero (getEffectiveProduction -- make sure all events are ok)
 //TODO if res is full and its crafts are not demanded but its conversion components are, shutoff conversion to res (and disable production of more conversion?)
@@ -308,7 +308,7 @@ getSafeStorage = res => {
 }
 //todo factor in crafting?????
 getEffectiveResourcePerTick = (res, bestCase, reserved) => {
-    var resourcePerTick = game.getResourcePerTick(unFixResourceTitle(res), true);
+    var resourcePerTick = game.getResourcePerTick(getResourceInternalName(res), true);
     //todo: doesn't account for metaphysics upgrades
     if (res === "science" || res === "starchart" && game.science.get("astronomy").researched) {
         var astronomicalEventChance = bestCase ? 1 : Math.min((25 / 10000) + game.getEffect("starEventChance"), 1);
@@ -361,13 +361,13 @@ isResourceFull = res => getResourceOwned(res) > getSafeStorage(res);
 /************** 
  * Crafting
 **************/
-getCraftPrices = craft => { return game.workshop.getCraft(unFixResourceTitle(craft)).prices.map(fixPriceTitle) }
+getCraftPrices = craft => { return game.workshop.getCraft(getResourceInternalName(craft)).prices.map(fixPriceTitle) }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
 findCraftAllButton = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("all")')[0]
 craftFirstTime = name => {
     if (canAfford(getCraftPrices(name), {})) {
         withTab("Workshop", () => {
-            var longTitle = getResourceLongTitle(unFixResourceTitle(name));
+            var longTitle = getResourceLongTitle(getResourceInternalName(name));
             log("First time crafting " + longTitle, true);
             findButton(longTitle).click();
         })
@@ -379,7 +379,7 @@ craftAll = name => {
 }
 findCraftButtons = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("+")');
 findCraftButtonValues = (craft, craftRatio) => {
-    if (!canCraft(unFixResourceTitle(craft))) {
+    if (!canCraft(getResourceInternalName(craft))) {
         return [];
     } else if (craft === "wood" && game.bld.get("workshop").val === 0) {
         return [{click: () => withTab("Bonfire", () => findButton("Refine catnip").click()), times: 1, amount: craftRatio}]
