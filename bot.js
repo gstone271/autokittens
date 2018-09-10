@@ -251,7 +251,7 @@ mainLoop = () => {
 additionalActions = [
     () => $('#observeBtn').click(),
     () => { 
-        if (state.autoHunt && isResourceFull("catpower") && getResourceOwned("catpower") >= 100) { 
+        if (state.autoHunt && (isResourceFull("catpower") || getTotalDemand("catpower") === 0) && getResourceOwned("catpower") >= 100) { 
             withLeader("Manager", () => $('a:contains("Send hunters")')[0].click())
         }
     },
@@ -290,6 +290,7 @@ multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, 
 //TODO calculate if resource production is zero (getEffectiveProduction -- make sure all events are ok)
 //TODO if res is full and its crafts are not demanded but its conversion components are, shutoff conversion to res (and disable production of more conversion?)
 getTotalDemand = res => {
+    //this could be optimized a lot...
     var prices = flattenArr(state.queue.map(bld => bld.getPrices()).filter(prices => haveEnoughStorage(prices, {})));
     var allPrices = [];
     var maxDepth = 10;
