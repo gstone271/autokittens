@@ -287,6 +287,22 @@ unFixResourceTitle = name => resourceNameCache[name].name;
 fixPriceTitle = price => ({ val: price.val, name: fixResourceTitle(price.name) });
 getCraftPrices = craft => { return game.workshop.getCraft(unFixResourceTitle(craft)).prices.map(fixPriceTitle) }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
+//TODO calculate if resource production is zero (getEffectiveProduction -- make sure all events are ok)
+//TODO if res is full and its crafts are not demanded but its conversion components are, shutoff conversion to res (and disable production of more conversion?)
+getTotalDemand = res => {
+    var prices = flattenArr(state.queue.map(bld => bld.getPrices()).filter(prices => haveEnoughStorage(prices, {})));
+    var allPrices = [];
+    var maxDepth = 10;
+    while (prices.length && maxDepth--) {
+        if (!maxDepth) console.error("Infinite loop for " + res)
+        allPrices = allPrices.concat(prices);
+        prices = prices.filter(price => isCraft(price.name)).map(price => multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name))))
+    }
+    return allPrices
+        .filter(price => price.name === res)
+        .map(price => price.val)
+        .reduce((acc, item) => acc + item, 0)
+}
 findCraftAllButton = (name) => $('div.res-row:contains("' + name + '") div.craft-link:contains("all")')[0]
 craftFirstTime = name => {
     var longTitle = getResourceLongTitle(name);
