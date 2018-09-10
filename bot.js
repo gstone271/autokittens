@@ -38,7 +38,7 @@ addLog = item => {
 }
 //TODO (for trades especially) return the number bought
 logBuy = bld => addLog({ name: bld.name, type: "Buy", buy: bld});
-logKitten = numKittens => addLog({ name: numKittens + " Kittens", type: "Kitten", kittens: numKittens});
+logKitten = (numKittens, job) => addLog({ name: numKittens + " Kittens", type: "Kitten", kittens: numKittens, job: job});
 logReset = () => addLog({ name: "Reset", type: "Reset", kittens: game.village.sim.getKittens()});
 rotateLogs = () => {
     state.previousHistories.push(state.history);
@@ -62,11 +62,11 @@ game.resetAutomatic = () => {
         game.realResetAutomatic();
     }
 }
-recountKittens = () => {
+recountKittens = (newJob) => {
     var kittens = game.village.sim.getKittens();
     if (kittens > state.numKittens) {
         state.numKittens = kittens;
-        logKitten(kittens)
+        logKitten(kittens, newJob)
     }
 }
 
@@ -113,7 +113,6 @@ loadDefaults = () => {
 }
 initialize = () => {
     state.ticks = game.ticks;
-    recountKittens();
     setSpeed(state.speed);
 }
 if (!game.console.realSave) game.console.realSave = game.console.save;
@@ -258,15 +257,15 @@ additionalActions = [
     },
     () => {
         if (state.populationIncrease > 0 && getTabButtonByNumber(tabNumbers.Town).text().includes("(")) {
+            var job = getJobShortName(state.defaultJob);
+            //it's actually possible to cheat and click on a button that hasn't been revealed yet
+            if (!isJobEnabled(job)) job = "woodcutter";
             withTab("Town", () => {
-                var job = getJobShortName(state.defaultJob);
-                //it's actually possible to cheat and click on a button that hasn't been revealed yet
-                if (!isJobEnabled(job)) job = "woodcutter"
                 getJobButton(job).click();
                 log("Assigned new kitten to " + job);
             });
             state.populationIncrease--;
-            recountKittens();
+            recountKittens(job);
 
         }
     },
@@ -531,7 +530,7 @@ switchToJob = jobName => {
         withTab("Town", () => {
             if (game.village.isFreeKittens() && state.populationIncrease) {
                 state.populationIncrease--; //we overrode the normal new job
-                recountKittens();
+                recountKittens(jobName);
             }
             if (!game.village.isFreeKittens()) {
                 var mostCommonJob = maxBy(getJobCounts().filter(job => job.name !== jobName), job => job.val);
