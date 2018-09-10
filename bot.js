@@ -2,8 +2,6 @@
 if (window.stopLoop) stopLoop();
 $("#botInfo").remove()
 $('#gamePageContainer').append($('<div id="botInfo" style="position: absolute; bottom: 50px; right: 10px;">'))
-$("#botSettings").remove()
-$('#gamePageContainer').append($('<div id="botSettings" style="position: absolute; top: 50px; right: 10px;"><div id="botOn" onclick="event.preventDefault(); toggleRunning()" style="margin-bottom: 5px"></div><div id="timeSetting" onclick="event.preventDefault(); speedUp();" oncontextmenu="event.preventDefault(); slowDown();"></div></div>'))
 
 /************** 
  * Utilities
@@ -113,6 +111,7 @@ loadDefaults = () => {
 initialize = () => {
     state.ticks = game.ticks;
     setSpeed(state.speed);
+    createSettingsMenu();
 }
 if (!game.console.realSave) game.console.realSave = game.console.save;
 game.console.save = (data) => {
@@ -955,16 +954,47 @@ updateManagementButtons = () => {
     var tabCache = getActiveTab();
     $("p.botManage").each((idx, elem) => updateButton(elem, tabCache));
 }
+settingsMenu = [
+    {
+        name: "botOn",
+        leftClick: toggleRunning,
+        getHtml: () => "Bot: " + (state.running ? "on" : "off")
+    },
+    {
+        name: "gameSpeed",
+        leftClick: speedUp,
+        rightClick: slowDown,
+        getHtml: () => "Speed: " + state.speed + "x" + (state.speed > 30 ? " <br />(right click<br />to lower)" : "")
+    }
+];
+createSettingsMenu = () => {
+    $("#botSettings").remove()
+    var botSettings = $('<div id="botSettings" style="position: absolute; top: 50px; right: 10px;">');
+    var eventHandler = action => event => {
+        event.preventDefault();
+        if (action) action();
+        updateSettingsMenu();
+    };
+    settingsMenu.forEach(item => {
+        var button = $('<div id="' + item.name + '" style="margin-bottom: 5px">');
+        button.click(eventHandler(item.leftClick));
+        button.contextmenu(eventHandler(item.rightClick));
+        botSettings.append(button)
+    })
+    $('#gamePageContainer').append(botSettings);
+    updateSettingsMenu();
+}
+updateSettingsMenu = () => {
+    settingsMenu.forEach(item => $('#' + item.name).html(item.getHtml()));
+}
 
 /************** 
  * Speed
 **************/
 baseDelay = 2000;
-updateSpeedText = () => $("#timeSetting").html("Speed: " + state.speed + "x" + (state.speed > 30 ? " <br />(right click<br />to lower)" : ""));
-setSpeed = spd => { 
-    if (spd >= 1) { 
-        state.speed = spd; 
-        updateSpeedText();
+setSpeed = spd => {
+    if (spd >= 1) {
+        state.speed = spd;
         state.delay = Math.max(baseDelay / spd, 200);
         state.highPerformance = spd > 1;
         var millisPerLoop = state.delay;
@@ -1004,7 +1034,6 @@ setRunning = newRunning => {
     } else {
         stopLoop();
     }
-    $("#botOn").text("Bot: " + (newRunning ? "on" : "off"));
 }
 loopHandle = 0;
 stopLoop = () => clearInterval(loopHandle);
