@@ -259,8 +259,11 @@ additionalActions = [
     () => {
         if (state.populationIncrease > 0 && getTabButtonByNumber(tabNumbers.Town).text().includes("(")) {
             withTab("Town", () => {
-                findButton(state.defaultJob).click();
-                log("Assigned new kitten to " + state.defaultJob);
+                var job = getJobShortName(state.defaultJob);
+                //it's actually possible to cheat and click on a button that hasn't been revealed yet
+                if (!isJobEnabled(job)) job = "woodcutter"
+                getJobButton(job).click();
+                log("Assigned new kitten to " + job);
             });
             state.populationIncrease--;
             recountKittens();
@@ -516,13 +519,15 @@ getJobCounts = () => {
     }));
 }
 getJobLongName = jobName => game.village.jobs.find(job => job.name === jobName).title;
+getJobShortName = jobLongName => game.village.jobs.find(job => job.title === jobLongName).name;
 getJobButton = jobName => findButton(getJobLongName(jobName));
 //decrease button uses en dash (–), not hyphen (-)
 decreaseJob = jobName => getJobButton(jobName).find('a:contains("[–]")')[0].click();
 //when we decrease a job, other job big buttons don't become immediately enabled; instead click the +
 increaseJob = jobName => getJobButton(jobName).find('a:contains("[+]")')[0].click();
+isJobEnabled = jobName => game.village.jobs.find(job => job.name === jobName).unlocked;
 switchToJob = jobName => {
-    if (game.village.jobs.find(job => job.name === jobName).unlocked) {
+    if (isJobEnabled(jobName)) {
         withTab("Town", () => {
             if (game.village.isFreeKittens() && state.populationIncrease) {
                 state.populationIncrease--; //we overrode the normal new job
