@@ -224,7 +224,7 @@ updateQueue = (queue, bought) => {
     return queue.filter(bld => !bought.includes(bld)).concat(bought.filter(bld => !bld.once));
 }
 buyPrioritiesQueue = (queue) => {
-    var priorities = findPriorities(queue, {catnip: getWinterCatnipStockNeeded(true), furs: getFursStockNeeded()});
+    var priorities = findPriorities(queue, {catnip: getWinterCatnipStockNeeded(canHaveColdSeason()), furs: getFursStockNeeded()});
     botDebug.priorities = priorities;
     $("#botInfo").html("Up next: <br />" + priorities.filter(plan => plan.viable).map(plan => plan.bld.name).join("<br />"));
     var bought = tryBuy(priorities);
@@ -465,6 +465,7 @@ makeCraft = (craft, amountNeeded, reserved) => {
 **************/
 //todo: all of this is wrong in accelerated time
 //but the calendar speed is also bugged in accelerated time, wait for fix
+canHaveColdSeason = () => game.calendar.year < 4;
 getWinterCatnipProduction = isCold => {
     return getSeasonalCatnipProduction(isCold ? .1 : .25);
 }
@@ -493,7 +494,7 @@ getWinterCatnipStockNeeded = (isCold, additionalConsumption) => {
     }
 }
 getAdditionalCatnipNeeded = populationIncrease => {
-    return getWinterCatnipStockNeeded(true, populationIncrease * -game.village.catnipPerKitten) - getWinterCatnipStockNeeded(true, 0)
+    return getWinterCatnipStockNeeded(canHaveColdSeason(), populationIncrease * -game.village.catnipPerKitten) - getWinterCatnipStockNeeded(canHaveColdSeason(), 0)
 }
 //this might need to be slightly more in case you trade, etc
 getFursStockNeeded = () => {
@@ -1093,8 +1094,6 @@ improve interface
 --infinity: automatically top of queue (queue with other infinities)
 reserve ivory like furs
 early game needs:
---starvation
-----after some year, survive cold winter
 --job management
 ----if no academies yet, manage jobs based entirely on queue
 ----set next job based on highest need in queue (measured in ticks)?
