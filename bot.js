@@ -49,6 +49,7 @@ game.resetAutomatic = () => {
     logReset();
     rotateLogs();
     state.queue = []; //todo reload master plan
+    state.numKittens = 0;
     if (window.usingBotStarter) {
         //based on resetAutomatic code
 		game.timer.scheduleEvent(dojo.hitch(this, function() {
@@ -59,6 +60,13 @@ game.resetAutomatic = () => {
         }));
     } else {
         game.realResetAutomatic();
+    }
+}
+recountKittens = () => {
+    var kittens = game.village.sim.getKittens();
+    if (kittens > state.numKittens) {
+        state.numKittens = kittens;
+        logKitten(kittens)
     }
 }
 
@@ -101,8 +109,11 @@ loadDefaults = () => {
     if (!state.ticks) state.ticks = game.ticks;
     if (!state.history) state.history = [];
     if (!state.previousHistories) state.previousHistories = [];
+    if (!state.numKittens) state.numKittens = game.village.sim.getKittens();
 }
 initialize = () => {
+    state.ticks = game.ticks;
+    recountKittens();
     setSpeed(state.speed);
 }
 if (!game.console.realSave) game.console.realSave = game.console.save;
@@ -252,6 +263,8 @@ additionalActions = [
                 log("Assigned new kitten to " + state.defaultJob);
             });
             state.populationIncrease--;
+            recountKittens();
+
         }
     },
     () => state.tradeTimer++,
@@ -513,6 +526,7 @@ switchToJob = jobName => {
         withTab("Town", () => {
             if (game.village.isFreeKittens() && state.populationIncrease) {
                 state.populationIncrease--; //we overrode the normal new job
+                recountKittens();
             }
             if (!game.village.isFreeKittens()) {
                 var mostCommonJob = maxBy(getJobCounts().filter(job => job.name !== jobName), job => job.val);
