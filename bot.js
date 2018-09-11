@@ -117,7 +117,13 @@ initialize = () => {
 }
 if (!game.console.realSave) game.console.realSave = game.console.save;
 game.console.save = (data) => {
-    save();
+    try {
+        save();
+    } catch (err) {
+        //eg. not enough storage
+        //todo warn the user more loudly?
+        console.error(err);
+    }
     game.console.realSave(data);
 }
 wipeBotSave = () => localStorage.removeItem("autokittens.state");
