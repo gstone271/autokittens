@@ -159,7 +159,7 @@ findPriorities = (queue, reserved) => {
     var isLimitingResource = price => getTicksToEnough(price) >= ticksNeeded;
     //if the resource is craftable, need to figure out which of its components is limiting
     //ticksNeeded is ok
-    var getIngredientsNeeded = price => (isCraft(price.name) ? multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)) ) : [])
+    var getIngredientsNeeded = price => (canCraft(getResourceInternalName(price.name)) ? multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)) ) : [])
 
     var newReserved = Object.assign({}, reserved);
     //amount to reserve, if you will have ticks production
@@ -204,7 +204,10 @@ tryBuy = (priorities) => {
         var prices = bld.getPrices();
         var additionalNeeded = getAdditionalNeeded(prices, reserved);
         if (additionalNeeded.length) {
-            additionalNeeded.filter(price => isCraft(price.name)).filter(price => price.val < Infinity).forEach(price => makeCraft(price.name, price.val, reserved));
+            additionalNeeded
+                .filter(price => canCraft(getResourceInternalName(price.name)))
+                .filter(price => price.val < Infinity)
+                .forEach(price => makeCraft(price.name, price.val, reserved));
         }
         if (canAfford(prices, reserved)) {
             var numBought = bld.buy(reserved);
@@ -295,7 +298,9 @@ getTotalDemand = res => {
     while (prices.length && maxDepth--) {
         if (!maxDepth) console.error("Infinite loop for " + res)
         allPrices = allPrices.concat(prices);
-        prices = prices.filter(price => isCraft(price.name)).map(price => multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name))))
+        prices = flattenArr(prices
+            .filter(price => canCraft(getResourceInternalName(price.name)))
+            .map(price => multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)))))
     }
     return allPrices
         .filter(price => price.name === res)
@@ -334,7 +339,7 @@ getEffectiveResourcePerTick = (res, bestCase, reserved) => {
         resourcePerTick += eventsPerTick * valuePerEvent;
     }
     //don't bother with the other possible events; they don't have capacities
-    if (res === "steel" && state.autoSteel || isCraft(res)) {
+    if (res === "steel" && state.autoSteel || canCraft(getResourceInternalName(res))) {
         //once we're willing to chain craft catnip this will be wrong due to seasons
         //don't worry about it for now
         var prices = getCraftPrices(res);
@@ -436,10 +441,10 @@ doAutoCraft = () => {
         }
     });
 }
-findCraft = targetCraft => game.workshop.crafts.filter(convert => convert.name === targetCraft)
-isCraft = targetCraft => findCraft(targetCraft).length
-canCraft = resInternalName => game.workshop.getCraft(resInternalName).unlocked && (game.bld.get("workshop").val || resInternalName === "wood");
-getCraftChain = targetCraft => flattenArr(findCraft(targetCraft).map(convert => flattenArr(convert.prices.map(price => price.name).map(getCraftChain)))).concat(targetCraft) //blueprint lists science twice but that's fine
+canCraft = resInternalName => {
+    var craftData = game.workshop.getCraft(resInternalName);
+    return craftData && craftData.unlocked && (game.bld.get("workshop").val || resInternalName === "wood");
+}
 getCraftRatio = res => game.getResCraftRatio({ name: res }) + 1;
 makeCraft = (craft, amountNeeded, reserved) => {
     var craftRatio = getCraftRatio(craft);
@@ -449,7 +454,7 @@ makeCraft = (craft, amountNeeded, reserved) => {
     var additionalNeeded = getAdditionalNeeded(totalPrices, reserved);
     if (additionalNeeded.length) {
         additionalNeeded
-            .filter(price => isCraft(price.name))
+            .filter(price => canCraft(getResourceInternalName(price.name)))
             .filter(price => price.val < Infinity)
             .forEach(price => makeCraft(price.name, price.val, reserved));
     }
@@ -1100,6 +1105,7 @@ faith reset without transcending
 improve performance at high speeds
 --run bot in the game update function
 simplify resource name/title usage
+prevent cheating (don't craft resource too early)
 energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
