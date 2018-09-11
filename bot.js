@@ -184,12 +184,6 @@ findPriorities = (queue, reserved) => {
     }
     return [{bld: found, reserved: reserved, viable: viable}].concat(findPriorities(queue.slice(1, queue.length), newReserved));
 }
-//TODO don't use this for upgrades--particularly, photolithography will be delayed
-//--when all resources are close to full, allow them to become completely full
-//--don't include resources that can't be crafted yet
-haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(price.name) >= price.val + (reserved[price.name] || 0))
-canAfford = (prices, reserved) => prices.every(price => getResourceOwned(price.name) - (reserved[price.name] || 0) >= price.val);
-getAdditionalNeeded = (prices, reserved) => prices.map(price => ({ name: price.name, val: (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name))})).filter(price => price.val > 0);
 subtractUnreserved = (reserved, bought) => {
     var newReserved = Object.assign({}, reserved);
     Object.keys(bought).forEach(res => newReserved[res] = (newReserved[res] - bought[res]) || 0)
@@ -202,13 +196,7 @@ tryBuy = (priorities) => {
         var bld = plan.bld;
         var reserved = subtractUnreserved(plan.reserved, reservationsBought);
         var prices = bld.getPrices();
-        var additionalNeeded = getAdditionalNeeded(prices, reserved);
-        if (additionalNeeded.length) {
-            additionalNeeded
-                .filter(price => canCraft(price.name))
-                .filter(price => price.val < Infinity)
-                .forEach(price => makeCraft(price.name, price.val, reserved));
-        }
+        craftAdditionalNeeded(prices, reserved);
         if (canAfford(prices, reserved)) {
             var numBought = bld.buy(reserved);
             if (numBought === undefined) numBought = 1;
@@ -311,6 +299,12 @@ getSafeStorage = res => {
     var max = getResourceMax(res);
     return max === Infinity ? max : max - state.ticksPerLoop * getEffectiveResourcePerTick(res, true, {});
 }
+//TODO don't use this for upgrades--particularly, photolithography will be delayed
+//--when all resources are close to full, allow them to become completely full
+//--don't include resources that can't be crafted yet
+haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(price.name) >= price.val + (reserved[price.name] || 0))
+canAfford = (prices, reserved) => prices.every(price => getResourceOwned(price.name) - (reserved[price.name] || 0) >= price.val);
+isResourceFull = res => getResourceOwned(res) > getSafeStorage(res);
 //todo factor in crafting?????
 getEffectiveResourcePerTick = (res, bestCase, reserved) => {
     var resourcePerTick = game.getResourcePerTick(res, true);
@@ -361,7 +355,6 @@ getEffectiveResourcePerTick = (res, bestCase, reserved) => {
     //todo production from hunting?
     return resourcePerTick;
 }
-isResourceFull = res => getResourceOwned(res) > getSafeStorage(res);
 
 /************** 
  * Crafting
@@ -445,19 +438,22 @@ canCraft = resInternalName => {
     //construction required for first craft, though it is possible to cheat and click the buttons before they're shown 
     return craftData && craftData.unlocked && ((game.bld.get("workshop").val && game.science.get("construction").researched) || resInternalName === "wood");
 }
+getAdditionalNeeded = (prices, reserved) => 
+    prices
+        .map(price => ({ name: price.name, val: (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name))}))
+        .filter(price => price.val > 0);
+craftAdditionalNeeded = (prices, reserved) =>
+    getAdditionalNeeded(prices, reserved)
+        .filter(price => canCraft(price.name))
+        .filter(price => price.val < Infinity)
+        .forEach(price => makeCraft(price.name, price.val, reserved));
 getCraftRatio = res => game.getResCraftRatio({ name: res }) + 1;
 makeCraft = (craft, amountNeeded, reserved) => {
     var craftRatio = getCraftRatio(craft);
     var prices = getCraftPrices(craft);
     var timesToCraft = Math.ceil(amountNeeded / craftRatio);
     var totalPrices = multiplyPrices(prices, timesToCraft);
-    var additionalNeeded = getAdditionalNeeded(totalPrices, reserved);
-    if (additionalNeeded.length) {
-        additionalNeeded
-            .filter(price => canCraft(price.name))
-            .filter(price => price.val < Infinity)
-            .forEach(price => makeCraft(price.name, price.val, reserved));
-    }
+    craftAdditionalNeeded(totalPrices, reserved);
     if (canAfford(totalPrices, reserved)) {
         var maxClicks = 20;
         while (maxClicks > 0 && timesToCraft > 0) {
@@ -1113,7 +1109,8 @@ improve interface
 reserve ivory like furs
 early game needs:
 --job management
-----if no academies yet, manage jobs based entirely on queue
+----wood/catnip efficiency
+------factor in skill learning rate (give 5% leeway if kitten is already better at its current job?)
 ----set next job based on highest need in queue (measured in ticks)?
 ----unassign scholars when useless (reassign?)
 --first leader
@@ -1121,7 +1118,6 @@ early game needs:
 --first hunting (get efficiency)
 --try harder to get rid of ivory??
 --smelter management (handle negative production)
---wood/catnip efficiency
 add help menu
 organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
