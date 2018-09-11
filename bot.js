@@ -1147,6 +1147,12 @@ buy script (-> genetic algorithm)
 ----1pt per building
 ----1pt per %faith bonus
 ----2000pt if moon +1pt/day early
+--compare with human performance
+----human vs. human + bot vs. master plan
+----human plays 10min/2hr (+10min at start of game?)
+------after 10min passed, pause game; once ready, fast forward 1:50 and then pause
+----time to moon, paragon/hr (go for unobtainium huts; use best paragon/hr)
+------graph #technologies, #kittens
 trade calculations -> needsResource function
 --try not to have full gold
 faith reset without transcending
@@ -1174,4 +1180,5 @@ early game needs:
 add help menu
 organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
+log human actions?
 */
