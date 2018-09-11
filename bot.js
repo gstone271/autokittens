@@ -77,13 +77,13 @@ recountKittens = (newJob) => {
 **************/
 save = () => { localStorage.setItem("autokittens.state", exportSave()); console.log("Bot state saved"); }
 loadString = string => {
-    var parsed = JSON.parse(string);
+    var parsed = JSON.parse(LZString.decompressFromBase64(string));
     var rawQueue = parsed.queue;
     parsed.queue = [];
     state = parsed;
     reloadQueue(rawQueue);
 }
-exportSave = () => JSON.stringify(state);
+exportSave = () => LZString.compressToBase64(JSON.stringify(state));
 importSave = saveString => {
     loadString(saveString);
     loadDefaults();
@@ -1117,6 +1117,7 @@ trade calculations -> needsResource function
 faith reset without transcending
 improve performance at high speeds
 --run bot in the game update function
+--lag indicator (ticks/sec)
 energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
@@ -1139,6 +1140,4 @@ early game needs:
 add help menu
 organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
-reduce logs (praise the sun!)
-compress save
 */
