@@ -443,7 +443,8 @@ doAutoCraft = () => {
 }
 canCraft = resInternalName => {
     var craftData = game.workshop.getCraft(resInternalName);
-    return craftData && craftData.unlocked && (game.bld.get("workshop").val || resInternalName === "wood");
+    //construction required for first craft, though it is possible to cheat and click the buttons before they're shown 
+    return craftData && craftData.unlocked && ((game.bld.get("workshop").val && game.science.get("construction").researched) || resInternalName === "wood");
 }
 getCraftRatio = res => game.getResCraftRatio({ name: res }) + 1;
 makeCraft = (craft, amountNeeded, reserved) => {
@@ -1105,7 +1106,6 @@ faith reset without transcending
 improve performance at high speeds
 --run bot in the game update function
 simplify resource name/title usage
-prevent cheating (don't craft resource too early)
 energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
