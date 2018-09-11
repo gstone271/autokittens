@@ -113,6 +113,7 @@ loadDefaults = () => {
     if (!state.previousHistories) state.previousHistories = [];
     if (!state.numKittens) state.numKittens = game.village.sim.getKittens();
     if (!state.desiredApi) state.desiredApi = 0;
+    if (!state.verboseQueue) state.verboseQueue = 0;
     if (!window.botDebug) botDebug = {};
 }
 initialize = () => {
@@ -159,7 +160,8 @@ findPriorities = (queue, reserved) => {
     var found = queue[0];
     var prices = found.getPrices();
     if (!found.isEnabled() || !haveEnoughStorage(prices, reserved)) return findPriorities(queue.slice(1, queue.length), reserved);
-    var viable = prices.every(price => (reserved[price.name] || 0) <= getResourceOwned(price.name));
+    var unavailableResources = prices.map(price => price.name).filter(res => (reserved[res] || 0) > getResourceOwned(res));
+    var viable = unavailableResources.length ? false : true;
     var canAffordOne = price => getResourceOwned(price.name) - (reserved[price.name] || 0) > price.val;
     var getTicksToEnough = price => //ticks until you have enough. May be infinite or negative
         (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name)) / getEffectiveResourcePerTick(price.name, false, reserved);
@@ -173,10 +175,14 @@ findPriorities = (queue, reserved) => {
     var getIngredientsNeeded = price => (canCraft(price.name) ? multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)) ) : [])
 
     var newReserved = Object.assign({}, reserved);
+    var limitingResources = {};
     //amount to reserve, if you will have ticks production
     var getEnoughForTicks = (price, ticks) => Math.max(0, (newReserved[price.name] || 0) + price.val - (ticks * getEffectiveResourcePerTick(price.name, false, newReserved) || 0))
     var reserveNonLimiting = price => newReserved[price.name] = (newReserved[price.name] || 0) + getEnoughForTicks(price, ticksNeeded);
-    var reserveLimiting = price => newReserved[price.name] = (newReserved[price.name] || 0) + price.val;
+    var reserveLimiting = price => {
+        newReserved[price.name] = (newReserved[price.name] || 0) + price.val;
+        limitingResources[price.name] = true;
+    }
     prices.filter(canAffordOne).forEach(reserveNonLimiting);
     //don't reserve infinity?
     var getShortage = price => ({ name: price.name, val: Math.max(0, (newReserved[price.name] || 0) - getResourceOwned(price.name) + price.val) })
@@ -193,7 +199,8 @@ findPriorities = (queue, reserved) => {
         shortages.filter(price => !isLimitingResource(price)).forEach(reserveNonLimiting);
         shortages = flattenArr(shortages.map(getIngredientsNeeded)).map(getShortage);
     }
-    return [{bld: found, reserved: reserved, viable: viable}].concat(findPriorities(queue.slice(1, queue.length), newReserved));
+    return [{bld: found, reserved: reserved, viable: viable, unavailable: unavailableResources, limiting: Object.keys(limitingResources)}]
+        .concat(findPriorities(queue.slice(1, queue.length), newReserved));
 }
 subtractUnreserved = (reserved, bought) => {
     var newReserved = Object.assign({}, reserved);
@@ -225,10 +232,32 @@ tryBuy = (priorities) => {
 updateQueue = (queue, bought) => {
     return queue.filter(bld => !bought.includes(bld)).concat(bought.filter(bld => !bld.once));
 }
+setVerbosity = level => {
+    if (level >= 0 && level <= 1) {
+        state.verboseQueue = level;
+        updateUpNext(botDebug.priorities);
+    }
+}
+moreVerbose = () => setVerbosity(state.verboseQueue + 1);
+lessVerbose = () => setVerbosity(state.verboseQueue - 1);
+updateUpNext = priorities => {
+    var filter;
+    var getHtml;
+    if (state.verboseQueue) {
+        filter = plan => true;
+        getHtml = plan => "<span" + (plan.viable ? "" : ' style="color: #999999"') + ">"
+             + plan.bld.name
+             + " (" + Array.from(new Set(plan.limiting.concat(plan.unavailable))).join(", ") + ")</span>"
+    } else {
+        filter = plan => plan.viable;
+        getHtml = plan => plan.bld.name;
+    }
+    $("#botInfo").html("Up next: <br />" + priorities.filter(filter).map(getHtml).join("<br />"));
+}
 buyPrioritiesQueue = (queue) => {
     var priorities = findPriorities(queue, {catnip: getWinterCatnipStockNeeded(canHaveColdSeason()), furs: getFursStockNeeded()});
     botDebug.priorities = priorities;
-    $("#botInfo").html("Up next: <br />" + priorities.filter(plan => plan.viable).map(plan => plan.bld.name).join("<br />"));
+    updateUpNext(priorities);
     var bought = tryBuy(priorities);
     return updateQueue(queue, bought);
 }
@@ -1055,6 +1084,12 @@ settingsMenu = [
         leftClick: moreApi,
         rightClick: lessApi,
         getHtml: () => "API: " + (state.desiredApi ? "some" : state.api ? "(some)" : "none")
+    },
+    {
+        name: "queueVerbosity",
+        leftClick: moreVerbose,
+        rightClick: lessVerbose,
+        getHtml: () => "Up Next: " + (state.verboseQueue ? "verbose" : "concise")
     }
 ];
 createSettingsMenu = () => {
@@ -1124,7 +1159,6 @@ improve interface
 ----1/2: when none of your craft chain is reserved, become normal and go to end of queue
 ----2: queued twice
 ----infinity: automatically top of queue (queue with other infinities)
---verbose Up Next
 reserve ivory like furs
 early game needs:
 --job management
