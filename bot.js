@@ -36,6 +36,10 @@ addLog = item => {
 }
 logBuy = (bld, numBought) => addLog({ name: bld.name, type: "Buy", buy: bld, num: numBought});
 logKitten = (numKittens, job) => addLog({ name: numKittens + " Kittens", type: "Kitten", kittens: numKittens, job: job});
+logFaith = () => {
+    var totalFaith = game.religion.faith;
+    addLog({ name: game.getDisplayValueExt(totalFaith) + " Faith", type: "Faith", faith: totalFaith});
+}
 logReset = () => addLog({ name: "Reset", type: "Reset", kittens: game.village.sim.getKittens()});
 rotateLogs = () => {
     state.previousHistories.push(state.history);
@@ -43,6 +47,7 @@ rotateLogs = () => {
 }
 if (!game.realResetAutomatic) game.realResetAutomatic = game.resetAutomatic;
 game.resetAutomatic = () => {
+    logFaith();
     logReset();
     rotateLogs();
     state.queue = []; //todo reload master plan
@@ -93,7 +98,7 @@ load = () => {
     if (data) {
         loadString(data);
     }
-        loadDefaults();
+    loadDefaults();
     initialize();
 }
 loadDefaults = () => {
@@ -208,7 +213,7 @@ tryBuy = (priorities) => {
             if (numBought === undefined) numBought = 1;
             if (numBought) {
                 if (!bld.silent) log("Buying " + bld.name, bld.quiet);
-                logBuy(bld, numBought);
+                if (!bld.noLog) logBuy(bld, numBought);
                 bought = bought.concat([bld]);
                 //unreserve resources -- makes trading not have as many log entries
                 prices.forEach(price => reservationsBought[price.name] = (reservationsBought[price.name] || 0) + price.val);
@@ -732,14 +737,19 @@ Religion.prototype.getData = function() {
 Religion.prototype.buy = function() {
     var waitForTears = false;
     var doBuy = () => withTab("Religion", () => {
-        var prices = this.getRealPrices();
-        var maxClicks = 25;
-        var tearsNeeded = prices.filter(price => price.name === "tears").map(price => price.val - getResourceOwned("tears"))[0] || 0;
-        while (maxClicks > 0 && tearsNeeded > 0) {
-            findButton("Sacrifice Unicorns").click();
-            maxClicks--;
-            tearsNeeded -= game.bld.get("ziggurat").val;
-            waitForTears = true;
+        if (this.panel === "Order of the Sun") {
+            //note how much faith we had before buying an upgrade
+            logFaith();
+        } else {
+            var prices = this.getRealPrices();
+            var maxClicks = 25;
+            var tearsNeeded = prices.filter(price => price.name === "tears").map(price => price.val - getResourceOwned("tears"))[0] || 0;
+            while (maxClicks > 0 && tearsNeeded > 0) {
+                findButton("Sacrifice Unicorns").click();
+                maxClicks--;
+                tearsNeeded -= game.bld.get("ziggurat").val;
+                waitForTears = true;
+            }
         }
         if (!waitForTears) findButton(this.name).click();
     });
@@ -770,6 +780,7 @@ function PraiseSun(name, tab, panel) {
     this.getPrices = () => ([{ name: "faith", val: Math.min(getResourceOwned("faith"), .9 * getResourceMax("faith")) }]);
     this.isEnabled = () => true;
     this.silent = true;
+    this.noLog = true;
 }
 function Transcend(name, tab, panel) {
     this.name = name;
@@ -1109,9 +1120,10 @@ improve performance at high speeds
 energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
---1/2: when none of your craft chain is reserved, become normal and go to end of queue
---2: queued twice
---infinity: automatically top of queue (queue with other infinities)
+----1/2: when none of your craft chain is reserved, become normal and go to end of queue
+----2: queued twice
+----infinity: automatically top of queue (queue with other infinities)
+--verbose Up Next
 reserve ivory like furs
 early game needs:
 --job management
@@ -1127,4 +1139,6 @@ early game needs:
 add help menu
 organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
+reduce logs (praise the sun!)
+compress save
 */
