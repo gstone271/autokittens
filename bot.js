@@ -391,6 +391,7 @@ findCraftButtonValues = (craft, craftRatio) => {
     } else if (getResourceOwned(craft) === 0) {
         return [{click: () => craftFirstTime(craft), times: 1, amount: craftRatio}]
     } else {
+        //TODO finding these buttons is significant performance (28% of total); just bypass them in api: some
         var craftAllButton = findCraftAllButton(craft);
         var craftAllTimes = Math.min(...getCraftPrices(craft).map(price => Math.floor(getResourceOwned(price.name) / price.val)));
         return findCraftButtons(craft).toArray().map((button) => {
@@ -400,7 +401,7 @@ findCraftButtonValues = (craft, craftRatio) => {
         }).concat(craftAllButton ? {click: () => craftAllButton.click(), times: craftAllTimes, amount: craftAllTimes * craftRatio } : []);
     }
 }
-craftOne = name => { var button = findCraftButtonValues(name, getCraftRatio(name))[0]; if (button) button.click(); }
+craftOne = name => { var button = findCraftButtonValues(name, getCraftRatio(name))[0]; if (button) { button.click(); return button.amount; } else { return 0; } }
 haveEnoughCraft = (res, amount) => {
     return getResourceMax(res) === Infinity 
         && !state.queue.map(bld => bld.getPrices())
@@ -627,7 +628,7 @@ function Craft(name, tab, panel) {
     this.panel = panel;
     this.resName = getResourceShortTitle(name);
 }
-Craft.prototype.buy = function() { craftOne(fixResourceTitle(this.resName)); }
+Craft.prototype.buy = function() { return craftOne(fixResourceTitle(this.resName)); }
 Craft.prototype.getPrices = function() { return getCraftPrices(fixResourceTitle(this.resName)); }
 Craft.prototype.isEnabled = function() { return canCraft(this.resName); }
 
