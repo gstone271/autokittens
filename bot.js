@@ -24,14 +24,15 @@ $('#helpDiv').prepend($(`<div id="botHelp">
         <li>safe: As normal, but assume twice as much time will pass before the bot runs. Useful at high game speeds, high bot speeds, or if the game is laggy. Consider using this mode if you see "Warning: [resource] full" messages in the console.</li>
     </ul></li>
 </ul>If one setting is being overridden by another, its effective value will be displayed in parentheses. For example, Bot Speed currently cannot be faster than 1/Game Speed.</p>
-<p>Special buttons: <ul>
+<p>Special buttons: These queueing buttons look normal but have a special effect when enabled, and may not actually use the queue.<ul>
     <li>Send Hunters: Send hunters whenever your catpower is full or you have nothing else in the queue which needs catpower</li>
-    <li>Steel: Always make as much steel as possible (to prevent wasting coal, even if your queue needs more iron than coal)</li>
-    <li>Transcend: Wait for faith to be full, then click Transcend, then click Faith Reset, then Praise the Sun.</li>
+    <li>Steel (in Workshop): Always make as much steel as possible (to prevent wasting coal, even if your queue needs more iron than coal)</li>
+    <li>Transcend: Wait for faith to be full, then click Transcend once, then click Faith Reset, then Praise the Sun.</li>
 </ul></p>
 <p>Leaders: It is recommended that you make an Artisan your leader. For all tasks except crafting, if you already have a leader, the bot will automatically switch to a leader of the appropriate type. If API is set to none, a leader of the appropriate type must appear on the first page of kittens (you may need to promote one).</p>
 <p>Compatibility: Autokittens requires a modern browser (with HTML5 and ES6) and is currently only compatible with the English version of the game.</p>
 <hr />
+<h3>Kittens Game Official "Help"</h3>
 </div>`))
 $('#helpDiv').css({"margin-top": "0", top: "10%", overflow: "auto", "max-height": "75%"});
 $("#botInfo").remove()
