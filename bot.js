@@ -708,10 +708,8 @@ function Trade(name, tab, panel) {
 Trade.prototype.buy = function(reserved) {
     var quantityTraded = 0;
     if (state.api >= 1 || state.tradeTimer >= 10 || getResourceOwned("manpower") * 1.2 > getResourceMax("manpower")) {
-        withLeader("Merchant", () => withTab("Trade", () => {
-            var maxClicks = 10;
+        withLeader("Merchant", () => {
             var prices = this.getPrices();
-            if (!canAfford(prices, reserved)) console.error(reserved);
             if (state.api >= 1) {
                 var yieldResTotal = null;
                 while (canAfford(prices, reserved) && this.needProduct(1) && quantityTraded < 1000) {
@@ -721,24 +719,28 @@ Trade.prototype.buy = function(reserved) {
                 }
                 game.diplomacy.gainTradeRes(yieldResTotal, quantityTraded);
             } else {
-                while (maxClicks > 0 && canAfford(prices, reserved) && this.needProduct(1)) {
-                    var allQuantity = Math.floor(Math.min(...prices.map(price => getResourceOwned(price.name) / price.val)));
-                    buttons = getTradeButtons(this.panel).toArray().map((elem) => {
-                        text = $(elem).text();
-                        return {
-                            button: elem,
-                            quantity: text === "Send caravan" ? 1 : text === "all" ? allQuantity : text.replace("x", "") * 1
-                        }
-                    });
-                    affordableButtons = buttons.filter((button) => canAfford(multiplyPrices(prices, button.quantity), reserved) && this.needProduct(button.quantity)); //always nonempty
-                    targetButton = maxBy(affordableButtons, button => button.quantity);
-                    targetButton.button.click();
-                    quantityTraded += targetButton.quantity;
-                    maxClicks--;
-                }
+                withTab("Trade", () => {
+                    if (!canAfford(prices, reserved)) console.error(reserved);
+                    var maxClicks = 10;
+                    while (maxClicks > 0 && canAfford(prices, reserved) && this.needProduct(1)) {
+                        var allQuantity = Math.floor(Math.min(...prices.map(price => getResourceOwned(price.name) / price.val)));
+                        buttons = getTradeButtons(this.panel).toArray().map((elem) => {
+                            text = $(elem).text();
+                            return {
+                                button: elem,
+                                quantity: text === "Send caravan" ? 1 : text === "all" ? allQuantity : text.replace("x", "") * 1
+                            }
+                        });
+                        affordableButtons = buttons.filter((button) => canAfford(multiplyPrices(prices, button.quantity), reserved) && this.needProduct(button.quantity)); //always nonempty
+                        targetButton = maxBy(affordableButtons, button => button.quantity);
+                        targetButton.button.click();
+                        quantityTraded += targetButton.quantity;
+                        maxClicks--;
+                    }
+                })
             }
             state.tradeTimer = 0;
-        }))
+        })
     }
     return quantityTraded;
 }
@@ -1230,6 +1232,8 @@ improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
 ----1/2: when none of your craft chain is reserved, become normal and go to end of queue
 ----2: queued twice
+--combine trade messages
+----read game.console.messages; change message and set span to undefined, then call game.ui.renderConsoleLog()
 reserve ivory like furs
 early game needs:
 --job management
