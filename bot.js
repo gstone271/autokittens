@@ -21,6 +21,11 @@ $('#helpDiv').prepend($(`<div id="botHelp">
         <br />In Verbose mode, enqueued items you have enough storage to buy are displayed, followed by the resources you need more of to buy them. In Concise, the resources are not displayed.
         <br />If one of the needed resources is reserved by an item higher in the queue, this item is grayed out. In Concise, it is hidden instead.
     </li>
+    <li>Auto Craft: Automatically craft resouces that are near their max storage capacity. The bot won't attempt to buy buildings whose cost is so near your storage capacity that a needed resouce would be auto crafted.<ul>
+        <li>off: Don't auto craft.</li>
+        <li>normal: Craft resources that would be full by the time the bot plans to run again.</li>
+        <li>safe: As normal, but assume twice as much time will pass before the bot runs. Useful at high game speeds, high bot speeds, or if the game is laggy. Consider using this mode if you see "Warning: [resource] full" messages in the console.</li>
+    </ul></li>
 </ul>If one setting is being overridden by another, its effective value will be displayed in parentheses. For example, Bot Speed currently cannot be faster than 1/Game Speed.</p>
 <p>Special buttons: <ul>
     <li>Send Hunters: Send hunters whenever your catpower is full or you have nothing else in the queue which needs catpower</li>
@@ -144,6 +149,7 @@ loadDefaults = () => {
     if (!state.numKittens) state.numKittens = game.village.sim.getKittens();
     if (!state.desiredApi) state.desiredApi = 0;
     if (!state.verboseQueue) state.verboseQueue = 0;
+    if (state.autoCraftLevel === undefined) state.autoCraftLevel = 1;
     if (!window.botDebug) botDebug = {};
 }
 initialize = () => {
@@ -369,7 +375,7 @@ getTotalDemand = res => {
 }
 getSafeStorage = res => {
     var max = getResourceMax(res);
-    return max === Infinity ? max : max - state.ticksPerLoop * getEffectiveResourcePerTick(res, state.ticksPerLoop, {});
+    return max === Infinity ? max : max - state.autoCraftLevel * state.ticksPerLoop * getEffectiveResourcePerTick(res, state.ticksPerLoop, {});
 }
 //TODO don't use this for upgrades--particularly, photolithography will be delayed
 //--when all resources are close to full, allow them to become completely full
@@ -522,6 +528,11 @@ doAutoCraft = () => {
             }
         }
     });
+}
+setAutoCrafting = level => {
+    if (level >= 0 && level <= 2) {
+        state.autoCraftLevel = level;
+    }
 }
 canCraft = resInternalName => {
     var craftData = game.workshop.getCraft(resInternalName);
@@ -1188,6 +1199,12 @@ settingsMenu = [
         leftClick: moreVerbose,
         rightClick: lessVerbose,
         getHtml: () => "Up Next: " + (state.verboseQueue ? "verbose" : "concise")
+    },
+    {
+        name: "autoCraft",
+        leftClick: () => setAutoCrafting(state.autoCraftLevel + 1),
+        rightClick: () => setAutoCrafting(state.autoCraftLevel - 1),
+        getHtml: () => "Auto Craft: " + ["off", "normal", "safe"][state.autoCraftLevel]
     }
 ];
 createSettingsMenu = () => {
