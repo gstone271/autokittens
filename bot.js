@@ -134,6 +134,7 @@ loadDefaults = () => {
     if (!state.populationIncrease) state.populationIncrease = 0;
     if (!state.tradeTimer) state.tradeTimer = 0;
     if (!state.speed) state.speed = 1;
+    if (!state.desiredTicksPerLoop) state.desiredTicksPerLoop = 8;
     if (!state.queue) state.queue = [];
     if (!state.ticks) state.ticks = game.ticks;
     if (!state.history) state.history = [];
@@ -191,7 +192,7 @@ findPriorities = (queue, reserved) => {
     var viable = unavailableResources.length ? false : true;
     var canAffordOne = price => getResourceOwned(price.name) - (reserved[price.name] || 0) > price.val;
     var getTicksToEnough = price => //ticks until you have enough. May be infinite or negative
-        (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name)) / getEffectiveResourcePerTick(price.name, false, reserved);
+        (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name)) / getEffectiveResourcePerTick(price.name, 0, reserved);
     var unaffordablePrices = prices.filter(price => !canAffordOne(price));
     //todo: this isn't correct for repeat prices (eg steel + gear). but the reserveBufferTime helps
     var ticksNeeded = Math.max(0, Math.max(...unaffordablePrices.map(getTicksToEnough)) - reserveBufferTime);
@@ -204,7 +205,7 @@ findPriorities = (queue, reserved) => {
     var newReserved = Object.assign({}, reserved);
     var limitingResources = {};
     //amount to reserve, if you will have ticks production
-    var getEnoughForTicks = (price, ticks) => Math.max(0, (newReserved[price.name] || 0) + price.val - (ticks * getEffectiveResourcePerTick(price.name, false, newReserved) || 0))
+    var getEnoughForTicks = (price, ticks) => Math.max(0, (newReserved[price.name] || 0) + price.val - (ticks * getEffectiveResourcePerTick(price.name, 0, newReserved) || 0))
     var reserveNonLimiting = price => newReserved[price.name] = (newReserved[price.name] || 0) + getEnoughForTicks(price, ticksNeeded);
     var reserveLimiting = price => {
         newReserved[price.name] = (newReserved[price.name] || 0) + price.val;
@@ -366,7 +367,7 @@ getTotalDemand = res => {
 }
 getSafeStorage = res => {
     var max = getResourceMax(res);
-    return max === Infinity ? max : max - state.ticksPerLoop * getEffectiveResourcePerTick(res, true, {});
+    return max === Infinity ? max : max - state.ticksPerLoop * getEffectiveResourcePerTick(res, state.ticksPerLoop, {});
 }
 //TODO don't use this for upgrades--particularly, photolithography will be delayed
 //--when all resources are close to full, allow them to become completely full
@@ -375,12 +376,17 @@ haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(p
 canAfford = (prices, reserved) => prices.every(price => getResourceOwned(price.name) - (reserved[price.name] || 0) >= price.val);
 isResourceFull = res => getResourceOwned(res) > getSafeStorage(res);
 //todo factor in crafting?????
-getEffectiveResourcePerTick = (res, bestCase, reserved) => {
+/**
+ * bestCaseTicks: if nonzero, assume you will have this many ticks of the maximum possible astronomical events (for save storage calculation)
+ */
+getEffectiveResourcePerTick = (res, bestCaseTicks, reserved) => {
     var resourcePerTick = game.getResourcePerTick(res, true);
+    var bestCaseDays = Math.ceil(bestCaseTicks * game.calendar.dayPerTick);
+    var effectiveDaysPerTick = bestCaseTicks ? bestCaseDays / bestCaseTicks : game.calendar.dayPerTick;
     //todo: doesn't account for metaphysics upgrades
     if (res === "science" || res === "starchart" && game.science.get("astronomy").researched) {
-        var astronomicalEventChance = bestCase ? 1 : Math.min((25 / 10000) + game.getEffect("starEventChance"), 1);
-        var eventsPerTick = astronomicalEventChance * game.calendar.dayPerTick;
+        var astronomicalEventChance = bestCaseTicks ? 1 : Math.min((25 / 10000) + game.getEffect("starEventChance"), 1);
+        var eventsPerTick = astronomicalEventChance * effectiveDaysPerTick;
         var valuePerEvent;
         if (res === "science") {
             var celestialBonus = game.workshop.get("celestialMechanics").researched ? 5 : 0;
@@ -391,8 +397,8 @@ getEffectiveResourcePerTick = (res, bestCase, reserved) => {
         resourcePerTick += eventsPerTick * valuePerEvent;
     }
     if (res === "minerals" || res === "science" && game.workshop.get("celestialMechanics").researched) {
-        var meteorChance = bestCase ? 1 : 10 / 10000;
-        var eventsPerTick = meteorChance * game.calendar.dayPerTick;
+        var meteorChance = bestCaseTicks ? 1 : 10 / 10000;
+        var eventsPerTick = meteorChance * effectiveDaysPerTick;
         var valuePerEvent;
         if (res === "minerals") {
             valuePerEvent = 50 + 25 * game.getEffect("mineralsRatio");
@@ -416,7 +422,7 @@ getEffectiveResourcePerTick = (res, bestCase, reserved) => {
         if (res === "steel" || prices.every(price => !reserved[price.name])) {
             //special case steel: we always craft it
             resourcePerTick += getCraftRatio(res) * Math.min(...prices.map(price => 
-                getEffectiveResourcePerTick(price.name, bestCase, reserved) / price.val
+                getEffectiveResourcePerTick(price.name, bestCaseTicks, reserved) / price.val
             ))
         }
     }
@@ -1005,15 +1011,18 @@ getActiveTab = () => {
 /************** 
  * Speed
 **************/
-baseDelay = 2000;
+setDesiredTicksPerLoop = desired => {
+    if (desired >= 1) {
+        state.desiredTicksPerLoop = desired;
+    }
+    setSpeed(state.speed);
+}
 setSpeed = spd => {
     if (spd >= 1) {
         state.speed = spd;
-        state.delay = Math.max(baseDelay / spd, 200);
+        state.ticksPerLoop = Math.max(state.desiredTicksPerLoop, spd);
+        state.delay = 200 * state.ticksPerLoop / spd
         updateApiLevel();
-        var millisPerLoop = state.delay;
-        var millisPerTick = 1000 / (game.rate * state.speed);
-        state.ticksPerLoop = Math.ceil(millisPerLoop / millisPerTick);
     }
     setRunning(state.running);
 }
@@ -1145,7 +1154,13 @@ settingsMenu = [
         name: "gameSpeed",
         leftClick: speedUp,
         rightClick: slowDown,
-        getHtml: () => "Speed: " + state.speed + "x" + (state.speed > 30 ? " <br />(right click<br />to lower)" : "")
+        getHtml: () => "Game Speed: " + state.speed + "x" + (state.speed > 30 ? " <br />(right click<br />to lower)" : "")
+    },
+    {
+        name: "botSpeed",
+        leftClick: () => setDesiredTicksPerLoop(state.desiredTicksPerLoop / 2),
+        rightClick: () => setDesiredTicksPerLoop(state.desiredTicksPerLoop * 2),
+        getHtml: () => "Bot Speed: " + (state.desiredTicksPerLoop === state.ticksPerLoop ? "1/" + state.ticksPerLoop : "(1/" + state.ticksPerLoop + ")")
     },
     {
         name: "apiLevel",
@@ -1232,6 +1247,7 @@ faith reset without transcending
 improve performance at high speeds
 --run bot in the game update function
 --lag indicator (ticks/sec)
+--sometimes causes Your kittens will DIE message (on the last tick of autumn)
 energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
@@ -1253,6 +1269,7 @@ early game needs:
 --first hunting (get efficiency)
 --try harder to get rid of ivory??
 --smelter management (handle negative production)
+--don't spam First time crafting foobar if it's reduced to 0 (eg. negative production)
 add help menu
 organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
