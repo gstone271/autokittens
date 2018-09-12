@@ -472,31 +472,42 @@ findCraftButtonValues = (craft, craftRatio) => {
     }
 }
 craftOne = name => { var button = findCraftButtonValues(name, getCraftRatio(name))[0]; if (button) { button.click(); return button.amount; } else { return 0; } }
-haveEnoughCraft = (res, amount) => {
-    return getResourceMax(res) === Infinity 
-        && !state.queue.map(bld => bld.getPrices())
-            .concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched)
-            .map(tech => tech.prices))
-            .some(prices => getResourceOwned(res) - amount < getPrice(prices, res))
-        //TODO use the reservations in the queue instead
-        && (res !== "furs" || getResourceOwned(res) - amount > 500)
+getEnoughResource = res => {
+    if (res === "furs") {
+        return getFursStockNeeded();
+    } else if (getResourceMax(res) === Infinity) {
+        return getEnoughCraft(res);
+    } else {
+        return getSafeStorage(res);
+    }
 }
-shouldAutoCraft = (res, amount) => isResourceFull(res) || haveEnoughCraft(res, amount)
+getEnoughCraft = res =>
+    state.queue
+        .map(bld => bld.getPrices())
+        .concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched) //save some compendiums midgame
+            .map(tech => tech.prices))
+        .map(prices => getPrice(prices, res))
+        .reduce((sum, val) => sum + val, 0)
 autoCrafts = game.workshop.crafts
-    //parchment is needed to spend culture and science autocrafting
+    //parchment is needed to spend culture and science autocrafting, and there's no other craft for furs
     .filter(craft => craft.prices.some(price => getResourceMax(price.name) < Infinity || craft.name === "parchment"))
 doAutoCraft = () => {
     autoCrafts.forEach(craft => {
         if (canCraft(craft.name)) {
-            var maxCrafts = 10; //don't expect to need this many clicks, prevent something bad
+            var maxClicks = 10; //don't expect to need this many clicks, prevent something bad
             var craftRatio = getCraftRatio(craft.name);
-            while (craft.prices.every(price => shouldAutoCraft(price.name, price.val)) && maxCrafts--) {
+            var getAmountToCraft = price => Math.ceil((getResourceOwned(price.name) - getEnoughResource(price.name)) / price.val)
+            var timesToCraft = Math.min(...craft.prices.map(getAmountToCraft))
+            //TODO reduce logic duplication with makeCraft
+            while (timesToCraft > 0 && maxClicks--) {
                 var craftButtons = findCraftButtonValues(craft.name, craftRatio);
-                var targetButton = craftButtons[0]
-                if (!targetButton) {
+                if (!craftButtons.length) {
                     //button hasn't shown up yet (we just crafted one of the requirements)
                     break;
                 }
+                var targetButton = craftButtons.reduce((smallerButton, biggerButton) => 
+                    biggerButton.times < timesToCraft ? biggerButton : smallerButton
+                )
                 if (craft.name === "wood") {
                     //special case: only craftable resource where the craft target has a max capacity
                     var maxBeamCrafts = 10; //also useful in case we try to autocraft catnip before we have a workshop
@@ -504,8 +515,10 @@ doAutoCraft = () => {
                         craftOne("beam");
                     }
                 }
-                craft.prices.filter(price => getResourceOwned(price.name) >= getResourceMax(price.name)).forEach(price => console.log("Warning: " + price.name + " full (did the bot lag?)"))
+                craft.prices.filter(price => getResourceOwned(price.name) === getResourceMax(price.name) && price.name !== "culture")
+                    .forEach(price => console.log("Warning: " + price.name + " full " + (price.name === "science" ? "(do you have enough manuscripts?)" : "(did the bot lag?)")))
                 targetButton.click();
+                timesToCraft -= targetButton.times;
             }
         }
     });
