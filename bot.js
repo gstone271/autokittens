@@ -91,7 +91,7 @@ importSave = saveString => {
 }
 reloadQueue = queue => {
     state.queue = [];
-    queue.forEach(item => enable(item.name, item.tab, item.panel));
+    queue.forEach(item => enable(item.name, item.tab, item.panel, item.maxPriority));
 }
 load = () => {
     data = localStorage.getItem("autokittens.state");
@@ -255,6 +255,8 @@ updateUpNext = priorities => {
     $("#botInfo").html("Up next: <br />" + priorities.filter(filter).map(getHtml).join("<br />"));
 }
 buyPrioritiesQueue = (queue) => {
+    var maxPriority = queue.filter(bld => bld.maxPriority);
+    queue = maxPriority.concat(queue.filter(bld => !bld.maxPriority));
     var priorities = findPriorities(queue, {catnip: getWinterCatnipStockNeeded(canHaveColdSeason()), furs: getFursStockNeeded()});
     botDebug.priorities = priorities;
     updateUpNext(priorities);
@@ -853,11 +855,41 @@ function SendExplorers(name, tab, panel) {
  * Queue Management
 **************/
 disable = name => state.queue = state.queue.filter(bld => !(bld.name === name));
+decreasePriority = name => {
+    var item = findQueue(name);
+    if (item) {
+        if (item.maxPriority) {
+            item.maxPriority = false;
+            demote(name);
+        } else {
+            disable(name);
+        }
+    }
+}
 findQueue = name => state.queue.filter(bld => bld.name === name)[0];
-isEnabled = name => state.queue.filter(bld => bld.name === name).length
-//not used yet
+getPriority = name => {
+    var item = findQueue(name);
+    if (item) {
+        if (item.maxPriority) {
+            return Infinity;
+        } else {
+            return 1;
+        }
+    } else {
+        return 0;
+    }
+}
 promote = name => { var item = findQueue(name); disable(name); if (item) state.queue.unshift(item); }
-enable = (name, tab, panel) => { 
+demote = name => { var item = findQueue(name); disable(name); if (item) state.queue.push(item); }
+increasePriority = (name, tab, panel) => {
+    var existing = findQueue(name);
+    if (existing) {
+        existing.maxPriority = true;
+    } else {
+        enable(name, tab, panel);
+    }
+}
+enable = (name, tab, panel, maxPriority) => {
     var type;
     if (specialBuys[name]) type = specialBuys[name];
     else if (tab === "Bonfire") type = Building;
@@ -866,14 +898,9 @@ enable = (name, tab, panel) => {
     else if (tab === "Trade") type = Trade;
     else if (religionData[panel]) type = Religion;
     else console.error(tab + " tab not supported yet!");
-    state.queue.push(new type(name, tab, panel));
-}
-toggleEnabled = (name, tab, panel) => { 
-    if (isEnabled(name)) { 
-        disable(name);
-    } else {
-        enable(name, tab, panel);
-    }
+    var created = new type(name, tab, panel);
+    if (maxPriority) created.maxPriority = true;
+    state.queue.push(created);
 }
 
 /************** 
@@ -1030,23 +1057,25 @@ updateButton = (elem, tab) => {
     if (ignoredButtons.includes(item) || tab === "Science" && getPanelTitle(elem) === "Metaphysics") {
         $(elem).text("");
     } else {
-        var condition;
+        var value;
+        var asInt = bool => bool ? 1 : 0;
         if (stateButtons[item] && tab !== "Science") {
-            condition = state[stateButtons[item]];
+            value = asInt(state[stateButtons[item]]);
         } else if (tab === "Town" && !specialBuys[item]) {
-            condition = state.defaultJob === item;
+            value = asInt(state.defaultJob === item);
         } else if (tab === "Trade" && !specialBuys[item]) {
-            condition = isEnabled(getPanelTitle(elem));
+            value = getPriority(getPanelTitle(elem));
         //Bonfire page refine button has a lowercase c
         } else if (item === "Refine catnip") {
-            condition = isEnabled("Refine Catnip");
+            value = getPriority("Refine Catnip");
         } else {
-            condition = isEnabled(item);
+            value = getPriority(item);
         }
-        if (condition) $(elem).text("1"); else $(elem).text("0");
+        var text = value === Infinity ? "∞" : value;
+        $(elem).text(text);
     }
 }
-buttonEvent = elem => {
+buttonClick = (elem, leftClick) => {
     var item = getManagedItem(elem);
     var tab = getActiveTab();
     var panel = getPanelTitle(elem);
@@ -1054,16 +1083,20 @@ buttonEvent = elem => {
     //Bonfire page refine button has a lowercase c
     if (item === "Refine catnip") item = "Refine Catnip";
     if (stateButtons[item] && tab !== "Science") {
-        state[stateButtons[item]] = !state[stateButtons[item]];
+        state[stateButtons[item]] = leftClick;
     } else if (panel === "Jobs") {
-        state.defaultJob = item;
+        if (leftClick) state.defaultJob = item;
     } else {
-        toggleEnabled(item, tab, panel);
+        if (leftClick) {
+            increasePriority(item, tab, panel);
+        } else {
+            decreasePriority(item);
+        }
     }
     updateButton(elem, tab);
 }
 updateManagementButtons = () => {
-    $('div.btn.nosel:not(:has(>p))').prepend($('<p class="botManage" style="position: absolute; left: -13px; top: -4px" onclick="event.stopPropagation(); buttonEvent(this)">0</p>'));
+    $('div.btn.nosel:not(:has(>p))').prepend($('<p class="botManage" style="position: absolute; left: -13px; top: -4px" onclick="event.stopPropagation(); buttonClick(this, true)" oncontextmenu="event.stopPropagation(); event.preventDefault(); buttonClick(this, false)">0</p>'));
     var tabCache = getActiveTab();
     $("p.botManage").each((idx, elem) => updateButton(elem, tabCache));
 }
@@ -1164,7 +1197,6 @@ improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
 ----1/2: when none of your craft chain is reserved, become normal and go to end of queue
 ----2: queued twice
-----infinity: automatically top of queue (queue with other infinities)
 reserve ivory like furs
 early game needs:
 --job management
