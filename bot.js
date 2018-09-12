@@ -1280,6 +1280,8 @@ improve performance at high speeds
 --run bot in the game update function
 --lag indicator (ticks/sec)
 --sometimes causes Your kittens will DIE message (on the last tick of autumn)
+--still sometimes has catnip full
+--look into game lag compensation code
 energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
@@ -1287,7 +1289,7 @@ improve interface
 ----2: queued twice
 --combine trade messages
 ----read game.console.messages; change message and set span to undefined, then call game.ui.renderConsoleLog()
---turn off autocraft/autofarmer
+--turn off autofarmer
 stop warning about resources full when waiting for another
 reserve ivory like furs
 early game needs:
