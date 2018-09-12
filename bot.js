@@ -981,14 +981,18 @@ openTab = name => {
 getTabButtonByName = name => $('a.tab:contains("' + name + '")');
 getTabButtonByNumber = tabNumber => $('a.tab:nth-of-type(' + tabNumber + ')');
 withTab = (tab, op) => {
-    var oldTab = $('a.tab.activeTab')[0];
-    var oldScroll = $("#midColumn").scrollTop();
-    if (openTab(tab)) {
-        try {
-            op();
-        } finally {
-            oldTab.click(); //possibly no-op
-            $("#midColumn").scrollTop(oldScroll);
+    var oldTab = $('a.tab.activeTab');
+    if (tab === getActiveTab(oldTab)) {
+        op();
+    } else {
+        var oldScroll = $("#midColumn").scrollTop();
+        if (openTab(tab)) {
+            try {
+                op();
+            } finally {
+                oldTab[0].click(); //possibly no-op
+                $("#midColumn").scrollTop(oldScroll);
+            }
         }
     }
 }
@@ -1027,11 +1031,11 @@ withLeader = (leaderType, op) => {
         });
     }
 }
-getActiveTab = () => {
-    var activeTab = $("a.tab.activeTab");
-    var index = $('a.tab').index(activeTab)
+getActiveTab = (activeTabButton) => {
+    if (!activeTabButton) activeTabButton = $("a.tab.activeTab");
+    var index = $('a.tab').index(activeTabButton)
     if (index < 2) return Object.keys(tabNumbers).find(tab => tabNumbers[tab] === (index + 1));
-    return activeTab.text();
+    return activeTabButton.text();
 }
 
 /************** 
