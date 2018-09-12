@@ -14,18 +14,20 @@ $('#helpDiv').prepend($(`<div id="botHelp">
 </ul></p>
 <p>Settings: <ul>
     <li>Bot: Turns all bot functions on/off</li>
-    <li>Speed: Controls the game speed</li>
+    <li>Game Speed: Can increase the speed of all game progress (even when the bot is off)</li>
+    <li>Bot Speed: Controls how frequently the bot runs (per game tick)</li>
     <li>API: Increase to use more of the game API to improve performance. Decrease to instead use the actual buttons in the game interface.</li>
     <li>Up Next: Controls the amount of information displayed in the Up Next panel.
         <br />In Verbose mode, enqueued items you have enough storage to buy are displayed, followed by the resources you need more of to buy them. In Concise, the resources are not displayed.
         <br />If one of the needed resources is reserved by an item higher in the queue, this item is grayed out. In Concise, it is hidden instead.
     </li>
-</ul></p>
+</ul>If one setting is being overridden by another, its effective value will be displayed in parentheses. For example, Bot Speed currently cannot be faster than 1/Game Speed.</p>
 <p>Special buttons: <ul>
     <li>Send Hunters: Send hunters whenever your catpower is full or you have nothing else in the queue which needs catpower</li>
     <li>Steel: Always make as much steel as possible (to prevent wasting coal, even if your queue needs more iron than coal)</li>
     <li>Transcend: Wait for faith to be full, then click Transcend, then click Faith Reset, then Praise the Sun.</li>
 </ul></p>
+<p>Compatibility: Autokittens requires a modern browser (with HTML5 and ES6) and is currently only compatible with the English version of the game.</p>
 <hr />
 </div>`))
 $('#helpDiv').css({"margin-top": "0", top: "10%", overflow: "auto", "max-height": "75%"});
