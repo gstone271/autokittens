@@ -29,6 +29,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     <li>Steel: Always make as much steel as possible (to prevent wasting coal, even if your queue needs more iron than coal)</li>
     <li>Transcend: Wait for faith to be full, then click Transcend, then click Faith Reset, then Praise the Sun.</li>
 </ul></p>
+<p>Leaders: It is recommended that you make an Artisan your leader. For all tasks except crafting, if you already have a leader, the bot will automatically switch to a leader of the appropriate type. If API is set to none, a leader of the appropriate type must appear on the first page of kittens (you may need to promote one).</p>
 <p>Compatibility: Autokittens requires a modern browser (with HTML5 and ES6) and is currently only compatible with the English version of the game.</p>
 <hr />
 </div>`))
