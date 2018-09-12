@@ -1052,8 +1052,8 @@ setDesiredApiLevel = level => {
         updateApiLevel();
     }
 }
-moreApi = () => setDesiredApiLevel(state.api + 1);
-lessApi = () => setDesiredApiLevel(state.api - 1);
+moreApi = () => setDesiredApiLevel(state.desiredApi + 1);
+lessApi = () => setDesiredApiLevel(state.desiredApi - 1);
 updateApiLevel = () => {
     state.api = Math.max(state.desiredApi, state.speed > 1 ? 1 : 0);
 }
