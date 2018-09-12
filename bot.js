@@ -1021,7 +1021,6 @@ updateApiLevel = () => {
 /************** 
  * Running
 **************/
-toggleRunning = () => setRunning(!state.running);
 setRunning = newRunning => {
     state.running = newRunning;
     if (state.running) {
@@ -1103,7 +1102,8 @@ updateManagementButtons = () => {
 settingsMenu = [
     {
         name: "botOn",
-        leftClick: toggleRunning,
+        leftClick: () => setRunning(true),
+        rightClick: () => setRunning(false),
         getHtml: () => "Bot: " + (state.running ? "on" : "off")
     },
     {
