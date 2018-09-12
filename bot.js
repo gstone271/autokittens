@@ -1208,6 +1208,11 @@ buy script (-> genetic algorithm)
 ----------ensure craftables have enough storage
 --strategy viability
 ----exclude useless techs
+------mint, (ziggurat), barges, steel plants, workshop automation, advanced automation, pneumatic press, factory optimization, factory robotics, seti, ecology, unicorn selection, artificial intelligence, metaphysics, cryptotheology
+----questionable techs
+------nuclear fission, biochemistry, genetics, telecommunication
+----optional techs
+------architecture, acoustics, drama and poetry, biology, combustion, metallurgy, robotics
 --run scoring
 ----10pt per science, building type
 ----5pt per kitten
@@ -1234,6 +1239,8 @@ improve interface
 ----2: queued twice
 --combine trade messages
 ----read game.console.messages; change message and set span to undefined, then call game.ui.renderConsoleLog()
+--turn off autocraft/autofarmer
+stop warning about resources full when waiting for another
 reserve ivory like furs
 early game needs:
 --job management
@@ -1249,5 +1256,6 @@ early game needs:
 add help menu
 organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
+--eg blueprint need, with enough compendiums, still reserves 
 log human actions?
 */
