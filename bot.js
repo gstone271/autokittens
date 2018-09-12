@@ -2,6 +2,33 @@
 if (window.stopLoop) stopLoop();
 $("#botInfo").remove()
 $('#gamePageContainer').append($('<div id="botInfo" style="position: absolute; bottom: 50px; right: 10px;">'))
+$("#botHelp").remove()
+$('#helpDiv').prepend($(`<div id="botHelp">
+<h2>Autokittens by Griffin Stone</h2>
+<p>This program adds queueing buttons to the left of tasks you can automate, settings in the upper right, and queue information in the lower right.</p>
+<p>Left click to increase a value, right click to decrease a value.</p>
+<p>Queueing buttons are displayed as a 0, 1, or ∞ to the left of a button. <ul>
+    <li>0: Don't buy this item.</li>
+    <li>1: Put this item in the queue. When you have enough resources to buy it, and nothing higher in the queue needs those resources, buy it and put it at the bottom of the queue</li>
+    <li>∞: As 1, but always move this item to the top of the queue (buy as many as possible).</li>
+</ul></p>
+<p>Settings: <ul>
+    <li>Bot: Turns all bot functions on/off</li>
+    <li>Speed: Controls the game speed</li>
+    <li>API: Increase to use more of the game API to improve performance. Decrease to instead use the actual buttons in the game interface.</li>
+    <li>Up Next: Controls the amount of information displayed in the Up Next panel.
+        <br />In Verbose mode, enqueued items you have enough storage to buy are displayed, followed by the resources you need more of to buy them. In Concise, the resources are not displayed.
+        <br />If one of the needed resources is reserved by an item higher in the queue, this item is grayed out. In Concise, it is hidden instead.
+    </li>
+</ul></p>
+<p>Special buttons: <ul>
+    <li>Send Hunters: Send hunters whenever your catpower is full or you have nothing else in the queue which needs catpower</li>
+    <li>Steel: Always make as much steel as possible (to prevent wasting coal, even if your queue needs more iron than coal)</li>
+    <li>Transcend: Wait for faith to be full, then click Transcend, then click Faith Reset, then Praise the Sun.</li>
+</ul></p>
+<hr />
+</div>`))
+$('#helpDiv').css({"margin-top": "0", top: "10%", overflow: "auto", "max-height": "75%"});
 
 /************** 
  * Utilities
@@ -1036,7 +1063,7 @@ startLoop = () => { stopLoop(); loopHandle = setInterval(mainLoop, state.delay);
 /************** 
  * Interface
 **************/
-ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit"]
+ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit", "Sacrifice Unicorns"]
 stateButtons = {
     "Send hunters": "autoHunt",
     "Steel": "autoSteel",
@@ -1100,6 +1127,12 @@ updateManagementButtons = () => {
     $("p.botManage").each((idx, elem) => updateButton(elem, tabCache));
 }
 settingsMenu = [
+    {
+        name: "helpUpperRight",
+        leftClick: () => $('#helpDiv').toggle(),
+        rightClick: () => $('#helpDiv').hide(),
+        getHtml: () => "Help"
+    },
     {
         name: "botOn",
         leftClick: () => setRunning(true),
