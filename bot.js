@@ -999,7 +999,7 @@ highPerformanceSetLeader = newLeader => {
     game.village.leader = newLeader;
 }
 withLeader = (leaderType, op) => {
-    if (!game.workshop.get("register").researched) {
+    if (!game.workshop.get("register").researched || game.challenges.currentChallenge === "anarchy") {
         op();
     } else if (state.api >= 1) {
         var oldLeader = game.village.leader;
