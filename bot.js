@@ -1,7 +1,4 @@
 //Paste the contents of this file directly into the developer console
-if (window.stopLoop) stopLoop();
-$("#botInfo").remove()
-$('#gamePageContainer').append($('<div id="botInfo" style="position: absolute; bottom: 50px; right: 10px;">'))
 $("#botHelp").remove()
 $('#helpDiv').prepend($(`<div id="botHelp">
 <h2>Autokittens by Griffin Stone</h2>
@@ -36,6 +33,9 @@ $('#helpDiv').prepend($(`<div id="botHelp">
 <hr />
 </div>`))
 $('#helpDiv').css({"margin-top": "0", top: "10%", overflow: "auto", "max-height": "75%"});
+$("#botInfo").remove()
+$('#gamePageContainer').append($('<div id="botInfo" style="position: absolute; bottom: 50px; right: 10px;">'))
+if (window.stopLoop) stopLoop();
 
 /************** 
  * Utilities
