@@ -1265,7 +1265,8 @@ settingsMenu = [
         name: "gameSpeed",
         leftClick: speedUp,
         rightClick: slowDown,
-        getHtml: () => "Game Speed: " + state.speed + "x" + (state.speed > 30 ? " <br />(right click<br />to lower)" : "")
+        getHtml: () => "Game Speed: " + state.speed + "x"
+            + (state.speed > 30 ? " <br />(right click<br />to lower)" : "")
     },
     {
         name: "botSpeed",
@@ -1295,11 +1296,9 @@ settingsMenu = [
         name: "autoFarmer",
         leftClick: () => setAutoFarmer(1),
         rightClick: () => setAutoFarmer(0),
-        getHtml: () => "Auto Farmer: " + ["off", "on"][state.autoFarmer] + "<br />(need " + game.getDisplayValueExt(getWinterCatnipStockNeeded(false)) + " catnip)"
-    },
-    {
-        name: "farmerWoodcutterIndicator",
-        getHtml: () => "Farmer ratio: " + game.getDisplayValueExt(getFarmerEffectiveness())
+        getHtml: () => "Auto Farmer: " + ["off", "on"][state.autoFarmer]
+            + "<br />(need " + game.getDisplayValueExt(getWinterCatnipStockNeeded(false)) + " catnip)"
+            + "<br />farmer ratio: " + game.getDisplayValueExt(getFarmerEffectiveness())
     },
     {
         name: "autoSeti",
