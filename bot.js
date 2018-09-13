@@ -466,8 +466,14 @@ getEffectiveResourcePerTick = (res, bestCaseTicks, reserved) => {
 getCraftPrices = craft => { return game.workshop.getCraft(craft).prices }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
 craftTableElem = $('.craftTable');
-findCraftAllButton = (name) => craftTableElem.children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("all")')[0]
-findCraftButtons = (name) => craftTableElem.children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("+")');
+getCraftTableElem = () => {
+    if (!craftTableElem.length) {
+        craftTableElem = $('.craftTable');
+    }
+    return craftTableElem;
+}
+findCraftAllButton = (name) => getCraftTableElem().children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("all")')[0]
+findCraftButtons = (name) => getCraftTableElem().children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("+")');
 craftFirstTime = name => {
     if (canAfford(getCraftPrices(name), {})) {
         withTab("Workshop", () => {
@@ -1417,4 +1423,5 @@ organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
 --eg blueprint need, with enough compendiums, still reserves
 log human actions?
+don't craft away Chronosphere resources
 */
