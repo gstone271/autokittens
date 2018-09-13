@@ -700,7 +700,9 @@ housingMap = {
     Mansion: 1,
     "Space Station": 2,
 }
-findButton = name => $('span:contains("' + name + '")').parents("div.btn")
+//remove percentages and counts
+trimButtonText = text => text.replace(/(\(|\[)[^\])]*(\)|\])/g, "").trim()
+findButton = name => $('span').filter((idx, button) => trimButtonText(button.innerText) === name).parents("div.btn")
 buyButton = (name) => {
     var button = findButton(name);
     //might not have been enabled in the ui yet--after crafting a resource, you have to wait 1 tick
@@ -1151,7 +1153,7 @@ specialBuys = {
     "Refine Catnip": Craft,
     "Send explorers": SendExplorers,
 }
-getManagedItem = manageButton => $(manageButton).parent().find("span").first().text().replace(/(\(|\[)[^\])]*(\)|\])/g, "").trim();
+getManagedItem = manageButton => trimButtonText($(manageButton).parent().find("span").first().text());
 getPanelTitle = elem => getOwnText($(elem).parents('.panelContainer').children('.title')).trim();
 updateButton = (elem, tab) => {
     var item = getManagedItem(elem);
@@ -1319,6 +1321,7 @@ buy script (-> genetic algorithm)
 ------graph #technologies, #kittens
 trade calculations -> needsResource function
 --try not to have full gold
+--can get stuck needing titanium but with too much iron
 faith reset without transcending
 improve performance at high speeds
 --run bot in the game update function
@@ -1352,6 +1355,6 @@ early game needs:
 add help menu
 organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
---eg blueprint need, with enough compendiums, still reserves 
+--eg blueprint need, with enough compendiums, still reserves
 log human actions?
 */
