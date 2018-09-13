@@ -466,8 +466,12 @@ craftFirstTime = name => {
     }
 }
 craftAll = name => {
-    var button = findCraftButtonValues(name, 1).pop(); 
-    if (button) button.click(); 
+    if (state.api >= 1) {
+        if (canCraft(name)) game.workshop.craftAll(name);
+    } else {
+        var button = findCraftButtonValues(name, 1).pop(); 
+        if (button) button.click(); 
+    }
 }
 findCraftButtons = (name) => $('div.res-row:contains("' + getResourceTitle(name) + '") div.craft-link:contains("+")');
 findCraftButtonValues = (craft, craftRatio) => {
