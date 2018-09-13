@@ -312,8 +312,8 @@ buyPrioritiesQueue = (queue) => {
 **************/
 mainLoop = () => {
     if (state.autoFarmer) {
-    gatherIntialCatnip();
-    preventStarvation();
+        gatherIntialCatnip();
+        preventStarvation();
     }
     if (state.autoSteel) craftAll("steel")
     //todo make trades try harder to do more
@@ -700,8 +700,23 @@ housingMap = {
     Mansion: 1,
     "Space Station": 2,
 }
-
 findButton = name => $('span:contains("' + name + '")').parents("div.btn")
+buyButton = (name) => {
+    var button = findButton(name);
+    //might not have been enabled in the ui yet--after crafting a resource, you have to wait 1 tick
+    if (button.hasClass("disabled")) {
+        return 0;
+    } else {
+        button.click();
+        return 1;
+    }
+}
+tabBuyButton = (tab, name) => {
+    var bought;
+    withTab(tab, () => bought = buyButton(name));
+    return bought;
+}
+
 internalBuildingNames = flattenArr(game.bld.buildingsData.map(data => { if (data.stages) return (data.stages.map(stage => { return { name: data.name, label: stage.label }; })); return data; }))
 getBuildingPrices = name => internalBuildingNames.filter(bld => bld.label === name).map(data => game.bld.getPrices(data.name))[0] || []
 getPrice = (prices, res) => (prices.filter(price => price.name === res)[0] || {val: 0}).val
@@ -712,8 +727,11 @@ function Building(name, tab, panel) {
     this.internalName = internalBuildingNames.filter(bld => bld.label === name)[0].name;
 }
 Building.prototype.buy = function() {
-    withTab("Bonfire", () => findButton(this.name).click());
-    state.populationIncrease += housingMap[this.name] || 0;
+    var bought = tabBuyButton(this.tab, this.name);
+    if (bought) {
+        state.populationIncrease += housingMap[this.name] || 0;
+    }
+    return bought;
 }
 Building.prototype.getRealPrices = function() { 
     return game.bld.getPrices(this.internalName);
@@ -810,9 +828,13 @@ function Science(name, tab, panel) {
     this.panel = panel;
     this.once = tab !== "Space" || this.getData().noStackable;
 }
-Science.prototype.buy = function() { 
-    withLeader("Scientist", () => withTab(this.tab, () => findButton(this.name).click()));
-    state.populationIncrease += housingMap[this.name] || 0;
+Science.prototype.buy = function() {
+    var bought;
+    withLeader("Scientist", () => bought = tabBuyButton(this.tab, this.name));
+    if (bought) {
+        state.populationIncrease += housingMap[this.name] || 0;
+    }
+    return bought;
 } //don't actually need scientist for Space
 Science.prototype.getData = function() { return scienceData[this.tab].filter(data => data.label === this.name)[0]; }
 Science.prototype.getPrices = function() { 
@@ -839,7 +861,7 @@ Religion.prototype.getData = function() {
     return religionData[this.panel].filter(upgrade => upgrade.label === this.name)[0];
 }
 Religion.prototype.buy = function() {
-    var waitForTears = false;
+    var bought;
     var doBuy = () => withTab("Religion", () => {
         if (this.panel === "Order of the Sun") {
             //note how much faith we had before buying an upgrade
@@ -852,17 +874,17 @@ Religion.prototype.buy = function() {
                 findButton("Sacrifice Unicorns").click();
                 maxClicks--;
                 tearsNeeded -= game.bld.get("ziggurat").val;
-                waitForTears = true;
+                //we will probably need to wait 1 tick after making tears
             }
         }
-        if (!waitForTears) findButton(this.name).click();
+        bought = buyButton(this.name);
     });
     if (this.panel === "Order of the Sun") {
         withLeader("Philosopher", doBuy);
     } else {
         doBuy();
     }
-    if (waitForTears) return 0;
+    return bought;
 }
 Religion.prototype.getRealPrices = function() { 
     var data = this.getData();
@@ -909,7 +931,7 @@ function HoldFestival(name, tab, panel) {
     this.name = name;
     this.tab = tab;
     this.panel = panel;
-    this.buy = () => withTab(this.tab, () => findButton(this.name).click());
+    this.buy = () => tabBuyButton(this.tab, this.name);
     this.getPrices = () => ([{ name: "manpower", val: 1500 }, { name: "culture", val: 5000 }, { name: "parchment", val: 2500 }]);
     this.isEnabled = () => game.calendar.festivalDays === 0;
     this.quiet = true;
@@ -918,7 +940,7 @@ function SendExplorers(name, tab, panel) {
     this.name = name;
     this.tab = tab;
     this.panel = panel;
-    this.buy = () => withTab(this.tab, () => findButton(this.name).click());
+    this.buy = () => tabBuyButton(this.tab, this.name);
     this.getPrices = () => ([{ name: "manpower", val: 1000 }]);
     this.isEnabled = () => true; //TODO detect when new races are available
     this.once = true;
