@@ -23,6 +23,10 @@ $('#helpDiv').prepend($(`<div id="botHelp">
         <li>normal: Craft resources that would be full by the time the bot plans to run again.</li>
         <li>safe: As normal, but assume twice as much time will pass before the bot runs. Useful at high game speeds, high bot speeds, or if the game is laggy. Consider using this mode if you see "Warning: [resource] full" messages in the console.</li>
     </ul></li>
+    <li>Auto Farmer: Calculates the amount of catnip you need stockpiled today to survive a regular winter. Unlike the food advisor, this factors in the amount of catnip you're expected to produce before winter, making it more accurate and less overcautious.
+        <li>off: Don't automatically switch kittens to farmers. The bot won't buy buildings or housing that would reduce your catnip below the needed catnip stockpile for a cold winter. You can starve if you have two cold seasons in the same year.</li>
+        <li>on: Automatically switch a kitten to Farmer (from the most common job) if your catnip stockpile is not enough to survive winter. The bot will buy housing, but not buildings, that would reduce your catnip below the needed catnip stockpile for a cold winter. Also, gather the first 10 catnip of the game.</li>
+    </ul></li>
 </ul>If one setting is being overridden by another, its effective value will be displayed in parentheses. For example, Bot Speed currently cannot be faster than 1/Game Speed.</p>
 <p>Special buttons: These queueing buttons look normal but have a special effect when enabled, and may not actually use the queue.<ul>
     <li>Send Hunters: Send hunters whenever your catpower is full or you have nothing else in the queue which needs catpower</li>
@@ -152,6 +156,7 @@ loadDefaults = () => {
     if (!state.desiredApi) state.desiredApi = 0;
     if (!state.verboseQueue) state.verboseQueue = 0;
     if (state.autoCraftLevel === undefined) state.autoCraftLevel = 1;
+    if (state.autoFarmer === undefined) state.autoFarmer = 1;
     if (!window.botDebug) botDebug = {};
 }
 initialize = () => {
@@ -306,8 +311,10 @@ buyPrioritiesQueue = (queue) => {
  * Main Loop
 **************/
 mainLoop = () => {
+    if (state.autoFarmer) {
     gatherIntialCatnip();
     preventStarvation();
+    }
     if (state.autoSteel) craftAll("steel")
     //todo make trades try harder to do more
     if (isResourceFull("gold")) state.queue.filter(bld => bld.constructor.name === "Trade" && bld.isEnabled()).forEach(bld => promote(bld.name));
@@ -637,6 +644,9 @@ preventStarvation = () => {
         switchToJob("farmer");
     }
 }
+setAutoFarmer = auto => {
+    state.autoFarmer = auto;
+}
 
 /************** 
  * Jobs
@@ -710,7 +720,7 @@ Building.prototype.getRealPrices = function() {
 }
 Building.prototype.getPrices = function() { 
     var prices = this.getRealPrices();
-    if (housingMap[this.name] && !game.science.get("agriculture").researched) {
+    if (housingMap[this.name] && !(game.science.get("agriculture").researched && (state.autoFarmer || state.defaultJob === "Farmer"))) {
         prices = prices.concat({name: "catnip", val: getAdditionalCatnipNeeded(true, housingMap[this.name])});
     }
     return prices;
@@ -1211,6 +1221,12 @@ settingsMenu = [
         leftClick: () => setAutoCrafting(state.autoCraftLevel + 1),
         rightClick: () => setAutoCrafting(state.autoCraftLevel - 1),
         getHtml: () => "Auto Craft: " + ["off", "normal", "safe"][state.autoCraftLevel]
+    },
+    {
+        name: "autoFarmer",
+        leftClick: () => setAutoFarmer(1),
+        rightClick: () => setAutoFarmer(0),
+        getHtml: () => "Auto Farmer: " + ["off", "on"][state.autoFarmer] + "<br />(need " + game.getDisplayValueExt(getWinterCatnipStockNeeded(false)) + " catnip)"
     }
 ];
 createSettingsMenu = () => {
@@ -1295,7 +1311,7 @@ improve interface
 ----2: queued twice
 --combine trade messages
 ----read game.console.messages; change message and set span to undefined, then call game.ui.renderConsoleLog()
---turn off autofarmer
+--turn off Up Next, hide settings menu
 stop warning about resources full when waiting for another
 reserve ivory like furs
 early game needs:
@@ -1304,6 +1320,7 @@ early game needs:
 ------factor in skill learning rate (give 5% leeway if kitten is already better at its current job?)
 ----set next job based on highest need in queue (measured in ticks)?
 ----unassign scholars when useless (reassign?)
+----wood/geologist efficiency (for trade)
 --first leader
 ----promote leader
 --first hunting (get efficiency)
