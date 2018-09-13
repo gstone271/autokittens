@@ -114,6 +114,12 @@ recountKittens = (newJob) => {
         logKitten(kittens, newJob)
     }
 }
+getBestResetPoint = history =>
+    history
+        .filter(entry => entry.type === "Kitten" || entry.type === "Reset")
+        .map(entry => ({paragon: Math.max(0, entry.kittens - 70), year: entry.year + entry.day / 400}))
+        .map(entry => ({paragon: entry.paragon, year: entry.year, ratio: entry.paragon / entry.year}))
+        .sort((a, b) => b.ratio - a.ratio)
 
 /************** 
  * Save/Load
