@@ -28,6 +28,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
         <li>on: Automatically switch a kitten to Farmer (from the most common job) if your catnip stockpile is not enough to survive winter. The bot will buy housing, but not buildings, that would reduce your catnip below the needed catnip stockpile for a cold winter. Also, gather the first 10 catnip of the game.</li>
     </ul></li>
     <li>Farmer ratio: Calculates the ratio of wood per farmer to wood per woodcutter. If this ratio is greater than one, you should switch all your woodcutters to farmers.</li>
+    <li>Auto SETI: When on, automatically observe the sky. Doesn't work during redshift; if you have offline progression enabled, consider buying SETI to get more starcharts.</li>
 </ul>If one setting is being overridden by another, its effective value will be displayed in parentheses. For example, Bot Speed currently cannot be faster than 1/Game Speed.</p>
 <p>Special buttons: These queueing buttons look normal but have a special effect when enabled, and may not actually use the queue.<ul>
     <li>Send Hunters: Send hunters whenever your catpower is full or you have nothing else in the queue which needs catpower</li>
@@ -155,10 +156,11 @@ loadDefaults = () => {
     if (!state.history) state.history = [];
     if (!state.previousHistories) state.previousHistories = [];
     if (!state.numKittens) state.numKittens = game.village.sim.getKittens();
-    if (!state.desiredApi) state.desiredApi = 0;
     if (!state.verboseQueue) state.verboseQueue = 0;
+    if (state.desiredApi === undefined) state.desiredApi = 1;
     if (state.autoCraftLevel === undefined) state.autoCraftLevel = 1;
     if (state.autoFarmer === undefined) state.autoFarmer = 1;
+    if (state.autoSeti === undefined) state.autoSeti = 1;
     if (!window.botDebug) botDebug = {};
 }
 initialize = () => {
@@ -330,7 +332,9 @@ mainLoop = () => {
     state.ticks = game.ticks;
 }
 additionalActions = [
-    () => $('#observeBtn').click(),
+    () => {
+        if (state.autoSeti) $('#observeBtn').click()
+    },
     () => { 
         if (state.autoHunt && (isResourceFull("manpower") || getTotalDemand("manpower") === 0) && getResourceOwned("manpower") >= 100) { 
             withLeader("Manager", () => $('a:contains("Send hunters")')[0].click())
@@ -1143,7 +1147,7 @@ game.updateModel = () => {
             //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
             game.ticks++;
             //might be going so fast you would miss astro events
-            if (game.calendar.observeBtn) game.calendar.observeHandler();
+            if (state.autoSeti && game.calendar.observeBtn) game.calendar.observeHandler();
         }
         game.realUpdateModel(); 
     }
@@ -1296,7 +1300,13 @@ settingsMenu = [
     {
         name: "farmerWoodcutterIndicator",
         getHtml: () => "Farmer ratio: " + game.getDisplayValueExt(getFarmerEffectiveness())
-    }
+    },
+    {
+        name: "autoSeti",
+        leftClick: () => state.autoSeti = true,
+        rightClick: () => state.autoSeti = false,
+        getHtml: () => "Auto SETI: " + (state.autoSeti ? "on" : "off")
+    },
 ];
 createSettingsMenu = () => {
     $("#botSettings").remove()
