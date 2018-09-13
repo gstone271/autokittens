@@ -460,8 +460,8 @@ getEffectiveResourcePerTick = (res, bestCaseTicks, reserved) => {
 getCraftPrices = craft => { return game.workshop.getCraft(craft).prices }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
 craftTableElem = $('.craftTable');
-findCraftAllButton = (name) => craftTableElem.children('div.res-row:contains("' + getResourceTitle(name) + '") div.craft-link:contains("all")')[0]
-findCraftButtons = (name) => craftTableElem.children('div.res-row:contains("' + getResourceTitle(name) + '") div.craft-link:contains("+")');
+findCraftAllButton = (name) => craftTableElem.children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("all")')[0]
+findCraftButtons = (name) => craftTableElem.children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("+")');
 craftFirstTime = name => {
     if (canAfford(getCraftPrices(name), {})) {
         withTab("Workshop", () => {
