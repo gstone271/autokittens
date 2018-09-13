@@ -27,6 +27,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
         <li>off: Don't automatically switch kittens to farmers. The bot won't buy buildings or housing that would reduce your catnip below the needed catnip stockpile for a cold winter. You can starve if you have two cold seasons in the same year.</li>
         <li>on: Automatically switch a kitten to Farmer (from the most common job) if your catnip stockpile is not enough to survive winter. The bot will buy housing, but not buildings, that would reduce your catnip below the needed catnip stockpile for a cold winter. Also, gather the first 10 catnip of the game.</li>
     </ul></li>
+    <li>Farmer ratio: Calculates the ratio of wood per farmer to wood per woodcutter. If this ratio is greater than one, you should switch all your woodcutters to farmers.</li>
 </ul>If one setting is being overridden by another, its effective value will be displayed in parentheses. For example, Bot Speed currently cannot be faster than 1/Game Speed.</p>
 <p>Special buttons: These queueing buttons look normal but have a special effect when enabled, and may not actually use the queue.<ul>
     <li>Send Hunters: Send hunters whenever your catpower is full or you have nothing else in the queue which needs catpower</li>
@@ -690,6 +691,40 @@ switchToJob = jobName => {
         console.error("Job " + jobName + " not unlocked yet!");
     }
 }
+resourceEffectNames = ["JobRatio", "GlobalRatio", "Ratio", "RatioReligion", "SuperRatio"]
+/**
+ * Get the relative production ratio of assigning a kitten to a job producing resInternalName. Doesn't include festivals. Not for engineers.
+ */
+getResourceSpecificRatio = resInternalName => {
+    var totalRatio = resourceEffectNames
+        .map(effect => game.getEffect(resInternalName + effect))
+        .reduce((total, ratioAdded) => total * (1 + ratioAdded), 1);
+    if (!game.resPool.get(resInternalName).transient && resInternalName !== "catnip") {
+        //from game.calcResourcePerTick
+        if (resInternalName !== "oil") {
+            var steamworks = game.bld.get("steamworks");
+            var swRatio = steamworks.on > 0 ? (1 + steamworks.effects["magnetoBoostRatio"] * steamworks.on) : 1;
+            totalRatio *= 1 + (game.getEffect("magnetoRatio") * swRatio);
+        }
+        if (resInternalName !== "uranium") {
+            //reactors
+            totalRatio *= 1 + game.getEffect("productionRatio");
+        }
+    }
+    //generic effects
+    totalRatio *= game.village.happiness * (1 + (game.religion.getProductionBonus() / 100)) * (1 + game.prestige.getParagonProductionRatio());
+    return totalRatio;
+}
+//Doesn't include skill level.
+getResourcePerTickPerKitten = (jobInternalName, resInternalName) => {
+    return (game.village.getJob(jobInternalName).modifiers[resInternalName] || 0) * getResourceSpecificRatio(resInternalName);
+}
+getWoodPerFarmer = () => getResourcePerTickPerKitten("farmer", "catnip") * getCraftRatio("wood") / getPrice(getCraftPrices("wood"), "catnip")
+getFarmerEffectiveness = () => getWoodPerFarmer() / getResourcePerTickPerKitten("woodcutter", "wood")
+//from game.villageTab.getValueModifierPerSkill
+baseSkillRatioAtMaxLevel = 1.75
+//from village.updateResourceProduction
+getBestPossibleSkillRatio = () => 1 + (baseSkillRatioAtMaxLevel - 1) * (1 + game.getEffect("skillMultiplier")) / 4
 
 
 /************** 
@@ -1252,6 +1287,10 @@ settingsMenu = [
         leftClick: () => setAutoFarmer(1),
         rightClick: () => setAutoFarmer(0),
         getHtml: () => "Auto Farmer: " + ["off", "on"][state.autoFarmer] + "<br />(need " + game.getDisplayValueExt(getWinterCatnipStockNeeded(false)) + " catnip)"
+    },
+    {
+        name: "farmerWoodcutterIndicator",
+        getHtml: () => "Farmer ratio: " + game.getDisplayValueExt(getFarmerEffectiveness())
     }
 ];
 createSettingsMenu = () => {
