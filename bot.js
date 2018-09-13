@@ -294,7 +294,7 @@ updateUpNext = priorities => {
         filter = plan => true;
         getHtml = plan => "<span" + (plan.viable ? "" : ' style="color: #999999"') + ">"
              + plan.bld.name
-             + " (" + Array.from(new Set(plan.limiting.concat(plan.unavailable))).join(", ") + ")</span>"
+             + " (" + Array.from(new Set(plan.limiting.concat(plan.unavailable))).map(getResourceTitle).join(", ") + ")</span>"
     } else {
         filter = plan => plan.viable;
         getHtml = plan => plan.bld.name;
