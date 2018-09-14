@@ -768,7 +768,7 @@ housingMap = {
 }
 //remove percentages and counts
 trimButtonText = text => text.replace(/(\(|\[)[^\])]*(\)|\])/g, "").trim()
-findButton = name => $('span').filter((idx, button) => trimButtonText(button.innerText) === name).parents("div.btn")
+findButton = name => $('span:visible').filter((idx, button) => trimButtonText(button.innerText) === name).parents("div.btn")
 buyButton = (name) => {
     var button = findButton(name);
     //might not have been enabled in the ui yet--after crafting a resource, you have to wait 1 tick
