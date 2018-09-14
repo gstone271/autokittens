@@ -218,26 +218,45 @@ game._wipe = () => {
 /************** 
  * Queue Logic
 **************/
-reserveBufferTime = game.rate * 60 * 5; //5 minutes: reserve enough of non-limiting resources to be this far ahead of the limiting resource
-findPriorities = (queue, reserved) => {
-    if (queue.length == 0) return [];
-    var found = queue[0];
-    var prices = found.getPrices();
-    if (!found.isEnabled() || !haveEnoughStorage(prices, reserved)) return findPriorities(queue.slice(1, queue.length), reserved);
-    var unavailableResources = prices.map(price => price.name).filter(res => (reserved[res] || 0) > getResourceOwned(res));
-    var viable = unavailableResources.length ? false : true;
-    var canAffordOne = price => getResourceOwned(price.name) - (reserved[price.name] || 0) > price.val;
-    var getTicksToEnough = price => //ticks until you have enough. May be infinite or negative
-        (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name)) / getEffectiveResourcePerTick(price.name, 0, reserved);
-    var unaffordablePrices = prices.filter(price => !canAffordOne(price));
-    //todo: this isn't correct for repeat prices (eg steel + gear). but the reserveBufferTime helps
-    var ticksNeeded = Math.max(0, Math.max(...unaffordablePrices.map(getTicksToEnough)) - reserveBufferTime);
-    //assumes the price is unaffordable
-    var isLimitingResource = price => getTicksToEnough(price) >= ticksNeeded;
-    //if the resource is craftable, need to figure out which of its components is limiting
-    //ticksNeeded is ok
+//get the sum of the prices and the prices to craft any missing resources
+var getEffectivePrices = (prices, reserved) => {
+    var totalPricesMap = {};
+    var shortages = prices;
+    var maxDepth = 10;
+    var getShortage = price => ({ name: price.name, 
+        val: Math.max(0, price.val - Math.max(0, getResourceOwned(price.name) - (reserved[price.name] || 0) - (totalPricesMap[price.name] || 0))) 
+    })
     var getIngredientsNeeded = price => 
         (canCraft(price.name) ? multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)) ) : [])
+    while (shortages.length) {
+        if (!maxDepth--) {
+            //if the game ever lets you craft scaffold back into catnip...
+            console.error("Infinite loop finding shortages:")
+            console.error(shortages)
+            break;
+        }
+        var nextShortages = flattenArr(shortages.map(getShortage).map(getIngredientsNeeded));
+        shortages.forEach(price => totalPricesMap[price.name] = (totalPricesMap[price.name] || 0) + price.val)
+        shortages = nextShortages;
+    }
+    return Object.entries(totalPricesMap).map(price => ({name: price[0], val: price[1]}))
+}
+reserveBufferTime = game.rate * 60 * 5; //5 minutes: reserve enough of non-limiting resources to be this far ahead of the limiting resource
+var getTicksNeeded = (effectivePrices, originalPrices, reserved) => {
+    var unaffordablePrices = effectivePrices.filter(price => !canAffordOne(price, reserved));
+    return Math.max(
+        0,
+        Math.max(...unaffordablePrices
+            .filter(price => originalPrices.some(originalPrice => price.name === originalPrice.name))
+            .map(price => getTicksToEnough(price, reserved)))
+            - reserveBufferTime);
+}
+var canAffordOne = (price, reserved) => getResourceOwned(price.name) - (reserved[price.name] || 0) > price.val;
+var getTicksToEnough = (price, reserved) => //ticks until you have enough. May be infinite or negative
+    (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name)) / getEffectiveResourcePerTick(price.name, 0, reserved);
+var getResourcesToReserve = (effectivePrices, ticksNeeded, reserved) => {
+    //assumes the price is unaffordable
+    var isLimitingResource = price => !canAffordOne(price, reserved) && getTicksToEnough(price, reserved) >= ticksNeeded;
 
     var newReserved = Object.assign({}, reserved);
     var limitingResources = {};
@@ -251,26 +270,27 @@ findPriorities = (queue, reserved) => {
         newReserved[price.name] = (newReserved[price.name] || 0) + price.val;
         limitingResources[price.name] = true;
     }
-    prices.filter(canAffordOne).forEach(reserveNonLimiting);
-    //don't reserve infinity?
-    var getShortage = price => ({ name: price.name, 
-        val: Math.max(0, (newReserved[price.name] || 0) - getResourceOwned(price.name) + price.val) 
-    })
-    var shortages = unaffordablePrices;
-    var maxDepth = 10;
-    while (shortages.length) {
-        if (!maxDepth--) {
-            //if the game ever lets you craft scaffold back into catnip...
-            console.error("Infinite loop finding shortages:")
-            console.error(shortages)
-            break;
+    effectivePrices.forEach(price => {
+        if (isLimitingResource(price)) {
+            reserveLimiting(price);
+        } else {
+            reserveNonLimiting(price);
         }
-        shortages.filter(isLimitingResource).forEach(reserveLimiting);
-        shortages.filter(price => !isLimitingResource(price)).forEach(reserveNonLimiting);
-        shortages = flattenArr(shortages.map(getShortage).map(getIngredientsNeeded));
-    }
-    return [{bld: found, reserved: reserved, viable: viable, unavailable: unavailableResources, limiting: Object.keys(limitingResources)}]
-        .concat(findPriorities(queue.slice(1, queue.length), newReserved));
+    })
+    return {newReserved: newReserved, limitingResources: Object.keys(limitingResources)};
+}
+findPriorities = (queue, reserved) => {
+    if (queue.length == 0) return [];
+    var found = queue[0];
+    var prices = found.getPrices();
+    if (!found.isEnabled() || !haveEnoughStorage(prices, reserved)) return findPriorities(queue.slice(1), reserved);
+    var unavailableResources = prices.map(price => price.name).filter(res => (reserved[res] || 0) > getResourceOwned(res));
+    var viable = unavailableResources.length ? false : true;
+    var effectivePrices = getEffectivePrices(prices, reserved);
+    var ticksNeeded = getTicksNeeded(effectivePrices, prices, reserved);
+    var toReserve = getResourcesToReserve(effectivePrices, ticksNeeded, reserved);
+    return [{bld: found, reserved: reserved, viable: viable, unavailable: unavailableResources, limiting: toReserve.limitingResources}]
+        .concat(findPriorities(queue.slice(1), toReserve.newReserved));
 }
 subtractUnreserved = (reserved, bought) => {
     var newReserved = Object.assign({}, reserved);
