@@ -612,7 +612,10 @@ doAutoCraft = () => {
         if (canCraft(craft.name)) {
             var maxClicks = 10; //don't expect to need this many clicks, prevent something bad
             var craftRatio = getCraftRatio(craft.name);
-            var getAmountToCraft = price => Math.ceil((getResourceOwned(price.name) - getEnoughResource(price.name)) / price.val)
+            var getAmountToCraft = price => {
+                var safeCrafts = (getResourceOwned(price.name) - getEnoughResource(price.name)) / price.val
+                return getResourceMax(price.name) === Infinity ? Math.floor(safeCrafts) : Math.ceil(safeCrafts);
+            }
             var timesToCraft = Math.min(...craft.prices.map(getAmountToCraft))
             //TODO reduce logic duplication with makeCraft
             while (timesToCraft > 0 && maxClicks--) {
@@ -721,13 +724,12 @@ getWinterCatnipStockNeeded = (isCold, additionalConsumption) => {
 getAdditionalCatnipNeeded = populationIncrease => {
     return getWinterCatnipStockNeeded(canHaveColdSeason(), populationIncrease * -game.village.catnipPerKitten) - getWinterCatnipStockNeeded(canHaveColdSeason(), 0)
 }
-//this might need to be slightly more in case you trade, etc
 getFursStockNeeded = () => {
     var catpowerPerSec = game.getResourcePerTick("manpower", true);
     if (catpowerPerSec <= 0) {
         return game.getResourcePerTick("furs", true) >= 0 ? 0 : Infinity;
     }
-    return Math.max(0, -game.getResourcePerTick("furs", true) * (getResourceMax("manpower") / catpowerPerSec))
+    return Math.max(0, -game.getResourcePerTick("furs", true) * ((getResourceMax("manpower") + 50 * getResourceOwned("gold") / 15) / catpowerPerSec))
 }
 gatherIntialCatnip = () => {
     if (game.bld.get("field").val === 0 && getResourceOwned("catnip") < 10) {
