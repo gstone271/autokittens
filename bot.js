@@ -131,7 +131,7 @@ loadString = string => {
     var parsed = JSON.parse(LZString.decompressFromBase64(string));
     var rawQueue = parsed.queue;
     parsed.queue = [];
-    if (parsed.previousHistoriesCompressed) { parsed.previousHistories = LZString.decompressFromBase64(parsed.previousHistoriesCompressed); }
+    if (parsed.previousHistoriesCompressed) { parsed.previousHistories = JSON.parse(LZString.decompressFromBase64(parsed.previousHistoriesCompressed)); }
     state = parsed;
     reloadQueue(rawQueue);
 }
