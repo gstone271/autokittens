@@ -87,6 +87,8 @@ logReset = () => addLog({ name: "Reset", type: "Reset", kittens: game.village.si
 rotateLogs = () => {
     state.previousHistories.push(state.history);
     state.history = [];
+    //compress previous histories in advance so that saving doesn't need too much CPU
+    state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
 }
 if (!game.realResetAutomatic) game.realResetAutomatic = game.resetAutomatic;
 game.resetAutomatic = () => {
@@ -129,10 +131,15 @@ loadString = string => {
     var parsed = JSON.parse(LZString.decompressFromBase64(string));
     var rawQueue = parsed.queue;
     parsed.queue = [];
+    if (parsed.previousHistoriesCompressed) { parsed.previousHistories = LZString.decompressFromBase64(parsed.previousHistoriesCompressed); }
     state = parsed;
     reloadQueue(rawQueue);
 }
-exportSave = () => LZString.compressToBase64(JSON.stringify(state));
+exportSave = () => {
+    var savedState = Object.assign({}, state);
+    delete(savedState.previousHistories); //use previousHistoriesCompressed instead to save CPU
+    return LZString.compressToBase64(JSON.stringify(savedState));
+}
 importSave = saveString => {
     loadString(saveString);
     loadDefaults();
@@ -161,6 +168,7 @@ loadDefaults = () => {
     if (!state.ticks) state.ticks = game.ticks;
     if (!state.history) state.history = [];
     if (!state.previousHistories) state.previousHistories = [];
+    if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
     if (!state.numKittens) state.numKittens = game.village.sim.getKittens();
     if (!state.verboseQueue) state.verboseQueue = 0;
     if (state.desiredApi === undefined) state.desiredApi = 1;
