@@ -28,6 +28,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
         <li>on: Automatically switch a kitten to Farmer (from the most common job) if your catnip stockpile is not enough to survive winter. The bot will buy housing, but not buildings, that would reduce your catnip below the needed catnip stockpile for a cold winter. Also, gather the first 10 catnip of the game.</li>
     </ul></li>
     <li>Farmer ratio: Calculates the ratio of wood per farmer to wood per woodcutter. If this ratio is greater than one, you should switch all your woodcutters to farmers.</li>
+    <li>Auto Converters: When on, automatically turns off any conversion buildings (eg. smelter) if all of the conversion products are full and nothing in the queue needs the resources you can craft from them. The disabled buildings will be listed below, and won't be purchased.</li>
     <li>Auto SETI: When on, automatically observe the sky. Doesn't work during redshift; if you have offline progression enabled, consider buying SETI to get more starcharts.</li>
 </ul>If one setting is being overridden by another, its effective value will be displayed in parentheses. For example, Bot Speed currently cannot be faster than 1/Game Speed.</p>
 <p>Special buttons: These queueing buttons look normal but have a special effect when enabled, and may not actually use the queue.<ul>
@@ -171,10 +172,12 @@ loadDefaults = () => {
     if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
     if (!state.numKittens) state.numKittens = game.village.sim.getKittens();
     if (!state.verboseQueue) state.verboseQueue = 0;
+    if (!state.disabledConverters) state.disabledConverters = {};
     if (state.desiredApi === undefined) state.desiredApi = 1;
     if (state.autoCraftLevel === undefined) state.autoCraftLevel = 1;
     if (state.autoFarmer === undefined) state.autoFarmer = 1;
-    if (state.autoSeti === undefined) state.autoSeti = 1;
+    if (state.autoSeti === undefined) state.autoSeti = true;
+    if (state.autoConverters === undefined) state.autoConverters = true;
     if (!window.botDebug) botDebug = {};
 }
 initialize = () => {
@@ -337,6 +340,7 @@ mainLoop = () => {
     //todo make trades try harder to do more
     if (isResourceFull("gold")) state.queue.filter(bld => bld.constructor.name === "Trade" && bld.isEnabled()).forEach(bld => promote(bld.name));
     state.queue = buyPrioritiesQueue(state.queue);
+    if (state.autoConverters) manageConverters();
     doAutoCraft();
     additionalActions.forEach(action => action());
     updateManagementButtons();
@@ -372,6 +376,64 @@ additionalActions = [
 ]
 
 /************** 
+ * Conversion
+**************/
+converters = ["smelter", "calciner", "biolab", "accelerator"]
+getEffectsByNamePattern = (effects, pattern) => {
+    return Object.keys(effects)
+        .filter(name => name.match(pattern))
+        .map(key => ({name: key.replace(pattern, ""), val: effects[key]}))
+}
+getConsumptionsPerTick = effects => getEffectsByNamePattern(effects, /PerTickCon$/)
+getProductionsPerTick = effects => getEffectsByNamePattern(effects, /PerTickAutoprod$/)
+//if adding is true, reject productions that, if added, would make the resource become full
+//otherwise, only reject productions of resources that are already full
+//either way, only reject productions if they cannot be crafted into something useful
+isUselessProduction = (production, adding) => {
+    return production.val === 0 || (
+        isResourceFull(production.name, adding ? production.val * getResourceConversionRatio(production.name) : 0)
+        && !autoCrafts.some(craft => 
+            canCraft(craft.name) && craft.prices.some(price => price.name === production.name) && getTotalDemand(craft.name) > 0
+        )
+    )
+}
+manageConverters = () => {
+    converters.map(name => game.bld.get(name)).forEach(converter => {
+        var productions = getProductionsPerTick(converter.effects);
+        if (converter.on && productions.length && productions.every(isUselessProduction)) {
+            console.log("Disabling " + converter.name);
+            enableConverter(converter, -1);
+            state.disabledConverters[converter.name] = Math.min(converter.val, 1 + (state.disabledConverters[converter.name] || 0));
+        } else if (state.disabledConverters[converter.name] && productions.some(production => !isUselessProduction(production, true))) {
+            console.log("Re-enabling " + converter.name);
+            enableConverter(converter, 1);
+            state.disabledConverters[converter.name]--;
+        }
+    })
+}
+getResourceConversionRatio = res => {
+    return getResourceGenericRatio(res) * (1 + game.prestige.getParagonProductionRatio() * 0.05);
+}
+enableConverter = (converter, amount) => {
+    if (state.api >= 1) {
+        converter.on = Math.max(0, Math.min(converter.val, converter.on + amount));
+        game.upgrade(converter.upgrades);
+    } else {
+        withTab("Bonfire", () => {
+            var outerButton = findButton(converter.label);
+            var button = amount > 0 ? getBuildingIncreaseButton(outerButton) : getBuildingDecreaseButton(outerButton);
+            for (var i = 0; i < Math.abs(amount); i++) {
+                button.click();
+            }
+        })
+    }
+}
+resetConverters = () => {
+    Object.entries(state.disabledConverters).forEach(disabled => enableConverter(game.bld.get(disabled[0]), disabled[1]))
+    state.disabledConverters = {};
+}
+
+/************** 
  * Resources
 **************/
 getResourceOwned = resName => game.resPool.get(resName).value
@@ -402,17 +464,18 @@ getTotalDemand = res => {
         .map(price => price.val)
         .reduce((acc, item) => acc + item, 0)
 }
-getSafeStorage = (res, autoCraftLevel) => {
+getSafeStorage = (res, autoCraftLevel, additionalProduction) => {
     if (autoCraftLevel === undefined) autoCraftLevel = state.autoCraftLevel;
+    if (!additionalProduction) additionalProduction = 0;
     var max = getResourceMax(res);
-    return max === Infinity ? max : max - autoCraftLevel * state.ticksPerLoop * getEffectiveResourcePerTick(res, state.ticksPerLoop, {});
+    return max === Infinity ? max : max - autoCraftLevel * state.ticksPerLoop * (getEffectiveResourcePerTick(res, state.ticksPerLoop, {}) + additionalProduction);
 }
 //TODO don't use this for upgrades--particularly, photolithography will be delayed
 //--when all resources are close to full, allow them to become completely full
 //--don't include resources that can't be crafted yet
 haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(price.name) >= price.val + (reserved[price.name] || 0))
 canAfford = (prices, reserved) => prices.every(price => getResourceOwned(price.name) - (reserved[price.name] || 0) >= price.val);
-isResourceFull = res => getResourceOwned(res) >= getSafeStorage(res, Math.max(state.autoCraftLevel, 1));
+isResourceFull = (res, additionalProduction) => getResourceOwned(res) >= getSafeStorage(res, Math.max(state.autoCraftLevel, 1), additionalProduction);
 //todo factor in crafting?????
 /**
  * bestCaseTicks: if nonzero, assume you will have this many ticks of the maximum possible astronomical events (for save storage calculation)
@@ -725,10 +788,18 @@ resourceEffectNames = ["JobRatio", "GlobalRatio", "Ratio", "RatioReligion", "Sup
 /**
  * Get the relative production ratio of assigning a kitten to a job producing resInternalName. Doesn't include festivals. Not for engineers.
  */
-getResourceSpecificRatio = resInternalName => {
+getResourceKittenRatio = resInternalName => {
     var totalRatio = resourceEffectNames
         .map(effect => game.getEffect(resInternalName + effect))
         .reduce((total, ratioAdded) => total * (1 + ratioAdded), 1);
+    totalRatio *= getResourceGenericRatio(resInternalName);
+    //generic effects
+    totalRatio *= game.village.happiness * (1 + game.prestige.getParagonProductionRatio());
+    return totalRatio;
+}
+//production ratio component for both buildings and kittens
+getResourceGenericRatio = resInternalName => {
+    var totalRatio = 1 + (game.religion.getProductionBonus() / 100);
     if (!game.resPool.get(resInternalName).transient && resInternalName !== "catnip") {
         //from game.calcResourcePerTick
         if (resInternalName !== "oil") {
@@ -741,13 +812,11 @@ getResourceSpecificRatio = resInternalName => {
             totalRatio *= 1 + game.getEffect("productionRatio");
         }
     }
-    //generic effects
-    totalRatio *= game.village.happiness * (1 + (game.religion.getProductionBonus() / 100)) * (1 + game.prestige.getParagonProductionRatio());
     return totalRatio;
 }
 //Doesn't include skill level.
 getResourcePerTickPerKitten = (jobInternalName, resInternalName) => {
-    return (game.village.getJob(jobInternalName).modifiers[resInternalName] || 0) * getResourceSpecificRatio(resInternalName);
+    return (game.village.getJob(jobInternalName).modifiers[resInternalName] || 0) * getResourceKittenRatio(resInternalName);
 }
 getWoodPerFarmer = () => getResourcePerTickPerKitten("farmer", "catnip") * getCraftRatio("wood") / getPrice(getCraftPrices("wood"), "catnip")
 getFarmerEffectiveness = () => getWoodPerFarmer() / getResourcePerTickPerKitten("woodcutter", "wood")
@@ -766,9 +835,13 @@ housingMap = {
     Mansion: 1,
     "Space Station": 2,
 }
-//remove percentages and counts
+//remove percentages, counts, and (complete)
 trimButtonText = text => text.replace(/(\(|\[)[^\])]*(\)|\])/g, "").trim()
 findButton = name => $('span:visible').filter((idx, button) => trimButtonText(button.innerText) === name).parents("div.btn")
+//bonfire increase/decrease uses simple +/-, unlike jobs which use [] and en dash
+//make sure not to grab the -all button
+getBuildingDecreaseButton = button => button.find('a').filter((idx, elem) => elem.innerText.trim() === "-")[0];
+getBuildingIncreaseButton = button => button.find('a').filter((idx, elem) => elem.innerText.trim() === "+")[0];
 buyButton = (name) => {
     var button = findButton(name);
     //might not have been enabled in the ui yet--after crafting a resource, you have to wait 1 tick
@@ -812,7 +885,7 @@ Building.prototype.getPrices = function() {
     return prices;
 }
 Building.prototype.isEnabled = function() {
-    return game.bld.get(this.internalName).unlocked;
+    return game.bld.get(this.internalName).unlocked && !state.disabledConverters[this.internalName];
 }
 
 function Craft(name, tab, panel) {
@@ -1320,6 +1393,13 @@ settingsMenu = [
         getHtml: () => "Auto Farmer: " + ["off", "on"][state.autoFarmer]
             + "<br />(need " + game.getDisplayValueExt(getWinterCatnipStockNeeded(false)) + " catnip)"
             + "<br />farmer ratio: " + game.getDisplayValueExt(getFarmerEffectiveness())
+    },
+    {
+        name: "autoConverters",
+        leftClick: () => state.autoConverters = true,
+        rightClick: () => { state.autoConverters = false; resetConverters() },
+        getHtml: () => "Auto Converters: " + (state.autoConverters ? "on" : "off")
+            + Object.keys(state.disabledConverters).filter(key => state.disabledConverters[key]).map(key => "<br />(disabled " + state.disabledConverters[key] + " " + key + "s)")
     },
     {
         name: "autoSeti",
