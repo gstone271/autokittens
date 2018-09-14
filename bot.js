@@ -236,20 +236,26 @@ findPriorities = (queue, reserved) => {
     var isLimitingResource = price => getTicksToEnough(price) >= ticksNeeded;
     //if the resource is craftable, need to figure out which of its components is limiting
     //ticksNeeded is ok
-    var getIngredientsNeeded = price => (canCraft(price.name) ? multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)) ) : [])
+    var getIngredientsNeeded = price => 
+        (canCraft(price.name) ? multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)) ) : [])
 
     var newReserved = Object.assign({}, reserved);
     var limitingResources = {};
     //amount to reserve, if you will have ticks production
-    var getEnoughForTicks = (price, ticks) => Math.max(0, (newReserved[price.name] || 0) + price.val - (ticks * getEffectiveResourcePerTick(price.name, 0, newReserved) || 0))
-    var reserveNonLimiting = price => newReserved[price.name] = (newReserved[price.name] || 0) + getEnoughForTicks(price, ticksNeeded);
+    var getEnoughForTicks = (price, ticks) => 
+        Math.max(0, (newReserved[price.name] || 0) + price.val
+            - (ticks * getEffectiveResourcePerTick(price.name, 0, newReserved) || 0))
+    var reserveNonLimiting = price => 
+        newReserved[price.name] = (newReserved[price.name] || 0) + getEnoughForTicks(price, ticksNeeded);
     var reserveLimiting = price => {
         newReserved[price.name] = (newReserved[price.name] || 0) + price.val;
         limitingResources[price.name] = true;
     }
     prices.filter(canAffordOne).forEach(reserveNonLimiting);
     //don't reserve infinity?
-    var getShortage = price => ({ name: price.name, val: Math.max(0, (newReserved[price.name] || 0) - getResourceOwned(price.name) + price.val) })
+    var getShortage = price => ({ name: price.name, 
+        val: Math.max(0, (newReserved[price.name] || 0) - getResourceOwned(price.name) + price.val) 
+    })
     var shortages = unaffordablePrices;
     var maxDepth = 10;
     while (shortages.length) {
@@ -261,7 +267,7 @@ findPriorities = (queue, reserved) => {
         }
         shortages.filter(isLimitingResource).forEach(reserveLimiting);
         shortages.filter(price => !isLimitingResource(price)).forEach(reserveNonLimiting);
-        shortages = flattenArr(shortages.map(getIngredientsNeeded)).map(getShortage);
+        shortages = flattenArr(shortages.map(getShortage).map(getIngredientsNeeded));
     }
     return [{bld: found, reserved: reserved, viable: viable, unavailable: unavailableResources, limiting: Object.keys(limitingResources)}]
         .concat(findPriorities(queue.slice(1, queue.length), newReserved));
