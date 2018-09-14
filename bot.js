@@ -402,16 +402,17 @@ getTotalDemand = res => {
         .map(price => price.val)
         .reduce((acc, item) => acc + item, 0)
 }
-getSafeStorage = res => {
+getSafeStorage = (res, autoCraftLevel) => {
+    if (autoCraftLevel === undefined) autoCraftLevel = state.autoCraftLevel;
     var max = getResourceMax(res);
-    return max === Infinity ? max : max - state.autoCraftLevel * state.ticksPerLoop * getEffectiveResourcePerTick(res, state.ticksPerLoop, {});
+    return max === Infinity ? max : max - autoCraftLevel * state.ticksPerLoop * getEffectiveResourcePerTick(res, state.ticksPerLoop, {});
 }
 //TODO don't use this for upgrades--particularly, photolithography will be delayed
 //--when all resources are close to full, allow them to become completely full
 //--don't include resources that can't be crafted yet
 haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(price.name) >= price.val + (reserved[price.name] || 0))
 canAfford = (prices, reserved) => prices.every(price => getResourceOwned(price.name) - (reserved[price.name] || 0) >= price.val);
-isResourceFull = res => getResourceOwned(res) > getSafeStorage(res);
+isResourceFull = res => getResourceOwned(res) >= getSafeStorage(res, Math.max(state.autoCraftLevel, 1));
 //todo factor in crafting?????
 /**
  * bestCaseTicks: if nonzero, assume you will have this many ticks of the maximum possible astronomical events (for save storage calculation)
