@@ -255,7 +255,7 @@ var getTicksNeeded = (effectivePrices, originalPrices, reserved) => {
 }
 var canAffordOne = (price, reserved) => getResourceOwned(price.name) - (reserved[price.name] || 0) > price.val;
 var getTicksToEnough = (price, reserved) => //ticks until you have enough. May be infinite or negative
-    (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name)) / getEffectiveResourcePerTick(price.name, 0, reserved);
+    (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name)) / getCraftingResourcePerTick(price.name, reserved);
 var getResourcesToReserve = (effectivePrices, ticksNeeded, reserved) => {
     //assumes the price is unaffordable
     var isLimitingResource = price => !canAffordOne(price, reserved) && getTicksToEnough(price, reserved) >= ticksNeeded;
@@ -265,13 +265,14 @@ var getResourcesToReserve = (effectivePrices, ticksNeeded, reserved) => {
     //amount to reserve, if you will have ticks production
     var getEnoughForTicks = (price, ticks) => 
         Math.max(0, (newReserved[price.name] || 0) + price.val
-            - (ticks * getEffectiveResourcePerTick(price.name, 0, newReserved) || 0))
+            - (ticks * getCraftingResourcePerTick(price.name, newReserved) || 0))
     var reserveNonLimiting = price => 
         newReserved[price.name] = (newReserved[price.name] || 0) + getEnoughForTicks(price, ticksNeeded);
     var reserveLimiting = price => {
         newReserved[price.name] = (newReserved[price.name] || 0) + price.val;
         limitingResources[price.name] = true;
     }
+    //TODO when reserving non limiting, reserve a maxiumum amount and a portion of production
     effectivePrices.forEach(price => {
         if (isLimitingResource(price)) {
             reserveLimiting(price);
@@ -496,7 +497,7 @@ getSafeStorage = (res, autoCraftLevel, additionalProduction) => {
     if (autoCraftLevel === undefined) autoCraftLevel = state.autoCraftLevel;
     if (!additionalProduction) additionalProduction = 0;
     var max = getResourceMax(res);
-    return max === Infinity ? max : max - autoCraftLevel * state.ticksPerLoop * (getEffectiveResourcePerTick(res, state.ticksPerLoop, {}) + additionalProduction);
+    return max === Infinity ? max : max - autoCraftLevel * state.ticksPerLoop * (getEffectiveResourcePerTick(res, state.ticksPerLoop) + additionalProduction);
 }
 //TODO don't use this for upgrades--particularly, photolithography will be delayed
 //--when all resources are close to full, allow them to become completely full
@@ -504,11 +505,35 @@ getSafeStorage = (res, autoCraftLevel, additionalProduction) => {
 haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(price.name) >= price.val + (reserved[price.name] || 0))
 canAfford = (prices, reserved) => prices.every(price => getResourceOwned(price.name) - (reserved[price.name] || 0) >= price.val);
 isResourceFull = (res, additionalProduction) => getResourceOwned(res) >= getSafeStorage(res, Math.max(state.autoCraftLevel, 1), additionalProduction);
-//todo factor in crafting?????
+
+getCraftingResourcePerTick = (res, reserved) => {
+    var resourcePerTick = getEffectiveResourcePerTick(res, 0);
+    //don't bother with the other possible events; they don't have capacities
+    if (res === "steel" && state.autoSteel || canCraft(res)) {
+        //once we're willing to chain craft catnip this will be wrong due to seasons
+        //don't worry about it for now
+        var prices = getCraftPrices(res);
+        /* want to just say if reserved is less than current
+         * , but that wouldn't account for resources we expect to have production on
+         * maybe note the amount of ticks of production reserved?
+         * TODO This might be wrong in the case where you have a bunch of things limited 
+         * on different rare resources, not reserving a shared common resources;
+         * the common resource might be overspent
+         */
+        if (res === "steel" && state.autoSteel || prices.every(price => !reserved[price.name])) {
+            //special case steel: we always craft it
+            resourcePerTick += getCraftRatio(res) * Math.min(...prices.map(price => 
+                getCraftingResourcePerTick(price.name, reserved) / price.val
+            ))
+        }
+    }
+    //todo production from trade???? maybe just blueprints based on gold income?? needs more consistent trading
+    return resourcePerTick;
+}
 /**
  * bestCaseTicks: if nonzero, assume you will have this many ticks of the maximum possible astronomical events (for save storage calculation)
  */
-getEffectiveResourcePerTick = (res, bestCaseTicks, reserved) => {
+getEffectiveResourcePerTick = (res, bestCaseTicks) => {
     var resourcePerTick = game.getResourcePerTick(res, true);
     var bestCaseDays = Math.ceil(bestCaseTicks * game.calendar.dayPerTick);
     var effectiveDaysPerTick = bestCaseTicks ? bestCaseDays / bestCaseTicks : game.calendar.dayPerTick;
@@ -536,37 +561,17 @@ getEffectiveResourcePerTick = (res, bestCaseTicks, reserved) => {
         }
         resourcePerTick += eventsPerTick * valuePerEvent;
     }
-    //don't bother with the other possible events; they don't have capacities
-    if (res === "steel" && state.autoSteel || canCraft(res)) {
-        //once we're willing to chain craft catnip this will be wrong due to seasons
-        //don't worry about it for now
-        var prices = getCraftPrices(res);
-        /* want to just say if reserved is less than current
-         * , but that wouldn't account for resources we expect to have production on
-         * maybe note the amount of ticks of production reserved?
-         * TODO This might be wrong in the case where you have a bunch of things limited 
-         * on different rare resources, not reserving a shared common resources;
-         * the common resource might be overspent
-         */
-        if (res === "steel" && state.autoSteel || prices.every(price => !reserved[price.name])) {
-            //special case steel: we always craft it
-            resourcePerTick += getCraftRatio(res) * Math.min(...prices.map(price => 
-                getEffectiveResourcePerTick(price.name, bestCaseTicks, reserved) / price.val
-            ))
-        }
-    }
     if (res === "iron" && state.autoSteel) {
-        resourcePerTick = Math.max(0, resourcePerTick - getEffectiveResourcePerTick("coal", bestCaseTicks, reserved));
+        resourcePerTick = Math.max(0, resourcePerTick - getEffectiveResourcePerTick("coal", bestCaseTicks));
     }
     //don't bother with ivory and unicorns income; it doesn't matter
     if (res === "furs" && state.autoHunt) {
         var effectiveCatpowerPerTick = Math.max(0, 
-            getEffectiveResourcePerTick("manpower", bestCaseTicks, reserved)
-                - getEffectiveResourcePerTick("gold", bestCaseTicks, reserved) * 50 / 15
+            getEffectiveResourcePerTick("manpower", bestCaseTicks)
+                - getEffectiveResourcePerTick("gold", bestCaseTicks) * 50 / 15
         )
         resourcePerTick += getFursPerHunt() * effectiveCatpowerPerTick / 100;
     }
-    //todo production from trade???? maybe just blueprints based on gold income?? needs more consistent trading
     return resourcePerTick;
 }
 var getFursPerHunt = () => {
