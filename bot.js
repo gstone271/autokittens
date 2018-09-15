@@ -548,16 +548,32 @@ getEffectiveResourcePerTick = (res, bestCaseTicks, reserved) => {
          * on different rare resources, not reserving a shared common resources;
          * the common resource might be overspent
          */
-        if (res === "steel" || prices.every(price => !reserved[price.name])) {
+        if (res === "steel" && state.autoSteel || prices.every(price => !reserved[price.name])) {
             //special case steel: we always craft it
             resourcePerTick += getCraftRatio(res) * Math.min(...prices.map(price => 
                 getEffectiveResourcePerTick(price.name, bestCaseTicks, reserved) / price.val
             ))
         }
     }
+    if (res === "iron" && state.autoSteel) {
+        resourcePerTick = Math.max(0, resourcePerTick - getEffectiveResourcePerTick("coal", bestCaseTicks, reserved));
+    }
+    //don't bother with ivory and unicorns income; it doesn't matter
+    if (res === "furs" && state.autoHunt) {
+        var effectiveCatpowerPerTick = Math.max(0, 
+            getEffectiveResourcePerTick("manpower", bestCaseTicks, reserved)
+                - getEffectiveResourcePerTick("gold", bestCaseTicks, reserved) * 50 / 15
+        )
+        resourcePerTick += getFursPerHunt() * effectiveCatpowerPerTick / 100;
+    }
     //todo production from trade???? maybe just blueprints based on gold income?? needs more consistent trading
-    //todo production from hunting?
     return resourcePerTick;
+}
+var getFursPerHunt = () => {
+    var managerBonus = .05 * (1 + this.game.prestige.getBurnedParagonRatio())
+    var huntRatio = game.getEffect("hunterRatio") + managerBonus;
+    var maxResult = 80 + 65 * huntRatio;
+    return maxResult / 2;
 }
 
 /************** 
