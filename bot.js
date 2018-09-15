@@ -98,6 +98,8 @@ game.resetAutomatic = () => {
     rotateLogs();
     state.queue = []; //todo reload master plan
     state.numKittens = 0;
+    state.autoHunt = false;
+    state.autoSteel = false;
     if (window.usingBotStarter) {
         //based on resetAutomatic code
 		game.timer.scheduleEvent(dojo.hitch(this, function() {
