@@ -508,8 +508,7 @@ isResourceFull = (res, additionalProduction) => getResourceOwned(res) >= getSafe
 
 getCraftingResourcePerTick = (res, reserved) => {
     var resourcePerTick = getEffectiveResourcePerTick(res, 0);
-    //don't bother with the other possible events; they don't have capacities
-    if (res === "steel" && state.autoSteel || canCraft(res)) {
+    if (canCraft(res)) {
         //once we're willing to chain craft catnip this will be wrong due to seasons
         //don't worry about it for now
         var prices = getCraftPrices(res);
@@ -520,7 +519,7 @@ getCraftingResourcePerTick = (res, reserved) => {
          * on different rare resources, not reserving a shared common resources;
          * the common resource might be overspent
          */
-        if (res === "steel" && state.autoSteel || prices.every(price => !reserved[price.name])) {
+        if (prices.every(price => !reserved[price.name]) || res === "steel" && state.autoSteel) {
             //special case steel: we always craft it
             resourcePerTick += getCraftRatio(res) * Math.min(...prices.map(price => 
                 getCraftingResourcePerTick(price.name, reserved) / price.val
@@ -572,6 +571,7 @@ getEffectiveResourcePerTick = (res, bestCaseTicks) => {
         )
         resourcePerTick += getFursPerHunt() * effectiveCatpowerPerTick / 100;
     }
+    //don't bother with the other possible events; they don't have capacities
     return resourcePerTick;
 }
 var getFursPerHunt = () => {
