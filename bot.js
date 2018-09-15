@@ -935,6 +935,7 @@ function Trade(name, tab, panel) {
     this.tab = tab;
     this.panel = panel;
     this.quiet = true;
+    this.noLog = true;
 }
 Trade.prototype.buy = function(reserved) {
     var quantityTraded = 0;
