@@ -1070,6 +1070,7 @@ tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains
 getTradeButtons = race => $('div.panelContainer:contains("' + race + '") div.btnContent').children(":visible")
 getTradeData = race => game.diplomacy.get(race.toLowerCase());
 getTradeValue = (race, bestCase) => {
+    //TODO include attitude ratio
     return getTradeData(race).sells.map(sell => ({name: sell.name, 
         val: sell.value * (1 + game.diplomacy.getTradeRatio()) * (bestCase ? (1 + sell.delta/2) : 1) * sell.seasons[seasonNames[game.calendar.season]]}))
 }
@@ -1610,13 +1611,15 @@ specialUis = {
                 if (!tradeInfo.length) { tradeInfo = $("<span class=\"tradeInfo\">"); elem.append(tradeInfo); }
                 var raceName = getPanelTitle(elem);
                 var raceData = getTradeData(raceName);
+                var kittenTicks = 0;
                 var amount;
                 if (elem.children(".buys").length) {
                     amount = getPrice(raceData.buys, resource);
+                    kittenTicks += 50 / getResourcePerTickPerKitten("hunter", "manpower")
                 } else {
                     amount = getPrice(getTradeValue(raceName), resource);
                 }
-                var kittenTicks = amount / getResourcePerTickPerKitten(job.name, resource);
+                kittenTicks += amount / getResourcePerTickPerKitten(job.name, resource);
                 tradeInfo.text(" (" + game.getDisplayValueExt(kittenTicks) + " cat*t)")
             }
         })
