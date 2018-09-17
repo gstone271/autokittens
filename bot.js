@@ -982,11 +982,19 @@ getResourceGenericRatio = resInternalName => {
     return totalRatio;
 }
 //Doesn't include skill level.
-getResourcePerTickPerKitten = (jobInternalName, resInternalName) => {
-    return (game.village.getJob(jobInternalName).modifiers[resInternalName] || 0) * getResourceKittenRatio(resInternalName);
+getResourcePerTickPerKitten = (res, jobName) => {
+    if (jobName === undefined) {
+        var directJob = getJobForResource(res);
+        var directProduction = directJob ? getResourcePerTickPerKitten(res, directJob.name) : 0;
+        var indirectProduction = canCraft(res) ? 
+            Math.min(...getCraftPrices(res).map(price => getResourcePerTickPerKitten(price.name) / price.val)) * getCraftRatio(res)
+            : 0
+        return Math.max(directProduction, indirectProduction);
+    }
+    return (game.village.getJob(jobName).modifiers[res] || 0) * getResourceKittenRatio(res);
 }
-getWoodPerFarmer = () => getResourcePerTickPerKitten("farmer", "catnip") * getCraftRatio("wood") / getPrice(getCraftPrices("wood"), "catnip")
-getFarmerEffectiveness = () => getWoodPerFarmer() / getResourcePerTickPerKitten("woodcutter", "wood")
+getWoodPerFarmer = () => getResourcePerTickPerKitten("catnip", "farmer") * getCraftRatio("wood") / getPrice(getCraftPrices("wood"), "catnip")
+getFarmerEffectiveness = () => getWoodPerFarmer() / getResourcePerTickPerKitten("wood", "woodcutter")
 //from game.villageTab.getValueModifierPerSkill
 baseSkillRatioAtMaxLevel = 1.75
 //from village.updateResourceProduction
@@ -1605,8 +1613,8 @@ specialUis = {
         $("#gameContainerId div.trade-race > .left > div").toArray().forEach(div => {
             var elem = $(div);
             var resource = getOwnText(elem);
-            var job = getJobForResource(resource);
-            if (job) {
+            var kittenProduction = getResourcePerTickPerKitten(resource);
+            if (kittenProduction) {
                 var tradeInfo = elem.children(".tradeInfo");
                 if (!tradeInfo.length) { tradeInfo = $("<span class=\"tradeInfo\">"); elem.append(tradeInfo); }
                 var raceName = getPanelTitle(elem);
@@ -1615,11 +1623,11 @@ specialUis = {
                 var amount;
                 if (elem.children(".buys").length) {
                     amount = getPrice(raceData.buys, resource);
-                    kittenTicks += 50 / getResourcePerTickPerKitten("hunter", "manpower")
+                    kittenTicks += 50 / getResourcePerTickPerKitten("manpower", "hunter")
                 } else {
                     amount = getPrice(getTradeValue(raceName), resource);
                 }
-                kittenTicks += amount / getResourcePerTickPerKitten(job.name, resource);
+                kittenTicks += amount / kittenProduction;
                 tradeInfo.text(" (" + game.getDisplayValueExt(kittenTicks) + " cat*t)")
             }
         })
