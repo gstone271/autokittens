@@ -1649,9 +1649,15 @@ specialUis = {
                 tradeInfo.text(" (" + game.getDisplayValueExt(kittenTicks) + " cat*t)")
             }
         })
+        var kittenGoldProduction = getResourcePerTickPerKitten("gold");
+        if (kittenGoldProduction) {
+            var goldInfo = $("#goldInfo")
+            if (!goldInfo.length) { goldInfo = $('<div id="goldInfo" style="float: left; margin-top: -15px">'); $("#gameContainerId > .tabInner").prepend(goldInfo); }
+            goldInfo.text("15 Gold: " + game.getDisplayValueExt(15 / kittenGoldProduction) + " cat*t")
+        }
         if (canCraft("blueprint")) {
             var blueprintInfo = $("#blueprintInfo")
-            if (!blueprintInfo.length) { blueprintInfo = $('<div id="blueprintInfo" style="float: left; margin-top: -15px">'); $("#gameContainerId > .tabInner").prepend(blueprintInfo); }
+            if (!blueprintInfo.length) { blueprintInfo = $('<div id="blueprintInfo" style="float: left; margin-top: -15px; margin-right: 15px;">'); $("#gameContainerId > .tabInner").prepend(blueprintInfo); }
             var totalPrices = getTotalCraftPrices("blueprint");
             var scienceCost = getPrice(totalPrices, "science") / 10;
             var fursCost = getPrice(totalPrices, "furs") / 10;
