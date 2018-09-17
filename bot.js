@@ -328,7 +328,14 @@ canAffordOne = (price, reserved) => getResourceOwned(price.name) - (reserved ? r
 canAfford = (prices, reserved) => prices.every(price => canAffordOne(price, reserved));
 //ticks until you have enough. May be infinite.
 getTicksToEnough = (price, reserved, owned) => {
-    if (owned === undefined) owned = getResourceOwned(price.name);
+    if (owned === undefined) {
+        if (price.name === "iron" && state.autoSteel) {
+            //this might be negative; that's ok
+            owned = getResourceOwned(price.name) - getResourceOwned("coal");
+        } else {
+            owned = getResourceOwned(price.name);
+        }
+    }
     if (owned - reserved.get(price.name).current >= price.val) {
         return 0;
     }
