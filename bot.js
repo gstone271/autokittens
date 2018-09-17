@@ -15,7 +15,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     <li>Bot Speed: Controls how frequently the bot runs (per game tick)</li>
     <li>API: Increase to use more of the game API to improve performance. Decrease to instead use the actual buttons in the game interface.</li>
     <li>Up Next: Controls the amount of information displayed in the Up Next panel.
-        <br />In Verbose mode, enqueued items you have enough storage to buy are displayed, followed by the resources you need more of to buy them. In Concise, the resources are not displayed.
+        <br />In Verbose mode, enqueued items you have enough storage to buy are displayed, followed by the estimated time until it is bought and the resources you need more of to buy them. In Concise, the time and resources are not displayed.
         <br />If one of the needed resources is reserved by an item higher in the queue, this item is grayed out. In Concise, it is hidden instead.
     </li>
     <li>Auto Craft: Automatically craft resouces that are near their max storage capacity. The bot won't attempt to buy buildings whose cost is so near your storage capacity that a needed resouce would be auto crafted.<ul>
@@ -66,6 +66,13 @@ maxBy = (arr, fun) => {
     var maxValue = Math.max(...arr.map(fun));
     //we could reduce the number of iterations by one but it doesn't matter
     return arr.find(item => fun(item) === maxValue);
+}
+Object.fromEntries = Object.fromEntries || function(arr) {
+    var result = {};
+    arr.forEach(entry => {
+        result[entry[0]] = entry[1];
+    })
+    return result;
 }
 
 /************** 
@@ -220,16 +227,81 @@ game._wipe = () => {
 /************** 
  * Queue Logic
 **************/
+Reservations = function(initialReserved) {
+    this.reserved = Object.fromEntries(Object.entries(initialReserved).map(entry => [entry[0], Object.assign({}, entry[1])]));
+}
+Object.assign(Reservations.prototype, {
+    //reserve current now, plus once you own current, reserve production every tick, until you have total
+    get: function(res) { if (!this.reserved[res]) { this.reserved[res] = { current: 0, production: 0, total: 0 }; } return this.reserved[res]; },
+    add: function(res, current, production, total) {
+        var reservation = this.get(res);
+        reservation.current += current;
+        reservation.production += production;
+        reservation.total += total;
+    },
+    addCurrent: function(res, val) { this.add(res, val, 0, val) },
+    addOverTime: function(res, val, ticks, productionAvailable) {
+        //todo maybe it would be correct to just not include this, and if production is negative, reserve a negative amount of production if appropriate
+        if (productionAvailable < 0) productionAvailable = 0;
+        var maxOverTime = ticks * productionAvailable;
+        var currentNeeded;
+        var productionNeeded;
+        if (maxOverTime <= 0) {
+            productionNeeded = 0;
+            currentNeeded = val;
+        } else if (maxOverTime >= val) {
+            productionNeeded = val / ticks;
+            currentNeeded = 0;
+        } else {
+            productionNeeded = productionAvailable;
+            currentNeeded = val - maxOverTime;
+        }
+        this.add(res, currentNeeded, productionNeeded, val);
+    },
+    clone: function() { return new Reservations(this.reserved) },
+});
+getTimeToChange = reservations => {
+    return Math.ceil(Math.min(...Object.entries(reservations.reserved).map(entry => {
+        var resource = entry[0];
+        var reservation = entry[1];
+        if (reservation.total <= reservation.current) return Infinity;
+        return (reservation.total - reservation.current) / reservation.production;
+    })))
+}
+//get what the reservations will be the next time a partial reservation is fulfilled, and how many ticks until this happens
+//simulate production of resources by decreasing reservation. assumes that you have enough storage space for both the reservation and whatever you want to buy
+getNextFutureReservations = reservations => {
+    var timeToChange = getTimeToChange(reservations);
+    if (timeToChange === Infinity) {
+        return { ticks: Infinity, reserved: reservations };
+    } else if (timeToChange <= 0) {
+        console.error(reservations);
+        throw new Error("Miscalculated time to change: " + timeToChange);
+    } else {
+        return { ticks: timeToChange, reserved: getFutureReservations(reservations, timeToChange) }
+    }
+}
+getFutureReservations = (reservations, ticksPassed) => {
+    return new Reservations(Object.fromEntries(Object.entries(reservations.reserved).map(entry => {
+        var resource = entry[0];
+        var reservation = entry[1];
+        var totalProductionPerTick = reservation.production;
+        var totalProduction = totalProductionPerTick * ticksPassed;
+        var total = Math.max(0, reservation.total - totalProduction);
+        var current = Math.min(reservation.current, total);
+        return [resource, { current: current, production: total > current ? reservation.production : 0, total: total }]
+    })))
+}
+var getIngredientsNeeded = price => 
+    (canCraft(price.name) ? multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)) ) : [])
 //get the sum of the prices and the prices to craft any missing resources
-var getEffectivePrices = (prices, reserved) => {
+getEffectivePrices = (prices, reserved) => {
     var totalPricesMap = {};
     var shortages = prices;
     var maxDepth = 10;
     var getShortage = price => ({ name: price.name, 
-        val: Math.max(0, price.val - Math.max(0, getResourceOwned(price.name) - (reserved[price.name] || 0) - (totalPricesMap[price.name] || 0))) 
+        val: Math.max(0, price.val - Math.max(0, getResourceOwned(price.name) - reserved.get(price.name).current - (totalPricesMap[price.name] || 0))) 
     })
-    var getIngredientsNeeded = price => 
-        (canCraft(price.name) ? multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)) ) : [])
     while (shortages.length) {
         if (!maxDepth--) {
             //if the game ever lets you craft scaffold back into catnip...
@@ -243,36 +315,72 @@ var getEffectivePrices = (prices, reserved) => {
     }
     return Object.entries(totalPricesMap).map(price => ({name: price[0], val: price[1]}))
 }
-reserveBufferTime = game.rate * 60 * 5; //5 minutes: reserve enough of non-limiting resources to be this far ahead of the limiting resource
-var getTicksNeeded = (effectivePrices, originalPrices, reserved) => {
+getTicksNeeded = (effectivePrices, originalPrices, reserved) => {
     var unaffordablePrices = effectivePrices.filter(price => !canAffordOne(price, reserved));
-    return Math.max(
-        0,
-        Math.max(...unaffordablePrices
-            .filter(price => originalPrices.some(originalPrice => price.name === originalPrice.name))
-            .map(price => getTicksToEnough(price, reserved)))
-            - reserveBufferTime);
+    return Math.max(...unaffordablePrices
+        .filter(price => originalPrices.some(originalPrice => price.name === originalPrice.name))
+        .map(price => getTicksToEnough(price, reserved))
+    );
 }
-var canAffordOne = (price, reserved) => getResourceOwned(price.name) - (reserved[price.name] || 0) > price.val;
-var getTicksToEnough = (price, reserved) => //ticks until you have enough. May be infinite or negative
-    (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name)) / getCraftingResourcePerTick(price.name, reserved);
-var getResourcesToReserve = (effectivePrices, ticksNeeded, reserved) => {
-    //assumes the price is unaffordable
+reserveBufferTime = game.rate * 60 * 5; //5 minutes: reserve enough of non-limiting resources to be this far ahead of the limiting resource
+bufferTicksNeeded = ticksNeeded => Math.max(0, ticksNeeded - reserveBufferTime);
+canAffordOne = (price, reserved) => getResourceOwned(price.name) - (reserved ? reserved.get(price.name).current : 0) >= price.val;
+canAfford = (prices, reserved) => prices.every(price => canAffordOne(price, reserved));
+//ticks until you have enough. May be infinite.
+getTicksToEnough = (price, reserved, owned) => {
+    if (owned === undefined) owned = getResourceOwned(price.name);
+    if (owned - reserved.get(price.name).current >= price.val) {
+        return 0;
+    }
+    if (getEffectiveResourcePerTick(price.name) === 0) {
+        if (canCraft(price.name)) {
+            //more accurate calculation for crafted resources with no production
+            //still inaccurate for manuscript once you have printing press, but at least this special case is the common case for crafts
+            return Math.max(
+                ...getIngredientsNeeded({name: price.name, val: price.val + reserved.get(price.name).current - owned})
+                    .map(ingredientPrice => getTicksToEnough(ingredientPrice, reserved))
+            )
+        } else {
+            //just a performance improvement
+            return Infinity;
+        }
+    }
+    //maybe optimize this to reduce the total number of calls to getFutureReservations (easily cached)
+    var timeToChange = getTimeToChange(reserved);
+    var baseProduction = getCraftingResourcePerTick(price.name, reserved);
+    var freeProduction; //production not reserved at all
+    var reservedForShortageProduction; //production reserved for a "current" reservation
+    //this seems too complicated, maybe if Reservations was redesigned this would be simpler
+    if (reserved.get(price.name).current > owned) {
+        reservedForShortageProduction = baseProduction;
+        freeProduction = 0;
+        timeToChange = Math.min(timeToChange, Math.ceil((reserved.get(price.name).current - owned) / reservedForShortageProduction));
+    } else {
+        reservedForShortageProduction = 0;
+        freeProduction = baseProduction - reserved.get(price.name).production;
+    }
+    if (freeProduction <= 0) {
+        //all production is reserved
+        if (timeToChange === Infinity) return Infinity;
+        return timeToChange + getTicksToEnough(price, getFutureReservations(reserved, timeToChange), owned + reservedForShortageProduction * timeToChange);
+    } else if (freeProduction * timeToChange + owned - reserved.get(price.name).current >= price.val) {
+        return Math.ceil((price.val + reserved.get(price.name).current - owned) / freeProduction);
+    } else {
+        if (timeToChange === Infinity) throw new Error("Infinite price???");
+        return timeToChange + getTicksToEnough(price, getFutureReservations(reserved, timeToChange), owned + freeProduction * timeToChange)
+    }
+}
+getResourcesToReserve = (effectivePrices, ticksNeeded, reserved) => {
     var isLimitingResource = price => !canAffordOne(price, reserved) && getTicksToEnough(price, reserved) >= ticksNeeded;
 
-    var newReserved = Object.assign({}, reserved);
+    var newReserved = reserved.clone();
     var limitingResources = {};
-    //amount to reserve, if you will have ticks production
-    var getEnoughForTicks = (price, ticks) => 
-        Math.max(0, (newReserved[price.name] || 0) + price.val
-            - (ticks * getCraftingResourcePerTick(price.name, newReserved) || 0))
     var reserveNonLimiting = price => 
-        newReserved[price.name] = (newReserved[price.name] || 0) + getEnoughForTicks(price, ticksNeeded);
+        newReserved.addOverTime(price.name, price.val, ticksNeeded, getCraftingResourcePerTick(price.name, newReserved));
     var reserveLimiting = price => {
-        newReserved[price.name] = (newReserved[price.name] || 0) + price.val;
+        newReserved.addCurrent(price.name, price.val);
         limitingResources[price.name] = true;
     }
-    //TODO when reserving non limiting, reserve a maxiumum amount and a portion of production
     effectivePrices.forEach(price => {
         if (isLimitingResource(price)) {
             reserveLimiting(price);
@@ -287,17 +395,19 @@ findPriorities = (queue, reserved) => {
     var found = queue[0];
     var prices = found.getPrices();
     if (!found.isEnabled() || !haveEnoughStorage(prices, reserved)) return findPriorities(queue.slice(1), reserved);
-    var unavailableResources = prices.map(price => price.name).filter(res => (reserved[res] || 0) > getResourceOwned(res));
+    var unavailableResources = prices.map(price => price.name).filter(res => reserved.get(res).current > getResourceOwned(res));
     var viable = unavailableResources.length ? false : true;
     var effectivePrices = getEffectivePrices(prices, reserved);
-    var ticksNeeded = getTicksNeeded(effectivePrices, prices, reserved);
+    var realTicksNeeded = getTicksNeeded(effectivePrices, prices, reserved);
+    var ticksNeeded = bufferTicksNeeded(realTicksNeeded);
     var toReserve = getResourcesToReserve(effectivePrices, ticksNeeded, reserved);
-    return [{bld: found, reserved: reserved, viable: viable, unavailable: unavailableResources, limiting: toReserve.limitingResources}]
+    return [{bld: found, reserved, viable, unavailable: unavailableResources, limiting: toReserve.limitingResources, ticksNeeded: realTicksNeeded}]
         .concat(findPriorities(queue.slice(1), toReserve.newReserved));
 }
 subtractUnreserved = (reserved, bought) => {
-    var newReserved = Object.assign({}, reserved);
-    Object.keys(bought).forEach(res => newReserved[res] = (newReserved[res] - bought[res]) || 0)
+    var newReserved = reserved.clone();
+    //this shouldn't cause a negative reservation
+    Object.keys(bought).forEach(res => newReserved.addCurrent(res, -bought[res]))
     return newReserved;
 }
 tryBuy = (priorities) => {
@@ -340,6 +450,7 @@ updateUpNext = priorities => {
         filter = plan => true;
         getHtml = plan => "<span" + (plan.viable ? "" : ' style="color: #999999"') + ">"
              + plan.bld.name
+             + " (" + (plan.ticksNeeded === Infinity ? "???" : game.toDisplaySeconds(plan.ticksNeeded / game.rate)) + ")"
              + " (" + Array.from(new Set(plan.limiting.concat(plan.unavailable))).map(getResourceTitle).join(", ") + ")</span>"
     } else {
         filter = plan => plan.viable;
@@ -350,7 +461,10 @@ updateUpNext = priorities => {
 buyPrioritiesQueue = (queue) => {
     var maxPriority = queue.filter(bld => bld.maxPriority);
     queue = maxPriority.concat(queue.filter(bld => !bld.maxPriority));
-    var priorities = findPriorities(queue, {catnip: getWinterCatnipStockNeeded(canHaveColdSeason()), furs: getFursStockNeeded()});
+    var reserved = new Reservations({});
+    reserved.addCurrent("catnip", getWinterCatnipStockNeeded(canHaveColdSeason()));
+    reserved.addCurrent("furs", getFursStockNeeded());
+    var priorities = findPriorities(queue, reserved);
     botDebug.priorities = priorities;
     updateUpNext(priorities);
     var bought = tryBuy(priorities);
@@ -478,7 +592,7 @@ fixPriceTitle = price => ({ val: price.val, name: getResourceTitle(price.name) }
 //TODO if res is full and its crafts are not demanded but its conversion components are, shutoff conversion to res (and disable production of more conversion?)
 getTotalDemand = res => {
     //this could be optimized a lot...
-    var prices = flattenArr(state.queue.map(bld => bld.getPrices()).filter(prices => haveEnoughStorage(prices, {})));
+    var prices = flattenArr(state.queue.map(bld => bld.getPrices()).filter(prices => haveEnoughStorage(prices)));
     var allPrices = [];
     var maxDepth = 10;
     while (prices.length && maxDepth--) {
@@ -502,29 +616,20 @@ getSafeStorage = (res, autoCraftLevel, additionalProduction) => {
 //TODO don't use this for upgrades--particularly, photolithography will be delayed
 //--when all resources are close to full, allow them to become completely full
 //--don't include resources that can't be crafted yet
-haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(price.name) >= price.val + (reserved[price.name] || 0))
-canAfford = (prices, reserved) => prices.every(price => getResourceOwned(price.name) - (reserved[price.name] || 0) >= price.val);
+haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(price.name) >= price.val + (reserved ? reserved.get(price.name).current : 0))
 isResourceFull = (res, additionalProduction) => getResourceOwned(res) >= getSafeStorage(res, Math.max(state.autoCraftLevel, 1), additionalProduction);
 
 getCraftingResourcePerTick = (res, reserved) => {
     var resourcePerTick = getEffectiveResourcePerTick(res, 0);
     if (canCraft(res)) {
-        //once we're willing to chain craft catnip this will be wrong due to seasons
-        //don't worry about it for now
+        //special case steel: we always craft it
+        var ignoreReservations = res === "steel" && state.autoSteel || !reserved;
         var prices = getCraftPrices(res);
-        /* want to just say if reserved is less than current
-         * , but that wouldn't account for resources we expect to have production on
-         * maybe note the amount of ticks of production reserved?
-         * TODO This might be wrong in the case where you have a bunch of things limited 
-         * on different rare resources, not reserving a shared common resources;
-         * the common resource might be overspent
-         */
-        if (prices.every(price => !reserved[price.name]) || res === "steel" && state.autoSteel) {
-            //special case steel: we always craft it
-            resourcePerTick += getCraftRatio(res) * Math.min(...prices.map(price => 
-                getCraftingResourcePerTick(price.name, reserved) / price.val
-            ))
-        }
+        //for catnip, this will be wrong due to seasons
+        //don't worry about it for now
+        resourcePerTick += Math.max(0, getCraftRatio(res) * Math.min(...prices.map(price => 
+            (getCraftingResourcePerTick(price.name, reserved) - (ignoreReservations ? 0 : reserved.get(price.name).production)) / price.val
+        )));
     }
     //todo production from trade???? maybe just blueprints based on gold income?? needs more consistent trading
     return resourcePerTick;
@@ -596,7 +701,7 @@ getCraftTableElem = () => {
 findCraftAllButton = (name) => getCraftTableElem().children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("all")')[0]
 findCraftButtons = (name) => getCraftTableElem().children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("+")');
 craftFirstTime = name => {
-    if (canAfford(getCraftPrices(name), {})) {
+    if (canAfford(getCraftPrices(name))) {
         withTab("Workshop", () => {
             var longTitle = getResourceLongTitle(name);
             log("First time crafting " + longTitle, true);
@@ -1565,4 +1670,5 @@ reservations seems still not correct (crafting too early)
 --eg blueprint need, with enough compendiums, still reserves
 log human actions?
 don't craft away Chronosphere resources
+fix kitten assignment/human intervention interaction
 */
