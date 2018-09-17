@@ -1064,6 +1064,10 @@ Craft.prototype.isEnabled = function() { return canCraft(this.resName); }
 tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains("Send caravan")').click()
 getTradeButtons = race => $('div.panelContainer:contains("' + race + '") div.btnContent').children(":visible")
 getTradeData = race => game.diplomacy.get(race.toLowerCase());
+getTradeValue = (race, bestCase) => {
+    return getTradeData(race).sells.map(sell => ({name: sell.name, 
+        val: sell.value * (1 + game.diplomacy.getTradeRatio()) * (bestCase ? (1 + sell.delta/2) : 1) * sell.seasons[seasonNames[game.calendar.season]]}))
+}
 seasonNames = ["spring", "summer", "autumn", "winter"];
 function Trade(name, tab, panel) {
     this.name = panel;
@@ -1113,7 +1117,7 @@ Trade.prototype.buy = function(reserved) {
 }
 Trade.prototype.getPrices = function() { return [{name: "manpower", val: 50}, {name: "gold", val: 15}].concat(getTradeData(this.panel).buys); }
 Trade.prototype.needProduct = function(quantity) {
-    return getTradeData(this.panel).sells.every(sell => getResourceOwned(sell.name) * 1.2 + sell.value * (1 + sell.delta/2) * (1 + game.diplomacy.getTradeRatio()) * quantity < getResourceMax(sell.name));
+    return getTradeValue(this.panel, true).every(sell => getResourceOwned(sell.name) * 1.2 + sell.val * quantity < getResourceMax(sell.name));
 }
 Trade.prototype.bestSeason = function() {
     return getTradeData(this.panel).sells[0].seasons[seasonNames[game.calendar.season]] >= Math.max(...Object.values(getTradeData(this.panel).sells[0].seasons))
@@ -1641,6 +1645,8 @@ buy script (-> genetic algorithm)
 trade calculations -> needsResource function
 --try not to have full gold
 --can get stuck needing titanium but with too much iron
+--trade more like crafting
+--calculate resouce per kitten for trades
 faith reset without transcending
 improve performance at high speeds
 --run bot in the game update function
