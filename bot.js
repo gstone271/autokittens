@@ -1162,7 +1162,8 @@ religionData = {
     "Order of the Sun": game.religion.religionUpgrades,
     "Ziggurats": game.religion.zigguratUpgrades,
 }
-getUnicornsNeeded = tears => 2500 * Math.ceil((tears - getResourceOwned("tears")) / game.bld.get("ziggurat").val);
+//TODO just add this to crafting for more accuracy
+getUnicornsNeeded = tears => 2500 * Math.ceil((tears) / game.bld.get("ziggurat").val);
 priceTearsToUnicorns = price => (price.name === "tears" ? { name: "unicorns", val: getUnicornsNeeded(price.val) } : price)
 function Religion(name, tab, panel) {
     this.name = name;
