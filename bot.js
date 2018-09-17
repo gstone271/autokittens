@@ -575,7 +575,7 @@ getEffectiveResourcePerTick = (res, bestCaseTicks) => {
     return resourcePerTick;
 }
 var getFursPerHunt = () => {
-    var managerBonus = .05 * (1 + this.game.prestige.getBurnedParagonRatio())
+    var managerBonus = .05 * (1 + game.prestige.getBurnedParagonRatio())
     var huntRatio = game.getEffect("hunterRatio") + managerBonus;
     var maxResult = 80 + 65 * huntRatio;
     return maxResult / 2;
