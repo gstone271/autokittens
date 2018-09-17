@@ -846,6 +846,23 @@ makeCraft = (craft, amountNeeded, reserved) => {
         craftAll(craft);
     }
 }
+getTotalCraftPrices = (res) => {
+    var totalPricesMap = {};
+    var prices = getCraftPrices(res);
+    var maxDepth = 10;
+    while (prices.length) {
+        if (!maxDepth--) {
+            //if the game ever lets you craft scaffold back into catnip...
+            console.error("Infinite loop finding craft prices:")
+            console.error(prices)
+            break;
+        }
+        var nextPrices = flattenArr(prices.map(getIngredientsNeeded));
+        prices.forEach(price => totalPricesMap[price.name] = (totalPricesMap[price.name] || 0) + price.val)
+        prices = nextPrices;
+    }
+    return Object.entries(totalPricesMap).map(price => ({name: price[0], val: price[1]}))
+}
 
 /************** 
  * Starvation
@@ -1632,6 +1649,17 @@ specialUis = {
                 tradeInfo.text(" (" + game.getDisplayValueExt(kittenTicks) + " cat*t)")
             }
         })
+        if (canCraft("blueprint")) {
+            var blueprintInfo = $("#blueprintInfo")
+            if (!blueprintInfo.length) { blueprintInfo = $('<div id="blueprintInfo" style="float: left; margin-top: -15px">'); $("#gameContainerId > .tabInner").prepend(blueprintInfo); }
+            var totalPrices = getTotalCraftPrices("blueprint");
+            var scienceCost = getPrice(totalPrices, "science") / 10;
+            var fursCost = getPrice(totalPrices, "furs") / 10;
+            var scienceKittensTicks = scienceCost / getResourcePerTickPerKitten("science");
+            var fursKittenTicks = fursCost / getFursPerHunt() * 100 / getResourcePerTickPerKitten("manpower");
+            var totalKittenTicks = scienceKittensTicks + fursKittenTicks;
+            blueprintInfo.text("Blueprints: " + game.getDisplayValueExt(totalKittenTicks) + " cat*t/trade")
+        }
     }
 }
 updateUi = () => {
