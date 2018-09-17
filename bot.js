@@ -359,7 +359,8 @@ getTicksToEnough = (price, reserved, owned) => {
     var reservedForShortageProduction; //production reserved for a "current" reservation
     //this seems too complicated, maybe if Reservations was redesigned this would be simpler
     if (reserved.get(price.name).current > owned) {
-        reservedForShortageProduction = baseProduction;
+        //just ignore negative production, it won't last forever. needed to prevent infinite loop
+        reservedForShortageProduction = Math.max(0, baseProduction);
         freeProduction = 0;
         timeToChange = Math.min(timeToChange, Math.ceil((reserved.get(price.name).current - owned) / reservedForShortageProduction));
     } else {
