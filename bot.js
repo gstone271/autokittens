@@ -514,11 +514,11 @@ additionalActions = [
         }
     },
     () => {
-        if (state.populationIncrease > 0 && getTabButtonByNumber(tabNumbers.Town).text().includes("(")) {
+        if (state.populationIncrease > 0 && getTabButtonByNumber(tabNumbers.Village).text().includes("(")) {
             var job = getJobShortName(state.defaultJob);
             //it's actually possible to cheat and click on a button that hasn't been revealed yet
             if (!isJobEnabled(job)) job = "woodcutter";
-            withTab("Town", () => {
+            withTab("Village", () => {
                 getJobButton(job).click();
                 log("Assigned new kitten to " + job);
             });
@@ -930,7 +930,7 @@ increaseJob = jobName => getJobButton(jobName).find('a:contains("[+]")')[0].clic
 isJobEnabled = jobName => game.village.jobs.find(job => job.name === jobName).unlocked;
 switchToJob = jobName => {
     if (isJobEnabled(jobName)) {
-        withTab("Town", () => {
+        withTab("Village", () => {
             if (game.village.isFreeKittens() && state.populationIncrease) {
                 state.populationIncrease--; //we overrode the normal new job
                 recountKittens(jobName);
@@ -1315,7 +1315,7 @@ enable = (name, tab, panel, maxPriority) => {
 /************** 
  * Tabs
 **************/
-tabNumbers = { Bonfire: 1, Town: 2 } //these have changing names, but fixed position
+tabNumbers = { Bonfire: 1, Village: 2 } //these have changing names, but fixed position
 openTab = name => {
     var tabButton = tabNumbers[name] ? getTabButtonByNumber(tabNumbers[name]) : getTabButtonByName(name);
     if (tabButton.length) {
@@ -1367,7 +1367,7 @@ withLeader = (leaderType, op) => {
             if (oldLeader && newLeader) highPerformanceSetLeader(oldLeader);
         }
     } else {
-        withTab("Town", () => {
+        withTab("Village", () => {
             var oldLeader = $('a:contains("★")');
             var newLeader = $('div.panelContainer:contains("Census") > div.container > div:contains("' + leaderType + '") a:contains("☆")').first();
             if (oldLeader.length && newLeader.length) newLeader[0].click(); else console.error("Unable to find leader type " + leaderType + ". Make sure to promote a kitten of that type so they appear on the first page.");
@@ -1476,7 +1476,7 @@ updateButton = (elem, tab) => {
         var asInt = bool => bool ? 1 : 0;
         if (stateButtons[item] && tab !== "Science") {
             value = asInt(state[stateButtons[item]]);
-        } else if (tab === "Town" && !specialBuys[item]) {
+        } else if (tab === "Village" && !specialBuys[item]) {
             value = asInt(state.defaultJob === item);
         } else if (tab === "Trade" && !specialBuys[item]) {
             value = getPriority(getPanelTitle(elem));
