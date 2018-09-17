@@ -1615,6 +1615,7 @@ specialUis = {
             var resource = getOwnText(elem);
             var kittenProduction = getResourcePerTickPerKitten(resource);
             if (kittenProduction) {
+                if (resource === "catnip" && getFarmerEffectiveness() < 1) kittenProduction /= getFarmerEffectiveness();
                 var tradeInfo = elem.children(".tradeInfo");
                 if (!tradeInfo.length) { tradeInfo = $("<span class=\"tradeInfo\">"); elem.append(tradeInfo); }
                 var raceName = getPanelTitle(elem);
