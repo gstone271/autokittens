@@ -1329,16 +1329,16 @@ openTab = name => {
 getTabButtonByName = name => $('a.tab:contains("' + name + '")');
 getTabButtonByNumber = tabNumber => $('a.tab:nth-of-type(' + tabNumber + ')');
 withTab = (tab, op) => {
-    var oldTab = $('a.tab.activeTab');
-    if (tab === getActiveTab(oldTab)) {
+    if (tab === getActiveTab()) {
         op();
     } else {
+        var oldTab = $('a.tab.activeTab');
         var oldScroll = $("#midColumn").scrollTop();
         if (openTab(tab)) {
             try {
                 op();
             } finally {
-                oldTab[0].click(); //possibly no-op
+                oldTab[0].click();
                 $("#midColumn").scrollTop(oldScroll);
             }
         }
@@ -1379,11 +1379,8 @@ withLeader = (leaderType, op) => {
         });
     }
 }
-getActiveTab = (activeTabButton) => {
-    if (!activeTabButton) activeTabButton = $("a.tab.activeTab");
-    var index = $('a.tab').index(activeTabButton)
-    if (index < 2) return Object.keys(tabNumbers).find(tab => tabNumbers[tab] === (index + 1));
-    return activeTabButton.text();
+getActiveTab = () => {
+    return game.ui.activeTabId;
 }
 
 /************** 
