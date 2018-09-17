@@ -498,8 +498,7 @@ mainLoop = () => {
     if (state.autoConverters) manageConverters();
     doAutoCraft();
     additionalActions.forEach(action => action());
-    updateManagementButtons();
-    updateSettingsMenu();
+    updateUi();
     var ticksPassed = game.ticks - state.ticks;
     if (ticksPassed !== state.ticksPerLoop) console.log(ticksPassed + " ticks passed (expected " + state.ticksPerLoop + ")")
     state.ticks = game.ticks;
@@ -992,6 +991,7 @@ getFarmerEffectiveness = () => getWoodPerFarmer() / getResourcePerTickPerKitten(
 baseSkillRatioAtMaxLevel = 1.75
 //from village.updateResourceProduction
 getBestPossibleSkillRatio = () => 1 + (baseSkillRatioAtMaxLevel - 1) * (1 + game.getEffect("skillMultiplier")) / 4
+getJobForResource = res => game.village.jobs.find(job => job.modifiers[res]);
 
 
 /************** 
@@ -1598,6 +1598,35 @@ createSettingsMenu = () => {
 }
 updateSettingsMenu = () => {
     settingsMenu.forEach(item => $('#' + item.name).html(item.getHtml()));
+}
+specialUis = {
+    Trade: () => {
+        $("#gameContainerId div.trade-race > .left > div").toArray().forEach(div => {
+            var elem = $(div);
+            var resource = getOwnText(elem);
+            var job = getJobForResource(resource);
+            if (job) {
+                var tradeInfo = elem.children(".tradeInfo");
+                if (!tradeInfo.length) { tradeInfo = $("<span class=\"tradeInfo\">"); elem.append(tradeInfo); }
+                var raceName = getPanelTitle(elem);
+                var raceData = getTradeData(raceName);
+                var amount;
+                if (elem.children(".buys").length) {
+                    amount = getPrice(raceData.buys, resource);
+                } else {
+                    amount = getPrice(getTradeValue(raceName), resource);
+                }
+                var kittenTicks = amount / getResourcePerTickPerKitten(job.name, resource);
+                tradeInfo.text(" (" + game.getDisplayValueExt(kittenTicks) + " cat*t)")
+            }
+        })
+    }
+}
+updateUi = () => {
+    updateManagementButtons();
+    updateSettingsMenu();
+    specialUi = specialUis[getActiveTab()];
+    if (specialUi) specialUi();
 }
 
 /************** 
