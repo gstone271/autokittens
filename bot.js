@@ -810,7 +810,7 @@ canCraft = resInternalName => {
 }
 getAdditionalNeeded = (prices, reserved) => 
     prices
-        .map(price => ({ name: price.name, val: (price.val + (reserved[price.name] || 0) - getResourceOwned(price.name))}))
+        .map(price => ({ name: price.name, val: (price.val + reserved.get(price.name).current - getResourceOwned(price.name))}))
         .filter(price => price.val > 0);
 craftAdditionalNeeded = (prices, reserved) =>
     getAdditionalNeeded(prices, reserved)
@@ -839,7 +839,7 @@ makeCraft = (craft, amountNeeded, reserved) => {
             timesToCraft -= targetButton.times;
             maxClicks--;
         }
-    } else if (prices.every(price => !reserved[price.name])) {
+    } else if (prices.every(price => !reserved.get(price.name).current)) {
         craftAll(craft);
     }
 }
