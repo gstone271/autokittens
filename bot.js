@@ -977,7 +977,11 @@ getResourceKittenRatio = resInternalName => {
         .map(effect => game.getEffect(resInternalName + effect))
         .reduce((total, ratioAdded) => total * (1 + ratioAdded), 1);
     totalRatio *= getResourceGenericRatio(resInternalName);
-    //generic effects
+    var steamworks = game.bld.get("steamworks");
+    var swEffectGlobal = steamworks.effects[resInternalName+"RatioGlobal"];
+    if (steamworks.on > 0 && swEffectGlobal) {
+        totalRatio *= 1 + swEffectGlobal;
+    }
     totalRatio *= game.village.happiness * (1 + game.prestige.getParagonProductionRatio());
     return totalRatio;
 }
