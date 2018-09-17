@@ -1099,9 +1099,21 @@ tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains
 getTradeButtons = race => $('div.panelContainer:contains("' + race + '") div.btnContent').children(":visible")
 getTradeData = race => game.diplomacy.get(race.toLowerCase());
 getTradeValue = (race, bestCase) => {
-    //TODO include attitude ratio
-    return getTradeData(race).sells.map(sell => ({name: sell.name, 
-        val: sell.value * (1 + game.diplomacy.getTradeRatio()) * (bestCase ? (1 + sell.delta/2) : 1) * sell.seasons[seasonNames[game.calendar.season]]}))
+    var tradeData = getTradeData(race);
+    var standingRatio = bestCase ? 200 : game.getEffect("standingRatio") + (game.prestige.getPerk("diplomacy").researched ? 10 : 0);
+    var attitudeMultiplier = {
+        hostile: Math.min(1, tradeData.standing + standingRatio / 100),
+        neutral: 1,
+        friendly: 1 + .25 * Math.min(1, tradeData.standing + standingRatio / 200)
+    }[tradeData.attitude]
+    return tradeData.sells.map(sell => ({
+        name: sell.name, 
+        val: sell.value
+            * (1 + game.diplomacy.getTradeRatio())
+            * (bestCase ? (1 + sell.delta/2) : 1)
+            * attitudeMultiplier
+            * sell.seasons[seasonNames[game.calendar.season]]
+    }))
 }
 seasonNames = ["spring", "summer", "autumn", "winter"];
 function Trade(name, tab, panel) {
