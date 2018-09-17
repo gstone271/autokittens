@@ -234,6 +234,7 @@ Object.assign(Reservations.prototype, {
     //reserve current now, plus once you own current, reserve production every tick, until you have total
     get: function(res) { if (!this.reserved[res]) { this.reserved[res] = { current: 0, production: 0, total: 0 }; } return this.reserved[res]; },
     add: function(res, current, production, total) {
+        if ([current, production, total].some(isNaN)) throw new Error("Reserving NaN!")
         var reservation = this.get(res);
         reservation.current += current;
         reservation.production += production;
@@ -246,7 +247,7 @@ Object.assign(Reservations.prototype, {
         var maxOverTime = ticks * productionAvailable;
         var currentNeeded;
         var productionNeeded;
-        if (maxOverTime <= 0) {
+        if (maxOverTime <= 0 || isNaN(maxOverTime)) {
             productionNeeded = 0;
             currentNeeded = val;
         } else if (maxOverTime >= val) {
@@ -1685,4 +1686,5 @@ reservations seems still not correct (crafting too early)
 log human actions?
 don't craft away Chronosphere resources
 fix kitten assignment/human intervention interaction
+check for updates
 */
