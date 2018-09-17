@@ -45,6 +45,9 @@ $('#helpDiv').prepend($(`<div id="botHelp">
 $('#helpDiv').css({"margin-top": "0", top: "10%", overflow: "auto", "max-height": "75%"});
 $("#botInfo").remove()
 $('#gamePageContainer').append($('<div id="botInfo" style="position: absolute; bottom: 50px; right: 10px;">'))
+updateBotInfoWidth = () => $("#botInfo").css("max-width", Math.max(225, $("#game").width() - $("#rightColumn")[0].getBoundingClientRect().right - 20));
+updateBotInfoWidth();
+$(window).resize(updateBotInfoWidth);
 if (window.stopLoop) stopLoop();
 
 /************** 
