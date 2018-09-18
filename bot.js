@@ -1158,6 +1158,7 @@ Trade.prototype.buy = function(reserved) {
                 if (actualTradeMessages !== state.tradeMessages || state.tradeSeason) {
                     //did not successfully clear logs; something else appeared
                     state.tradeResourceTotal = {};
+                    state.lastTradeQuantity = 0;
                 }
                 Object.entries(yieldResTotal).forEach(entry => state.tradeResourceTotal[entry[0]] = (state.tradeResourceTotal[entry[0]] || 0) + entry[1])
                 state.lastTradeQuantity += quantityTraded;
