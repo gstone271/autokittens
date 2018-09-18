@@ -13,7 +13,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     <li>Bot: Turns all bot functions on/off</li>
     <li>Game Speed: Can increase the speed of all game progress (even when the bot is off)</li>
     <li>Bot Speed: Controls how frequently the bot runs (per game tick)</li>
-    <li>API: Increase to use more of the game API to improve performance. Decrease to instead use the actual buttons in the game interface.</li>
+    <li>API: Increase to use more of the game API to improve performance and add features like trade log combining. Decrease to instead use the actual buttons in the game interface.</li>
     <li>Up Next: Controls the amount of information displayed in the Up Next panel.
         <br />In Verbose mode, enqueued items you have enough storage to buy are displayed, followed by the estimated time until it is bought and the resources you need more of to buy them. In Concise, the time and resources are not displayed.
         <br />If one of the needed resources is reserved by an item higher in the queue, this item is grayed out. In Concise, it is hidden instead.
@@ -185,6 +185,10 @@ loadDefaults = () => {
     if (!state.numKittens) state.numKittens = game.village.sim.getKittens();
     if (!state.verboseQueue) state.verboseQueue = 0;
     if (!state.disabledConverters) state.disabledConverters = {};
+    if (!state.tradeMessages) state.tradeMessages = 0;
+    if (!state.tradeResourceTotal) state.tradeResourceTotal = {};
+    if (!state.lastTradeSeason) state.lastTradeSeason = 0;
+    if (!state.lastTradeQuantity) state.lastTradeQuantity = 0;
     if (state.desiredApi === undefined) state.desiredApi = 1;
     if (state.autoCraftLevel === undefined) state.autoCraftLevel = 1;
     if (state.autoFarmer === undefined) state.autoFarmer = 1;
@@ -1135,7 +1139,23 @@ Trade.prototype.buy = function(reserved) {
                     yieldResTotal = game.diplomacy.tradeInternal(game.diplomacy.races.find(race => race.title === this.panel), true, yieldResTotal);
                     quantityTraded++;
                 }
-                game.diplomacy.gainTradeRes(yieldResTotal, quantityTraded);
+                gainTradeResources(yieldResTotal);
+                var tradeSeason = game.calendar.year + game.calendar.season / 4;
+                if (tradeSeason !== state.lastTradeSeason) {
+                    //make new logs each season
+                    state.tradeResourceTotal = {};
+                    state.tradeMessages = 0;
+                    state.lastTradeSeason = tradeSeason;
+                    state.lastTradeQuantity = 0;
+                }
+                var actualTradeMessages = clearTradeLogs(state.tradeMessages);
+                if (actualTradeMessages !== state.tradeMessages || state.tradeSeason) {
+                    //did not successfully clear logs; something else appeared
+                    state.tradeResourceTotal = {};
+                }
+                Object.entries(yieldResTotal).forEach(entry => state.tradeResourceTotal[entry[0]] = (state.tradeResourceTotal[entry[0]] || 0) + entry[1])
+                state.lastTradeQuantity += quantityTraded;
+                state.tradeMessages = logTrades(state.tradeResourceTotal, state.lastTradeQuantity);
             } else {
                 withTab("Trade", () => {
                     if (!canAfford(prices, reserved)) console.error(reserved);
@@ -1171,6 +1191,42 @@ Trade.prototype.bestSeason = function() {
 }
 Trade.prototype.isEnabled = function() { 
     return this.needProduct(1) && this.bestSeason(); 
+}
+gainTradeResources = yieldResTotal => Object.entries(yieldResTotal).forEach(entry => game.resPool.addResEvent(...entry))
+//from diplomacy.gainTradeRes
+logTrades = (yieldResTotal, amtTrade) => {
+    //add this return value
+    var totalMessages = 1;
+    for (var res in yieldResTotal){
+        //just need to rip this one line out
+        //var amt = this.game.resPool.addResEvent(res, yieldResTotal[res]);
+        var amt = yieldResTotal[res];
+        if (amt > 0){
+            if (res == "blueprint"){
+                game.msg($I("trade.msg.resources", [game.getDisplayValueExt(amt), res]) + "!", "notice", "trade", true);
+            } else if (res == "titanium"){
+                game.msg($I("trade.msg.resources", [game.getDisplayValueExt(amt), res]) + "!", "notice", "trade", true);
+            } else {
+                var resPool = this.game.resPool.get(res);
+                var name = resPool.title || res;
+                game.msg($I("trade.msg.resources", [game.getDisplayValueExt(amt), name]), null, "trade", true);
+            }
+            totalMessages++;
+        }
+    }
+    this.game.msg($I("trade.msg.trade.caravan", [amtTrade]), null, "trade");
+    return totalMessages;
+}
+clearTradeLogs = (expectedTradeMessages) => {
+    var tradeMessages = 0;
+    for (var i = game.console.messages.length - 2; i >= 0; i--) {
+        if (game.console.messages[i].tag === "trade") tradeMessages++; else break;
+    }
+    if (tradeMessages === expectedTradeMessages || expectedTradeMessages === undefined) {
+        game.console.messages.splice(game.console.messages.length - 1 - tradeMessages, tradeMessages);
+        game.ui.renderConsoleLog();
+    }
+    return tradeMessages;
 }
 
 scienceData = {
@@ -1737,7 +1793,7 @@ buy script (-> genetic algorithm)
 ----time to moon, paragon/hr (go for unobtainium huts; use best paragon/hr)
 ------graph #technologies, #kittens
 trade calculations -> needsResource function
---try not to have full gold
+--try not to have full gold (trade aggressively for blueprints)
 --can get stuck needing titanium but with too much iron
 --trade more like crafting
 --calculate resouce per kitten for trades
@@ -1753,8 +1809,6 @@ improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
 ----1/2: when none of your craft chain is reserved, become normal and go to end of queue
 ----2: queued twice
---combine trade messages
-----read game.console.messages; change message and set span to undefined, then call game.ui.renderConsoleLog()
 --turn off Up Next, hide settings menu
 stop warning about resources full when waiting for another
 reserve ivory like furs
