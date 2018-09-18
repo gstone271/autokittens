@@ -136,11 +136,13 @@ recountKittens = (newJob) => {
         logKitten(kittens, newJob)
     }
 }
-getBestResetPoint = history =>
+getBestResetPoint = (history, onlyLocalMaxima) =>
     history
         .filter(entry => entry.type === "Kitten" || entry.type === "Reset")
         .map(entry => ({paragon: Math.max(0, entry.kittens - 70), year: entry.year + entry.day / 400}))
+        .filter(entry => entry.year > 0) //prevent Infinity and NaN with cryochambers
         .map(entry => ({paragon: entry.paragon, year: entry.year, ratio: entry.paragon / entry.year}))
+		.filter((point, index, arr) => !onlyLocalMaxima || point.ratio > 0 && [arr[index - 1], arr[index + 1]].every(neighbor => !neighbor || point.ratio >= neighbor.ratio))
         .sort((a, b) => b.ratio - a.ratio)
 
 /************** 
@@ -1786,8 +1788,8 @@ specialUis = {
         if (game.village.sim.getKittens() > 70) {
             var paragonInfo = $("#paragonInfo");
             if (!paragonInfo.length) { paragonInfo = $('<div id="paragonInfo" style="float: right">'); $("#gameContainerId > div > div.panelContainer:nth-child(2) > div.toggle").after(paragonInfo); }
-            paragonInfo.html("Best reset points for paragon so far: <br />"
-                + getBestResetPoint(state.history).slice(0, 3)
+            paragonInfo.html("Best resets (local maxima of paragon/y): <br />"
+                + getBestResetPoint(state.history, true).slice(0, 3)
                     .map(point => 
                         "Paragon: " + game.getDisplayValueExt(point.paragon)
                         + " Year: " +  game.getDisplayValueExt(point.year)
