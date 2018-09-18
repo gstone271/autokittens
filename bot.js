@@ -1116,12 +1116,14 @@ getTradeValue = (race, bestCase) => {
         neutral: 1,
         friendly: 1 + .25 * Math.min(1, tradeData.standing + standingRatio / 200)
     }[tradeData.attitude]
+    var ships = this.game.resPool.get("ship").value;
     return tradeData.sells.map(sell => ({
         name: sell.name, 
-        val: sell.value
+        val: (sell.name === "titanium" ? 1.5 * (1 + ships / 50) : sell.value)
             * (1 + game.diplomacy.getTradeRatio())
             * (bestCase ? (1 + sell.delta/2) : 1)
             * attitudeMultiplier
+            * (bestCase ? 1 : (sell.name === "titanium" ? Math.min(1, .15 + ships * .0035) : sell.chance / 100))
             * sell.seasons[seasonNames[game.calendar.season]]
     }))
 }
