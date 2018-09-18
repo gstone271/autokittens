@@ -38,6 +38,13 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     <li>Jobs: In the Jobs panel, left click a job to set it as the job to assign new kittens to whenever the bot buys housing. The bot will not assign new kittens when you buy housing manually.</li>
 </ul></p>
 <p>Leaders: It is recommended that you make an Artisan your leader. For all tasks except crafting, if you already have a leader, the bot will automatically switch to a leader of the appropriate type. If API is set to none, a leader of the appropriate type must appear on the first page of kittens (you may need to promote one).</p>
+<p>Trade: Sending trade caravans is queued like buildings. <ul>
+    <li>When a trade is bought from the queue, it sends as many caravans as possible without spending a resource reserved for something higher in the queue.</li>
+    <li>The bot will not make trades for resources that you have a lot of already.</li>
+    <li>If your gold is near full, it will prioritize trades over other queued items (but not priority infinity items).</li>
+    <li>It will only trade during optimal seasons.</li>
+    <li>Exception: If your gold is at maximum and Nagas are enabled, it will trade with Nagas even if it's not the optimal season and you have a lot of minerals already, mostly in order to get more blueprints (but it will also craft slabs).</li>
+</ul>Next to tradeable resources, the bot will display the amount of time it would take one no-skill kitten to produce that much resource (in cats*ticks), or if kittens can't produce it, the amount of time it would take all your production to produce it (in ticks).</p>
 <p>Compatibility: Autokittens requires a modern browser (with HTML5 and ES6) and is currently only compatible with the English version of the game.</p>
 <hr />
 <h3>Kittens Game Official "Help"</h3>
@@ -779,37 +786,40 @@ autoCrafts = game.workshop.crafts
 doAutoCraft = () => {
     autoCrafts.forEach(craft => {
         if (canCraft(craft.name)) {
-            var maxClicks = 10; //don't expect to need this many clicks, prevent something bad
-            var craftRatio = getCraftRatio(craft.name);
             var getAmountToCraft = price => {
                 var safeCrafts = (getResourceOwned(price.name) - getEnoughResource(price.name)) / price.val
                 return getResourceMax(price.name) === Infinity ? Math.floor(safeCrafts) : Math.ceil(safeCrafts);
             }
             var timesToCraft = Math.min(...craft.prices.map(getAmountToCraft))
-            //TODO reduce logic duplication with makeCraft
-            while (timesToCraft > 0 && maxClicks--) {
-                var craftButtons = findCraftButtonValues(craft.name, craftRatio);
-                if (!craftButtons.length) {
-                    //button hasn't shown up yet (we just crafted one of the requirements)
-                    break;
-                }
-                var targetButton = craftButtons.reduce((smallerButton, biggerButton) => 
-                    biggerButton.times < timesToCraft ? biggerButton : smallerButton
-                )
-                if (craft.name === "wood") {
-                    //special case: only craftable resource where the craft target has a max capacity
-                    var maxBeamCrafts = 10; //also useful in case we try to autocraft catnip before we have a workshop
-                    while (getResourceOwned(craft.name) + targetButton.amount > getResourceMax(craft.name) && maxBeamCrafts--) {
-                        craftOne("beam");
-                    }
-                }
-                craft.prices.filter(price => getResourceOwned(price.name) === getResourceMax(price.name) && price.name !== "culture")
-                    .forEach(price => console.log("Warning: " + price.name + " full " + (price.name === "science" ? "(do you have enough manuscripts?)" : "(did the bot lag?)")))
-                targetButton.click();
-                timesToCraft -= targetButton.times;
-            }
+            craftMultiple(craft, timesToCraft);
         }
     });
+}
+craftMultiple = (craft, timesToCraft) => {
+    var craftRatio = getCraftRatio(craft.name);
+    //TODO reduce logic duplication with makeCraft
+    var maxClicks = 10; //don't expect to need this many clicks, prevent something bad
+    while (timesToCraft > 0 && maxClicks--) {
+        var craftButtons = findCraftButtonValues(craft.name, craftRatio);
+        if (!craftButtons.length) {
+            //button hasn't shown up yet (we just crafted one of the requirements)
+            break;
+        }
+        var targetButton = craftButtons.reduce((smallerButton, biggerButton) => 
+            biggerButton.times < timesToCraft ? biggerButton : smallerButton
+        )
+        if (craft.name === "wood") {
+            //special case: only craftable resource where the craft target has a max capacity
+            var maxBeamCrafts = 10; //also useful in case we try to autocraft catnip before we have a workshop
+            while (getResourceOwned(craft.name) + targetButton.amount > getResourceMax(craft.name) && maxBeamCrafts--) {
+                craftOne("beam");
+            }
+        }
+        craft.prices.filter(price => getResourceOwned(price.name) === getResourceMax(price.name) && price.name !== "culture")
+            .forEach(price => console.log("Warning: " + price.name + " full " + (price.name === "science" ? "(do you have enough manuscripts?)" : "(did the bot lag?)")))
+        targetButton.click();
+        timesToCraft -= targetButton.times;
+    }
 }
 setAutoCrafting = level => {
     if (level >= 0 && level <= 2) {
@@ -1135,36 +1145,52 @@ function Trade(name, tab, panel) {
     this.quiet = true;
     this.noLog = true;
 }
+var tradeTimerDuration = 10;
 Trade.prototype.buy = function(reserved) {
     var quantityTraded = 0;
-    if (state.api >= 1 || state.tradeTimer >= 10 || getResourceOwned("manpower") * 1.2 > getResourceMax("manpower")) {
+    if (state.api >= 1 || state.tradeTimer >= tradeTimerDuration || getResourceOwned("manpower") * 1.2 > getResourceMax("manpower") || this.overrideNeeds()) {
+        if (this.overrideNeeds()) {
+            var loopsToNextTrade = Math.max(1, state.autoCraftLevel);
+            var tradesToMake = Math.ceil((getResourceOwned("gold") - getSafeStorage("gold", loopsToNextTrade)) / 15)
+            var storageNeeded = multiplyPrices(getTradeValue(this.panel, true), tradesToMake);
+            storageNeeded.forEach(price => {
+                var craft = game.workshop.crafts.find(craft => craft.prices.some(craftPrice => craftPrice.name === price.name));
+                if (craft && canCraft(craft.name)) {
+                    var excess = getResourceOwned(price.name) + price.val - getSafeStorage(price.name)
+                    var timesToCraft = Math.max(0, Math.ceil(excess / craft.prices.find(craftPrice => craftPrice.name === price.name).val))
+                    craftMultiple(craft, timesToCraft);
+                }
+            })
+        }
         withLeader("Merchant", () => {
             var prices = this.getPrices();
             if (state.api >= 1) {
                 var yieldResTotal = null;
-                while (canAfford(prices, reserved) && this.needProduct(1) && quantityTraded < 1000) {
+                while (canAfford(prices, reserved) && this.needProduct(1, yieldResTotal) && quantityTraded < 1000) {
                     prices.forEach(price => game.resPool.addResEvent(price.name, -price.val));
                     yieldResTotal = game.diplomacy.tradeInternal(game.diplomacy.races.find(race => race.title === this.panel), true, yieldResTotal);
                     quantityTraded++;
                 }
-                gainTradeResources(yieldResTotal);
-                var tradeSeason = game.calendar.year + game.calendar.season / 4;
-                if (tradeSeason !== state.lastTradeSeason) {
-                    //make new logs each season
-                    state.tradeResourceTotal = {};
-                    state.tradeMessages = 0;
-                    state.lastTradeSeason = tradeSeason;
-                    state.lastTradeQuantity = 0;
+                if (yieldResTotal) {
+                    gainTradeResources(yieldResTotal);
+                    var tradeSeason = game.calendar.year + game.calendar.season / 4;
+                    if (tradeSeason !== state.lastTradeSeason) {
+                        //make new logs each season
+                        state.tradeResourceTotal = {};
+                        state.tradeMessages = 0;
+                        state.lastTradeSeason = tradeSeason;
+                        state.lastTradeQuantity = 0;
+                    }
+                    var actualTradeMessages = clearTradeLogs(state.tradeMessages);
+                    if (actualTradeMessages !== state.tradeMessages || state.tradeSeason) {
+                        //did not successfully clear logs; something else appeared
+                        state.tradeResourceTotal = {};
+                        state.lastTradeQuantity = 0;
+                    }
+                    Object.entries(yieldResTotal).forEach(entry => state.tradeResourceTotal[entry[0]] = (state.tradeResourceTotal[entry[0]] || 0) + entry[1])
+                    state.lastTradeQuantity += quantityTraded;
+                    state.tradeMessages = logTrades(state.tradeResourceTotal, state.lastTradeQuantity);
                 }
-                var actualTradeMessages = clearTradeLogs(state.tradeMessages);
-                if (actualTradeMessages !== state.tradeMessages || state.tradeSeason) {
-                    //did not successfully clear logs; something else appeared
-                    state.tradeResourceTotal = {};
-                    state.lastTradeQuantity = 0;
-                }
-                Object.entries(yieldResTotal).forEach(entry => state.tradeResourceTotal[entry[0]] = (state.tradeResourceTotal[entry[0]] || 0) + entry[1])
-                state.lastTradeQuantity += quantityTraded;
-                state.tradeMessages = logTrades(state.tradeResourceTotal, state.lastTradeQuantity);
             } else {
                 withTab("Trade", () => {
                     if (!canAfford(prices, reserved)) console.error(reserved);
@@ -1192,14 +1218,18 @@ Trade.prototype.buy = function(reserved) {
     return quantityTraded;
 }
 Trade.prototype.getPrices = function() { return [{name: "manpower", val: 50}, {name: "gold", val: 15}].concat(getTradeData(this.panel).buys); }
-Trade.prototype.needProduct = function(quantity) {
-    return getTradeValue(this.panel, true).every(sell => getResourceOwned(sell.name) * 1.2 + sell.val * quantity < getResourceMax(sell.name));
+Trade.prototype.needProduct = function(quantity, resourcesSoFar) {
+    if (!resourcesSoFar) resourcesSoFar = {};
+    return getTradeValue(this.panel, true).every(sell => getResourceOwned(sell.name) * (this.overrideNeeds() ? 1 : 1.2) + sell.val * quantity + (resourcesSoFar[sell.name] || 0) < getResourceMax(sell.name));
 }
 Trade.prototype.bestSeason = function() {
     return getTradeData(this.panel).sells[0].seasons[seasonNames[game.calendar.season]] >= Math.max(...Object.values(getTradeData(this.panel).sells[0].seasons))
 }
 Trade.prototype.isEnabled = function() { 
-    return this.needProduct(1) && this.bestSeason(); 
+    return this.needProduct(1) && this.bestSeason() || this.overrideNeeds(); 
+}
+Trade.prototype.overrideNeeds = function() {
+    return isResourceFull("gold") && this.panel === "Nagas";
 }
 gainTradeResources = yieldResTotal => Object.entries(yieldResTotal).forEach(entry => game.resPool.addResEvent(...entry))
 //from diplomacy.gainTradeRes
@@ -1216,14 +1246,14 @@ logTrades = (yieldResTotal, amtTrade) => {
             } else if (res == "titanium"){
                 game.msg($I("trade.msg.resources", [game.getDisplayValueExt(amt), res]) + "!", "notice", "trade", true);
             } else {
-                var resPool = this.game.resPool.get(res);
+                var resPool = game.resPool.get(res);
                 var name = resPool.title || res;
                 game.msg($I("trade.msg.resources", [game.getDisplayValueExt(amt), name]), null, "trade", true);
             }
             totalMessages++;
         }
     }
-    this.game.msg($I("trade.msg.trade.caravan", [amtTrade]), null, "trade");
+    game.msg($I("trade.msg.trade.caravan", [amtTrade]), null, "trade");
     return totalMessages;
 }
 clearTradeLogs = (expectedTradeMessages) => {
