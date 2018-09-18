@@ -1587,7 +1587,8 @@ startLoop = () => { stopLoop(); loopHandle = setInterval(mainLoop, state.delay);
 /************** 
  * Interface
 **************/
-ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit", "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time crystals", "Feed Elders"]
+ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit", "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time crystals", "Feed elders"]
+ignoredPanels = ["Metaphysics", "Cryptotheology", "Challenges"]
 stateButtons = {
     "Send hunters": "autoHunt",
     "Steel": "autoSteel",
@@ -1604,7 +1605,8 @@ getManagedItem = manageButton => trimButtonText($(manageButton).parent().find("s
 getPanelTitle = elem => getOwnText($(elem).parents('.panelContainer').children('.title')).trim();
 updateButton = (elem, tab) => {
     var item = getManagedItem(elem);
-    if (ignoredButtons.includes(item) || tab === "Science" && ["Metaphysics", "Cryptotheology"].includes(getPanelTitle(elem))) {
+    var panel = getPanelTitle(elem);
+    if (ignoredButtons.includes(item) || ignoredPanels.includes(panel)) {
         $(elem).text("");
     } else {
         var value;
@@ -1614,7 +1616,7 @@ updateButton = (elem, tab) => {
         } else if (tab === "Village" && !specialBuys[item]) {
             value = asInt(state.defaultJob === item);
         } else if (tab === "Trade" && !specialBuys[item]) {
-            value = getPriority(getPanelTitle(elem));
+            value = getPriority(panel);
         //Bonfire page refine button has a lowercase c
         } else if (item === "Refine catnip") {
             value = getPriority("Refine Catnip");
@@ -1740,6 +1742,7 @@ specialUis = {
     Trade: () => {
         $("#gameContainerId div.trade-race > .left > div").toArray().forEach(div => {
             var elem = $(div);
+            if (!elem.children(".buys, .sells").length) return;
             var resource = getResourceInternalName(getOwnText(elem)); 
             var kittenProduction = getResourcePerTickPerKitten(resource);
             var production = kittenProduction ? kittenProduction : getCraftingResourcePerTick(resource, new Reservations({}), true);
