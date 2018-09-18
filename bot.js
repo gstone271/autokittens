@@ -1555,7 +1555,7 @@ startLoop = () => { stopLoop(); loopHandle = setInterval(mainLoop, state.delay);
 /************** 
  * Interface
 **************/
-ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit", "Sacrifice Unicorns"]
+ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit", "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time crystals", "Feed Elders"]
 stateButtons = {
     "Send hunters": "autoHunt",
     "Steel": "autoSteel",
@@ -1572,7 +1572,7 @@ getManagedItem = manageButton => trimButtonText($(manageButton).parent().find("s
 getPanelTitle = elem => getOwnText($(elem).parents('.panelContainer').children('.title')).trim();
 updateButton = (elem, tab) => {
     var item = getManagedItem(elem);
-    if (ignoredButtons.includes(item) || tab === "Science" && getPanelTitle(elem) === "Metaphysics") {
+    if (ignoredButtons.includes(item) || tab === "Science" && ["Metaphysics", "Cryptotheology"].includes(getPanelTitle(elem))) {
         $(elem).text("");
     } else {
         var value;
