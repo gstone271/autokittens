@@ -339,7 +339,7 @@ getTicksNeeded = (effectivePrices, originalPrices, reserved) => {
 }
 reserveBufferTime = game.rate * 60 * 5; //5 minutes: reserve enough of non-limiting resources to be this far ahead of the limiting resource
 bufferTicksNeeded = ticksNeeded => Math.max(0, ticksNeeded - reserveBufferTime);
-canAffordOne = (price, reserved) => getResourceOwned(price.name) - (reserved ? reserved.get(price.name).current : 0) >= price.val;
+canAffordOne = (price, reserved) => price.val <= 0 || getResourceOwned(price.name) - (reserved ? reserved.get(price.name).current : 0) >= price.val;
 canAfford = (prices, reserved) => prices.every(price => canAffordOne(price, reserved));
 //ticks until you have enough. May be infinite.
 getTicksToEnough = (price, reserved, owned, forSteel) => {
