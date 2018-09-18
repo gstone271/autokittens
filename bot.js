@@ -1778,6 +1778,20 @@ specialUis = {
             var totalKittenTicks = scienceKittensTicks + fursKittenTicks;
             blueprintInfo.text("Blueprints: " + game.getDisplayValueExt(totalKittenTicks) + " cat*t/trade")
         }
+    },
+    Time: () => {
+        if (game.village.sim.getKittens() > 70) {
+            var paragonInfo = $("#paragonInfo");
+            if (!paragonInfo.length) { paragonInfo = $('<div id="paragonInfo" style="float: right">'); $("#gameContainerId > div > div.panelContainer:nth-child(2) > div.toggle").after(paragonInfo); }
+            paragonInfo.html("Best reset points for paragon so far: <br />"
+                + getBestResetPoint(state.history).slice(0, 3)
+                    .map(point => 
+                        "Paragon: " + game.getDisplayValueExt(point.paragon)
+                        + " Year: " +  game.getDisplayValueExt(point.year)
+                        + " Per Year: " + game.getDisplayValueExt(point.ratio, false, false, 3)
+                    ).join("<br />")
+            )
+        }
     }
 }
 updateUi = () => {
