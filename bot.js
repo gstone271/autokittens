@@ -649,7 +649,7 @@ getCraftingResourcePerTick = (res, reserved, forSteel) => {
         //for catnip, this will be wrong due to seasons
         //don't worry about it for now
         resourcePerTick += Math.max(0, getCraftRatio(res) * Math.min(...prices.map(price => 
-            (getCraftingResourcePerTick(price.name, reserved, res === "steel") - (ignoreReservations ? 0 : reserved.get(price.name).production)) / price.val
+            (getCraftingResourcePerTick(price.name, reserved, res === "steel" || forSteel) - (ignoreReservations ? 0 : reserved.get(price.name).production)) / price.val
         )));
     }
     if (res === "iron" && state.autoSteel && !forSteel) {
@@ -1710,22 +1710,23 @@ specialUis = {
             var elem = $(div);
             var resource = getOwnText(elem);
             var kittenProduction = getResourcePerTickPerKitten(resource);
-            if (kittenProduction) {
+            var production = kittenProduction ? kittenProduction : getCraftingResourcePerTick(resource, new Reservations({}), true);
+            if (production > 0) {
                 if (resource === "catnip" && getFarmerEffectiveness() < 1) kittenProduction /= getFarmerEffectiveness();
                 var tradeInfo = elem.children(".tradeInfo");
                 if (!tradeInfo.length) { tradeInfo = $("<span class=\"tradeInfo\">"); elem.append(tradeInfo); }
                 var raceName = getPanelTitle(elem);
                 var raceData = getTradeData(raceName);
-                var kittenTicks = 0;
+                var ticks = 0;
                 var amount;
                 if (elem.children(".buys").length) {
                     amount = getPrice(raceData.buys, resource);
-                    kittenTicks += 50 / getResourcePerTickPerKitten("manpower", "hunter")
+                    if (kittenProduction) ticks += 50 / getResourcePerTickPerKitten("manpower", "hunter");
                 } else {
                     amount = getPrice(getTradeValue(raceName), resource);
                 }
-                kittenTicks += amount / kittenProduction;
-                tradeInfo.text(" (" + game.getDisplayValueExt(kittenTicks) + " cat*t)")
+                ticks += amount / production;
+                tradeInfo.text(" (" + game.getDisplayValueExt(ticks) + (kittenProduction ? " cat*t)" : " t)"))
             }
         })
         var kittenGoldProduction = getResourcePerTickPerKitten("gold");
