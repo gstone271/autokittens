@@ -1850,8 +1850,10 @@ buy script (-> genetic algorithm)
 ----time to moon, paragon/hr (go for unobtainium huts; use best paragon/hr)
 ------graph #technologies, #kittens
 trade calculations -> needsResource function
---try not to have full gold (trade aggressively for blueprints)
 --can get stuck needing titanium but with too much iron
+----aggressive mode on trading
+------ignore needs (max gold, always), ignore season (max gold, always)
+----compare the ticks produced to decide titanium is more important?
 --trade more like crafting
 --calculate resouce per kitten for trades
 faith reset without transcending
