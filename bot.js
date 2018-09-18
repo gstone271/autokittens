@@ -1116,7 +1116,7 @@ getTradeValue = (race, bestCase) => {
         neutral: 1,
         friendly: 1 + .25 * Math.min(1, tradeData.standing + standingRatio / 200)
     }[tradeData.attitude]
-    var ships = this.game.resPool.get("ship").value;
+    var ships = game.resPool.get("ship").value;
     return tradeData.sells.map(sell => ({
         name: sell.name, 
         val: (sell.name === "titanium" ? 1.5 * (1 + ships / 50) : sell.value)
