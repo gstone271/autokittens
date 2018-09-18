@@ -1710,11 +1710,11 @@ specialUis = {
     Trade: () => {
         $("#gameContainerId div.trade-race > .left > div").toArray().forEach(div => {
             var elem = $(div);
-            var resource = getOwnText(elem);
+            var resource = getResourceInternalName(getOwnText(elem)); 
             var kittenProduction = getResourcePerTickPerKitten(resource);
             var production = kittenProduction ? kittenProduction : getCraftingResourcePerTick(resource, new Reservations({}), true);
             if (production > 0) {
-                if (resource === "catnip" && getFarmerEffectiveness() < 1) kittenProduction /= getFarmerEffectiveness();
+                if (resource === "catnip" && getFarmerEffectiveness() < 1) production /= getFarmerEffectiveness();
                 var tradeInfo = elem.children(".tradeInfo");
                 if (!tradeInfo.length) { tradeInfo = $("<span class=\"tradeInfo\">"); elem.append(tradeInfo); }
                 var raceName = getPanelTitle(elem);
