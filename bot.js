@@ -13,6 +13,11 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     <li>Bot: Turns all bot functions on/off</li>
     <li>Game Speed: Can increase the speed of all game progress (even when the bot is off)</li>
     <li>Bot Speed: Controls how frequently the bot runs (per game tick)</li>
+    <li>Bot Timer: <ul>
+        <li>game: Run the bot in the game loop. Guarantees the bot will not lag behind the game, but may cause the game to lag. Very useful if using Web Worker.</li>
+        <li>independent: Run the bot on a timer independent of the game loop.</li>
+    </ul></li>
+    <li>Timeskip bug: There is a bug in the game that causes time, but not the calendar, to move faster whenever you click a building. This causes the calendar to not be an accurate indicator of how much time has passed, and the bot to fall behind the game. Change to "fixed" to prevent time skipping.</li>
     <li>API: Increase to use more of the game API to improve performance and add features like trade log combining. Decrease to instead use the actual buttons in the game interface.</li>
     <li>Up Next: Controls the amount of information displayed in the Up Next panel.
         <br />In Verbose mode, enqueued items you have enough storage to buy are displayed, followed by the estimated time until it is bought and the resources you need more of to buy them. In Concise, the time and resources are not displayed.
