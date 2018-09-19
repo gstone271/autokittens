@@ -1797,6 +1797,19 @@ specialUis = {
                     ).join("<br />")
             )
         }
+        if (state.previousHistories.length > 0) {
+            var pastParagonInfo = $("#pastParagonInfo");
+            if (!pastParagonInfo.length) { pastParagonInfo = $('<div id="pastParagonInfo">'); $("#gameContainerId > div.tabInner").append(pastParagonInfo); }
+            pastParagonInfo.html("Past resets: <br />"
+                + state.previousHistories
+                    .map(history => history.find(event => event.type === "Reset"))
+                    .map(point => 
+                        "Paragon: " + game.getDisplayValueExt(point.kittens - 70)
+                        + " Year: " +  game.getDisplayValueExt(point.year + point.day / 400)
+                        + " Per Year: " + game.getDisplayValueExt((point.kittens - 70) / (point.year + point.day / 400), false, false, 3)
+                    ).join("<br />")
+            )
+        }
     }
 }
 updateUi = () => {
