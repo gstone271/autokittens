@@ -1547,15 +1547,27 @@ speedUp = () => setSpeed(state.speed * 2);
 slowDown = () => setSpeed(state.speed / 2);
 if (!game.realUpdateModel) game.realUpdateModel = game.updateModel;
 game.updateModel = () => {
-    for (var i = 0; i < state.speed; i++) { 
-        if (i !== 0) {
-            game.calendar.tick();
-            //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
-            game.ticks++;
-            //might be going so fast you would miss astro events
-            if (state.autoSeti && game.calendar.observeBtn) game.calendar.observeHandler();
+    if (!(state.disableTimeskip && game.isRendering)) {
+        for (var i = 0; i < state.speed; i++) { 
+            if (i !== 0) {
+                game.calendar.tick();
+                //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
+                game.ticks++;
+                //might be going so fast you would miss astro events
+                if (state.autoSeti && game.calendar.observeBtn) game.calendar.observeHandler();
+            }
+            game.realUpdateModel(); 
         }
-        game.realUpdateModel(); 
+    }
+}
+if (!game.realRender) game.realRender = game.render;
+game.render = () => {
+    //game.render ultimately calls game.updateModel, causing a 1-tick timeskip every time you click a button
+    game.isRendering = true;
+    try {
+        game.realRender();
+    } finally {
+        game.isRendering = false;
     }
 }
 //this makes the UI display the right /sec values but makes the calendar too fast
@@ -1713,6 +1725,12 @@ settingsMenu = [
         leftClick: () => { state.runInGameLoop = true; setRunning(state.running) },
         rightClick: () => { state.runInGameLoop = false; setRunning(state.running) },
         getHtml: () => "Bot Timer: " + (state.runInGameLoop ? "game" : "independent")
+    },
+    {
+        name: "disableTimeskip",
+        leftClick: () => state.disableTimeskip = true,
+        rightClick: () => state.disableTimeskip = false,
+        getHtml: () => "Timeskip bug: " + (state.disableTimeskip ? "fixed" : "normal")
     },
     {
         name: "apiLevel",
