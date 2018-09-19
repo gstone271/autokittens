@@ -1224,7 +1224,7 @@ Trade.prototype.buy = function(reserved) {
 Trade.prototype.getPrices = function() { return [{name: "manpower", val: 50}, {name: "gold", val: 15}].concat(getTradeData(this.panel).buys); }
 Trade.prototype.needProduct = function(quantity, resourcesSoFar) {
     if (!resourcesSoFar) resourcesSoFar = {};
-    return getTradeValue(this.panel, true).every(sell => getResourceOwned(sell.name) * (this.overrideNeeds() ? 1 : 1.2) + sell.val * quantity + (resourcesSoFar[sell.name] || 0) < getResourceMax(sell.name));
+    return getTradeValue(this.panel, true).every(sell => getResourceOwned(sell.name) * (this.overrideNeeds() ? 1 : 1.1) + sell.val * quantity + (resourcesSoFar[sell.name] || 0) < getResourceMax(sell.name));
 }
 Trade.prototype.bestSeason = function() {
     return getTradeData(this.panel).sells[0].seasons[seasonNames[game.calendar.season]] >= Math.max(...Object.values(getTradeData(this.panel).sells[0].seasons))
