@@ -198,11 +198,13 @@ loadDefaults = () => {
     if (!state.tradeResourceTotal) state.tradeResourceTotal = {};
     if (!state.lastTradeSeason) state.lastTradeSeason = 0;
     if (!state.lastTradeQuantity) state.lastTradeQuantity = 0;
+    if (!state.loopsUntilRun) state.loopsUntilRun = 0;
     if (state.desiredApi === undefined) state.desiredApi = 1;
     if (state.autoCraftLevel === undefined) state.autoCraftLevel = 1;
     if (state.autoFarmer === undefined) state.autoFarmer = 1;
     if (state.autoSeti === undefined) state.autoSeti = true;
     if (state.autoConverters === undefined) state.autoConverters = true;
+    if (state.runInGameLoop === undefined) state.runInGameLoop = true;
     if (!window.botDebug) botDebug = {};
 }
 initialize = () => {
@@ -1583,8 +1585,34 @@ setRunning = newRunning => {
     }
 }
 loopHandle = 0;
-stopLoop = () => clearInterval(loopHandle);
-startLoop = () => { stopLoop(); loopHandle = setInterval(mainLoop, state.delay); mainLoop(); }
+stopLoop = () => {
+    clearInterval(loopHandle);
+}
+startLoop = () => { 
+    stopLoop();
+    if (state.runInGameLoop) {
+        if (!(game.worker || game.useWorkers && game.isWebWorkerSupported())) {
+            //need to restart the game loop to use our version of game.tick
+            //technically we only need to do this once, even if we start and stop the bot, but it's fine to do it more
+            game.start();
+        }
+    } else {
+        loopHandle = setInterval(mainLoop, state.delay);
+    }
+    mainLoop();
+}
+if (!game.realTick) game.realTick = game.tick;
+game.tick = () => {
+    game.realTick();
+    if (state.running && state.runInGameLoop) {
+        if (state.loopsUntilRun <= 0) {
+            mainLoop();
+            state.loopsUntilRun = state.ticksPerLoop / state.speed - 1;
+        } else {
+            state.loopsUntilRun--;
+        }
+    }
+}
 
 /************** 
  * Interface
@@ -1679,6 +1707,12 @@ settingsMenu = [
         leftClick: () => setDesiredTicksPerLoop(state.desiredTicksPerLoop / 2),
         rightClick: () => setDesiredTicksPerLoop(state.desiredTicksPerLoop * 2),
         getHtml: () => "Bot Speed: " + (state.desiredTicksPerLoop === state.ticksPerLoop ? "1/" + state.ticksPerLoop : "(1/" + state.ticksPerLoop + ")")
+    },
+    {
+        name: "mainLoopMode",
+        leftClick: () => { state.runInGameLoop = true; setRunning(state.running) },
+        rightClick: () => { state.runInGameLoop = false; setRunning(state.running) },
+        getHtml: () => "Bot Timer: " + (state.runInGameLoop ? "game" : "independent")
     },
     {
         name: "apiLevel",
