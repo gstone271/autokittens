@@ -45,10 +45,9 @@ $('#helpDiv').prepend($(`<div id="botHelp">
 <p>Leaders: It is recommended that you make an Artisan your leader. For all tasks except crafting, if you already have a leader, the bot will automatically switch to a leader of the appropriate type. If API is set to none, a leader of the appropriate type must appear on the first page of kittens (you may need to promote one).</p>
 <p>Trade: Sending trade caravans is queued like buildings. <ul>
     <li>When a trade is bought from the queue, it sends as many caravans as possible without spending a resource reserved for something higher in the queue.</li>
-    <li>The bot will not make trades for resources that you have a lot of already.</li>
-    <li>If your gold is near full, it will prioritize trades over other queued items (but not priority infinity items).</li>
-    <li>It will only trade during optimal seasons.</li>
-    <li>Exception: If your gold is at maximum and Nagas are enabled, it will trade with Nagas even if it's not the optimal season and you have a lot of minerals already, mostly in order to get more blueprints (but it will also craft slabs).</li>
+    <li>If your gold is near full, the bot will prioritize trades over other queued items (but not priority infinity items).</li>
+    <li>The bot will not make trades for resources that you have a lot of already, unless you enable ignoreNeeds and you gold is full.</li>
+    <li>It will only trade during optimal seasons, unless you enable ignoreSeasons and you gold is full.</li>
 </ul>Next to tradeable resources, the bot will display the amount of time it would take one no-skill kitten to produce that much resource (in cats*ticks), or if kittens can't produce it, the amount of time it would take all your production to produce it (in ticks).</p>
 <p>Compatibility: Autokittens requires a modern browser (with HTML5 and ES6) and is currently only compatible with the English version of the game.</p>
 <hr />
@@ -204,6 +203,8 @@ loadDefaults = () => {
     if (!state.lastTradeSeason) state.lastTradeSeason = 0;
     if (!state.lastTradeQuantity) state.lastTradeQuantity = 0;
     if (!state.loopsUntilRun) state.loopsUntilRun = 0;
+    if (!state.ignoreNeeds) state.ignoreNeeds = {};
+    if (!state.ignoreSeason) state.ignoreSeason = {};
     if (state.desiredApi === undefined) state.desiredApi = 1;
     if (state.autoCraftLevel === undefined) state.autoCraftLevel = 1;
     if (state.autoFarmer === undefined) state.autoFarmer = 1;
@@ -1159,6 +1160,7 @@ Trade.prototype.buy = function(reserved) {
     var quantityTraded = 0;
     if (state.api >= 1 || state.tradeTimer >= tradeTimerDuration || getResourceOwned("manpower") * 1.2 > getResourceMax("manpower") || this.overrideNeeds()) {
         if (this.overrideNeeds()) {
+            //TODO for sharks, also craft away the beams
             var loopsToNextTrade = Math.max(1, state.autoCraftLevel);
             var tradesToMake = Math.ceil((getResourceOwned("gold") - getSafeStorage("gold", loopsToNextTrade)) / 15)
             var storageNeeded = multiplyPrices(getTradeValue(this.panel, true), tradesToMake);
@@ -1235,10 +1237,13 @@ Trade.prototype.bestSeason = function() {
     return getTradeData(this.panel).sells[0].seasons[seasonNames[game.calendar.season]] >= Math.max(...Object.values(getTradeData(this.panel).sells[0].seasons))
 }
 Trade.prototype.isEnabled = function() { 
-    return this.needProduct(1) && this.bestSeason() || this.overrideNeeds(); 
+    return (this.needProduct(1) || this.overrideNeeds()) && (this.bestSeason() || this.ignoreSeason());
 }
 Trade.prototype.overrideNeeds = function() {
-    return isResourceFull("gold") && this.panel === "Nagas";
+    return isResourceFull("gold") && state.ignoreNeeds[this.panel];
+}
+Trade.prototype.ignoreSeason = function() {
+    return isResourceFull("gold") && state.ignoreSeason[this.panel];
 }
 gainTradeResources = yieldResTotal => Object.entries(yieldResTotal).forEach(entry => game.resPool.addResEvent(...entry))
 //from diplomacy.gainTradeRes
@@ -1777,96 +1782,137 @@ settingsMenu = [
         getHtml: () => "Auto SETI: " + (state.autoSeti ? "on" : "off")
     },
 ];
+var eventHandler = action => event => {
+    event.preventDefault();
+    if (action) action();
+    updateSettingsMenu();
+};
+createSettingsButton = data => {
+    var button = $('<div id="' + data.name + '" style="margin-bottom: 5px">');
+    button.click(eventHandler(data.leftClick));
+    button.contextmenu(eventHandler(data.rightClick));
+    return button;
+}
 createSettingsMenu = () => {
     $("#botSettings").remove()
     var botSettings = $('<div id="botSettings" style="position: absolute; top: 50px; right: 10px;">');
-    var eventHandler = action => event => {
-        event.preventDefault();
-        if (action) action();
-        updateSettingsMenu();
-    };
-    settingsMenu.forEach(item => {
-        var button = $('<div id="' + item.name + '" style="margin-bottom: 5px">');
-        button.click(eventHandler(item.leftClick));
-        button.contextmenu(eventHandler(item.rightClick));
-        botSettings.append(button)
-    })
+    settingsMenu.map(createSettingsButton).forEach(button => botSettings.append(button));
     $('#gamePageContainer').append(botSettings);
     updateSettingsMenu();
 }
 updateSettingsMenu = () => {
     settingsMenu.forEach(item => $('#' + item.name).html(item.getHtml()));
 }
-specialUis = {
-    Trade: () => {
-        $("#gameContainerId div.trade-race > .left > div").toArray().forEach(div => {
-            var elem = $(div);
-            if (!elem.children(".buys, .sells").length) return;
-            var resource = getResourceInternalName(getOwnText(elem)); 
-            var kittenProduction = getResourcePerTickPerKitten(resource);
-            var production = kittenProduction ? kittenProduction : getCraftingResourcePerTick(resource, new Reservations({}), true);
-            if (production > 0) {
-                if (resource === "catnip" && getFarmerEffectiveness() < 1) production /= getFarmerEffectiveness();
-                var tradeInfo = elem.children(".tradeInfo");
-                if (!tradeInfo.length) { tradeInfo = $("<span class=\"tradeInfo\">"); elem.append(tradeInfo); }
-                var raceName = getPanelTitle(elem);
-                var raceData = getTradeData(raceName);
-                var ticks = 0;
-                var amount;
-                if (elem.children(".buys").length) {
-                    amount = getPrice(raceData.buys, resource);
-                    if (kittenProduction) ticks += 50 / getResourcePerTickPerKitten("manpower", "hunter");
-                } else {
-                    amount = getPrice(getTradeValue(raceName), resource);
+displayTradeValues = () => {
+    $("#gameContainerId div.trade-race > .left > div").toArray().forEach(div => {
+        var elem = $(div);
+        if (!elem.children(".buys, .sells").length) return;
+        var resource = getResourceInternalName(getOwnText(elem)); 
+        var kittenProduction = getResourcePerTickPerKitten(resource);
+        var production = kittenProduction ? kittenProduction : getCraftingResourcePerTick(resource, new Reservations({}), true);
+        if (production > 0) {
+            if (resource === "catnip" && getFarmerEffectiveness() < 1) production /= getFarmerEffectiveness();
+            var tradeInfo = elem.children(".tradeInfo");
+            if (!tradeInfo.length) { tradeInfo = $("<span class=\"tradeInfo\">"); elem.append(tradeInfo); }
+            var raceName = getPanelTitle(elem);
+            var raceData = getTradeData(raceName);
+            var ticks = 0;
+            var amount;
+            if (elem.children(".buys").length) {
+                amount = getPrice(raceData.buys, resource);
+                if (kittenProduction) ticks += 50 / getResourcePerTickPerKitten("manpower", "hunter");
+            } else {
+                amount = getPrice(getTradeValue(raceName), resource);
+            }
+            ticks += amount / production;
+            tradeInfo.text(" (" + game.getDisplayValueExt(ticks) + (kittenProduction ? " cat*t)" : " t)"))
+        }
+    })
+}
+displayGoldValue = () => {
+    var kittenGoldProduction = getResourcePerTickPerKitten("gold");
+    if (kittenGoldProduction) {
+        var goldInfo = $("#goldInfo")
+        if (!goldInfo.length) { goldInfo = $('<div id="goldInfo" style="float: left; margin-top: -15px">'); $("#gameContainerId > .tabInner").prepend(goldInfo); }
+        goldInfo.text("15 Gold: " + game.getDisplayValueExt(15 / kittenGoldProduction) + " cat*t")
+    }
+}
+displayBlueprintValue = () => {
+    if (canCraft("blueprint")) {
+        var blueprintInfo = $("#blueprintInfo")
+        if (!blueprintInfo.length) { blueprintInfo = $('<div id="blueprintInfo" style="float: left; margin-top: -15px; margin-right: 15px;">'); $("#gameContainerId > .tabInner").prepend(blueprintInfo); }
+        var totalPrices = getTotalCraftPrices("blueprint");
+        var scienceCost = getPrice(totalPrices, "science") / 10;
+        var fursCost = getPrice(totalPrices, "furs") / 10;
+        var scienceKittensTicks = scienceCost / getResourcePerTickPerKitten("science");
+        var fursKittenTicks = fursCost / getFursPerHunt() * 100 / getResourcePerTickPerKitten("manpower");
+        var totalKittenTicks = scienceKittensTicks + fursKittenTicks;
+        blueprintInfo.text("Blueprints: " + game.getDisplayValueExt(totalKittenTicks) + " cat*t/trade")
+    }
+}
+displayTradeAgressionSettings = () => {
+    $("#gameContainerId div.panelContainer > .title").toArray().forEach(div => {
+        var elem = $(div);
+        var raceName = getPanelTitle(elem);
+        ["ignoreNeeds", "ignoreSeason"].forEach(buttonType => {
+            var button = $("#" + buttonType + raceName);
+            if (!button.length) {
+                var updateButton = () => $("#" + buttonType + raceName).html(buttonData.getHtml());
+                var buttonData = {
+                    name: buttonType + raceName,
+                    leftClick: () => { state[buttonType][raceName] = true; updateButton(); },
+                    rightClick: () => { state[buttonType][raceName] = false; updateButton(); },
+                    getHtml: () => buttonType + ": " + (state[buttonType][raceName] ? "max gold" : "never")
                 }
-                ticks += amount / production;
-                tradeInfo.text(" (" + game.getDisplayValueExt(ticks) + (kittenProduction ? " cat*t)" : " t)"))
+                button = createSettingsButton(buttonData);
+                button.css("margin-bottom", "0");
+                button.css("margin-left", "10px");
+                button.css("display", "inline-block");
+                elem.append(button);
+                updateButton();
             }
         })
-        var kittenGoldProduction = getResourcePerTickPerKitten("gold");
-        if (kittenGoldProduction) {
-            var goldInfo = $("#goldInfo")
-            if (!goldInfo.length) { goldInfo = $('<div id="goldInfo" style="float: left; margin-top: -15px">'); $("#gameContainerId > .tabInner").prepend(goldInfo); }
-            goldInfo.text("15 Gold: " + game.getDisplayValueExt(15 / kittenGoldProduction) + " cat*t")
-        }
-        if (canCraft("blueprint")) {
-            var blueprintInfo = $("#blueprintInfo")
-            if (!blueprintInfo.length) { blueprintInfo = $('<div id="blueprintInfo" style="float: left; margin-top: -15px; margin-right: 15px;">'); $("#gameContainerId > .tabInner").prepend(blueprintInfo); }
-            var totalPrices = getTotalCraftPrices("blueprint");
-            var scienceCost = getPrice(totalPrices, "science") / 10;
-            var fursCost = getPrice(totalPrices, "furs") / 10;
-            var scienceKittensTicks = scienceCost / getResourcePerTickPerKitten("science");
-            var fursKittenTicks = fursCost / getFursPerHunt() * 100 / getResourcePerTickPerKitten("manpower");
-            var totalKittenTicks = scienceKittensTicks + fursKittenTicks;
-            blueprintInfo.text("Blueprints: " + game.getDisplayValueExt(totalKittenTicks) + " cat*t/trade")
-        }
+    })
+}
+displayParagonInfo = () => {
+    if (game.village.sim.getKittens() > 70) {
+        var paragonInfo = $("#paragonInfo");
+        if (!paragonInfo.length) { paragonInfo = $('<div id="paragonInfo" style="float: right">'); $("#gameContainerId > div > div.panelContainer:nth-child(2) > div.toggle").after(paragonInfo); }
+        paragonInfo.html("Best resets (local maxima of paragon/y): <br />"
+            + getBestResetPoint(state.history, true).slice(0, 3)
+                .map(point => 
+                    "Paragon: " + game.getDisplayValueExt(point.paragon)
+                    + " Year: " +  game.getDisplayValueExt(point.year)
+                    + " Per Year: " + game.getDisplayValueExt(point.ratio, false, false, 3)
+                ).join("<br />")
+        )
+    }
+}
+displayPreviousHistoryInfo = () => {
+    if (state.previousHistories.length > 0) {
+        var pastParagonInfo = $("#pastParagonInfo");
+        if (!pastParagonInfo.length) { pastParagonInfo = $('<div id="pastParagonInfo">'); $("#gameContainerId > div.tabInner").append(pastParagonInfo); }
+        pastParagonInfo.html("Past resets: <br />"
+            + state.previousHistories
+                .map(history => history.find(event => event.type === "Reset"))
+                .map(point => 
+                    "Paragon: " + game.getDisplayValueExt(point.kittens - 70)
+                    + " Year: " +  game.getDisplayValueExt(point.year + point.day / 400)
+                    + " Per Year: " + game.getDisplayValueExt((point.kittens - 70) / (point.year + point.day / 400), false, false, 3)
+                ).join("<br />")
+        )
+    }
+}
+specialUis = {
+    Trade: () => {
+        displayTradeValues();
+        displayGoldValue();
+        displayBlueprintValue();
+        displayTradeAgressionSettings();
     },
     Time: () => {
-        if (game.village.sim.getKittens() > 70) {
-            var paragonInfo = $("#paragonInfo");
-            if (!paragonInfo.length) { paragonInfo = $('<div id="paragonInfo" style="float: right">'); $("#gameContainerId > div > div.panelContainer:nth-child(2) > div.toggle").after(paragonInfo); }
-            paragonInfo.html("Best resets (local maxima of paragon/y): <br />"
-                + getBestResetPoint(state.history, true).slice(0, 3)
-                    .map(point => 
-                        "Paragon: " + game.getDisplayValueExt(point.paragon)
-                        + " Year: " +  game.getDisplayValueExt(point.year)
-                        + " Per Year: " + game.getDisplayValueExt(point.ratio, false, false, 3)
-                    ).join("<br />")
-            )
-        }
-        if (state.previousHistories.length > 0) {
-            var pastParagonInfo = $("#pastParagonInfo");
-            if (!pastParagonInfo.length) { pastParagonInfo = $('<div id="pastParagonInfo">'); $("#gameContainerId > div.tabInner").append(pastParagonInfo); }
-            pastParagonInfo.html("Past resets: <br />"
-                + state.previousHistories
-                    .map(history => history.find(event => event.type === "Reset"))
-                    .map(point => 
-                        "Paragon: " + game.getDisplayValueExt(point.kittens - 70)
-                        + " Year: " +  game.getDisplayValueExt(point.year + point.day / 400)
-                        + " Per Year: " + game.getDisplayValueExt((point.kittens - 70) / (point.year + point.day / 400), false, false, 3)
-                    ).join("<br />")
-            )
-        }
+        displayParagonInfo();
+        displayPreviousHistoryInfo();
     }
 }
 updateUi = () => {
@@ -1923,18 +1969,16 @@ buy script (-> genetic algorithm)
 ------graph #technologies, #kittens
 trade calculations -> needsResource function
 --can get stuck needing titanium but with too much iron
-----aggressive mode on trading
-------ignore needs (max gold, always), ignore season (max gold, always)
 ----compare the ticks produced to decide titanium is more important?
 --trade more like crafting
+----like faith, log how many trades were made before a building costing gold was bought; reserve that much gold
+------need to figure out how to have the gold reserved from the building but not the trade
 --calculate resouce per kitten for trades
 faith reset without transcending
 improve performance at high speeds
---run bot in the game update function
 --lag indicator (ticks/sec)
 --sometimes causes Your kittens will DIE message (on the last tick of autumn)
 --still sometimes has catnip full
---look into game lag compensation code
 energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
