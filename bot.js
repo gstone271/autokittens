@@ -46,8 +46,8 @@ $('#helpDiv').prepend($(`<div id="botHelp">
 <p>Trade: Sending trade caravans is queued like buildings. <ul>
     <li>When a trade is bought from the queue, it sends as many caravans as possible without spending a resource reserved for something higher in the queue.</li>
     <li>If your gold is near full, the bot will prioritize trades over other queued items (but not priority infinity items).</li>
-    <li>The bot will not make trades for resources that you have a lot of already, unless you enable ignoreNeeds and you gold is full.</li>
-    <li>It will only trade during optimal seasons, unless you enable ignoreSeasons and you gold is full.</li>
+    <li>The bot will not make trades for resources that you have a lot of already, unless you enable ignoreNeeds.</li>
+    <li>It will only trade during optimal seasons, unless you enable ignoreSeasons.</li>
 </ul>Next to tradeable resources, the bot will display the amount of time it would take one no-skill kitten to produce that much resource (in cats*ticks), or if kittens can't produce it, the amount of time it would take all your production to produce it (in ticks).</p>
 <p>Compatibility: Autokittens requires a modern browser (with HTML5 and ES6) and is currently only compatible with the English version of the game.</p>
 <hr />
@@ -1240,10 +1240,10 @@ Trade.prototype.isEnabled = function() {
     return (this.needProduct(1) || this.overrideNeeds()) && (this.bestSeason() || this.ignoreSeason());
 }
 Trade.prototype.overrideNeeds = function() {
-    return isResourceFull("gold") && state.ignoreNeeds[this.panel];
+    return isResourceFull("gold") && state.ignoreNeeds[this.panel] || state.ignoreNeeds[this.panel] >= 2;
 }
 Trade.prototype.ignoreSeason = function() {
-    return isResourceFull("gold") && state.ignoreSeason[this.panel];
+    return isResourceFull("gold") && state.ignoreSeason[this.panel] || state.ignoreSeason[this.panel] >= 2;
 }
 gainTradeResources = yieldResTotal => Object.entries(yieldResTotal).forEach(entry => game.resPool.addResEvent(...entry))
 //from diplomacy.gainTradeRes
@@ -1860,9 +1860,9 @@ displayTradeAgressionSettings = () => {
                 var updateButton = () => $("#" + buttonType + raceName).html(buttonData.getHtml());
                 var buttonData = {
                     name: buttonType + raceName,
-                    leftClick: () => { state[buttonType][raceName] = true; updateButton(); },
-                    rightClick: () => { state[buttonType][raceName] = false; updateButton(); },
-                    getHtml: () => buttonType + ": " + (state[buttonType][raceName] ? "max gold" : "never")
+                    leftClick: () => { state[buttonType][raceName] = Math.min(2, (state[buttonType][raceName] || 0) + 1); updateButton(); },
+                    rightClick: () => { state[buttonType][raceName] = Math.max(0, (state[buttonType][raceName] || 0) - 1); updateButton(); },
+                    getHtml: () => buttonType + ": " + ["never", "max gold", "always"][(state[buttonType][raceName] || 0)]
                 }
                 button = createSettingsButton(buttonData);
                 button.css("margin-bottom", "0");
@@ -2008,4 +2008,5 @@ log human actions?
 don't craft away Chronosphere resources
 fix kitten assignment/human intervention interaction
 check for updates
+rename -> Simba
 */
