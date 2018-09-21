@@ -119,6 +119,7 @@ game.resetAutomatic = () => {
     rotateLogs();
     state.queue = []; //todo reload master plan
     state.numKittens = 0;
+    state.kittensAssigned = 0;
     state.autoHunt = false;
     state.autoSteel = false;
     if (window.usingBotStarter) {
@@ -135,6 +136,13 @@ game.resetAutomatic = () => {
 }
 recountKittens = (newJob) => {
     var kittens = game.village.sim.getKittens();
+    if (state.populationIncrease > 0) {
+        state.populationIncrease--;
+        state.kittensAssigned++;
+    }
+    if (state.populationIncrease === 0) {
+        state.kittensAssigned = kittens;
+    }
     if (kittens > state.numKittens) {
         state.numKittens = kittens;
         logKitten(kittens, newJob)
@@ -196,6 +204,7 @@ loadDefaults = () => {
     if (!state.previousHistories) state.previousHistories = [];
     if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
     if (!state.numKittens) state.numKittens = game.village.sim.getKittens();
+    if (!state.kittensAssigned) state.kittensAssigned = game.village.sim.getKittens();
     if (!state.verboseQueue) state.verboseQueue = 0;
     if (!state.disabledConverters) state.disabledConverters = {};
     if (!state.tradeMessages) state.tradeMessages = 0;
@@ -540,7 +549,7 @@ additionalActions = [
         }
     },
     () => {
-        if (state.populationIncrease > 0 && getTabButtonByNumber(tabNumbers.Village).text().includes("(")) {
+        if (state.populationIncrease > 0 && game.village.isFreeKittens() && game.village.sim.getKittens() > state.kittensAssigned) {
             var job = getJobShortName(state.defaultJob);
             //it's actually possible to cheat and click on a button that hasn't been revealed yet
             if (!isJobEnabled(job)) job = "woodcutter";
@@ -548,7 +557,6 @@ additionalActions = [
                 getJobButton(job).click();
                 log("Assigned new kitten to " + job);
             });
-            state.populationIncrease--;
             recountKittens(job);
 
         }
@@ -980,7 +988,6 @@ switchToJob = jobName => {
     if (isJobEnabled(jobName)) {
         withTab("Village", () => {
             if (game.village.isFreeKittens() && state.populationIncrease) {
-                state.populationIncrease--; //we overrode the normal new job
                 recountKittens(jobName);
             }
             if (!game.village.isFreeKittens()) {
@@ -2014,7 +2021,6 @@ reservations seems still not correct (crafting too early)
 --eg blueprint need, with enough compendiums, still reserves
 log human actions?
 don't craft away Chronosphere resources
-fix kitten assignment/human intervention interaction
 check for updates
 rename -> Simba
 */
