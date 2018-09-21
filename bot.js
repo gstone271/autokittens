@@ -1370,7 +1370,13 @@ function PraiseSun(name, tab, panel) {
     this.name = name;
     this.tab = tab;
     this.panel = panel;
-    this.buy = () => $('#fastPraiseContainer > a')[0].click();
+    this.buy = () => {
+        if (state.api >= 1) {
+            game.religion.praise();
+        } else {
+            $('#fastPraiseContainer > a')[0].click();
+        }
+    }
     this.getPrices = () => ([{ name: "faith", val: Math.min(getResourceOwned("faith"), .9 * getResourceMax("faith")) }]);
     this.isEnabled = () => true;
     this.silent = true;
