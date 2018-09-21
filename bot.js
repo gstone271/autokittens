@@ -838,8 +838,10 @@ setAutoCrafting = level => {
 }
 canCraft = resInternalName => {
     var craftData = game.workshop.getCraft(resInternalName);
-    //construction required for first craft, though it is possible to cheat and click the buttons before they're shown 
-    return craftData && craftData.unlocked && ((game.bld.get("workshop").val && game.science.get("construction").researched) || resInternalName === "wood");
+    return craftData && craftData.unlocked 
+        //construction required for first craft, though it is possible to cheat and click the buttons before they're shown 
+        && ((game.bld.get("workshop").val && game.science.get("construction").researched) || resInternalName === "wood")
+        && getCraftPrices(resInternalName).every(price => getResourceMax(price.name) >= price.val);
 }
 getAdditionalNeeded = (prices, reserved) => 
     prices
