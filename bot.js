@@ -1999,6 +1999,17 @@ displayPreviousHistoryInfo = () => {
         )
     }
 }
+displayApocryphaNeededToTranscend = () => {
+    if (game.religion.getRU("transcendence").on) {
+        var transcendenceInfo = $("#transcendenceInfo");
+        if (!transcendenceInfo.length) { transcendenceInfo = $('<div id="transcendenceInfo">'); findButton("Transcend").append(transcendenceInfo); }
+        var tclevel = religion.getTranscendenceLevel();
+        //Transcend one Level at a time
+        var apocryphaNeeded = religion.getTranscendenceRatio(tclevel+1) - religion.getTranscendenceRatio(tclevel);
+        var percentageOwned = game.religion.faithRatio / apocryphaNeeded * 100;
+        transcendenceInfo.text(" (" + game.getDisplayValueExt(percentageOwned) + "% of apocrypha needed to trancend)");
+    }
+}
 specialUis = {
     Trade: () => {
         displayTradeValues();
@@ -2009,6 +2020,9 @@ specialUis = {
     Time: () => {
         displayParagonInfo();
         displayPreviousHistoryInfo();
+    },
+    Religion: () => {
+        displayApocryphaNeededToTranscend();
     }
 }
 updateUi = () => {
