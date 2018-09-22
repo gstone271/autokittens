@@ -210,6 +210,7 @@ loadDefaults = () => {
         previousHistories: [],
         numKittens: game.village.sim.getKittens(),
         kittensAssigned: game.village.sim.getKittens(),
+        leaderAssigned: game.village.leader ? true : false,
         verboseQueue: 0,
         disabledConverters: {},
         tradeMessages: 0,
@@ -534,6 +535,7 @@ buyPrioritiesQueue = (queue) => {
  * Main Loop
 **************/
 mainLoop = () => {
+    assignFirstLeader();
     if (state.autoFarmer) {
         gatherIntialCatnip();
         preventStarvation();
@@ -1072,6 +1074,98 @@ baseSkillRatioAtMaxLevel = 1.75
 getBestPossibleSkillRatio = () => 1 + (baseSkillRatioAtMaxLevel - 1) * (1 + game.getEffect("skillMultiplier")) / 4
 getJobForResource = res => game.village.jobs.find(job => job.modifiers[res]);
 
+/************** 
+ * Leaders
+**************/
+apiSetLeader = newLeader => {
+    var oldLeader = game.village.leader;
+    if (oldLeader) oldLeader.isLeader = false;
+    newLeader.isLeader = true;
+    game.village.leader = newLeader;
+}
+clickSetLeader = (newLeader, job) => {
+    if (!job) job = "";
+    var jobFilter = $("#gameContainerId select");
+    if (job !== jobFilter.val()) jobFilter.val(job)[0].dispatchEvent(new Event("change"));
+    var leaderButton = $('div.panelContainer:contains("Census") > div.container > div:contains("' + newLeader.name + " " + newLeader.surname + '") a:contains("☆")').first();
+    if (leaderButton.length) {
+        leaderButton[0].click();
+    } else {
+        console.error("Warning: Unable to find leader with job " + job)
+        console.error(newLeader);
+    }
+}
+assignFirstLeader = () => {
+    if (!state.leaderAssigned && game.science.get("civil").researched) {
+        if (game.village.leader) {
+            state.leaderAssigned = true;
+        } else {
+            var isArtisan = kitten => kitten.trait.name === "engineer";
+            var targetLeader;
+            if (state.api >= 1) {
+                targetLeader = game.village.sim.kittens.find(isArtisan);
+                if (targetLeader) {
+                    apiSetLeader(targetLeader);
+                }
+            } else {
+                var clickable = getClickableKitten(isArtisan);
+                if (clickable) {
+                    targetLeader = clickable.kitten;
+                    withTab("Village", () => clickSetLeader(targetLeader, clickable.job));
+                }
+            }
+            if (targetLeader) {
+                log("Assigned first leader to Artisan (job: " + getJobLongName(targetLeader.job) + ")")
+            }
+        }
+    }
+}
+//only the 10 most experienced kittens of each job type are clickable
+getClickableKitten = condition => {
+    var maxKittensDisplayed = 10;
+    var firstPageKitten = game.village.sim.kittens.slice(-maxKittensDisplayed).find(condition);
+    if (firstPageKitten) {
+        return { kitten: firstPageKitten };
+    }
+    return game.village.jobs.filter(job => job.unlocked).map(job => {
+        return { 
+            kitten: game.village.sim.kittens.filter(kitten => kitten.job === job.name).slice(-maxKittensDisplayed).find(condition),
+            job: job
+        }
+    }).find(candidate => candidate.kitten)
+}
+withLeader = (leaderType, op) => {
+    if (!game.science.get("civil").researched || game.challenges.currentChallenge === "anarchy") {
+        op();
+    } else if (state.api >= 1) {
+        var oldLeader = game.village.leader;
+        var newLeader = game.village.sim.kittens.find(kitten => kitten.trait.title === leaderType);
+        if (newLeader) {
+            apiSetLeader(newLeader);
+        } else {
+            console.error("Unable to find leader type " + leaderType + ". Are you low on kittens?");
+        }
+        try {
+            op();
+        } finally {
+            if (oldLeader && newLeader) apiSetLeader(oldLeader);
+        }
+    } else {
+        withTab("Village", () => {
+            var oldLeader = getClickableKitten(kitten => kitten.isLeader);
+            var newLeader = getClickableKitten(kitten => kitten.trait.title === leaderType);
+            if (oldLeader && newLeader) {
+                clickSetLeader(newLeader.kitten, newLeader.job);
+            } else console.error("Unable to find leader type " + leaderType + ". Make sure to promote a kitten of that type so they appear on the first page.");
+            try {
+                op();
+            } finally {
+                if (oldLeader && newLeader) clickSetLeader(oldLeader.kitten, oldLeader.job);
+            }
+        });
+    }
+}
+
 
 /************** 
  * Queueables
@@ -1531,41 +1625,6 @@ withTab = (tab, op) => {
         }
     }
 }
-highPerformanceSetLeader = newLeader => {
-    var oldLeader = game.village.leader;
-    if (oldLeader) oldLeader.isLeader = false;
-    newLeader.isLeader = true;
-    game.village.leader = newLeader;
-}
-withLeader = (leaderType, op) => {
-    if (!game.workshop.get("register").researched || game.challenges.currentChallenge === "anarchy") {
-        op();
-    } else if (state.api >= 1) {
-        var oldLeader = game.village.leader;
-        var newLeader = game.village.sim.kittens.find(kitten => kitten.trait.title === leaderType);
-        if (newLeader) {
-            highPerformanceSetLeader(newLeader);
-        } else {
-            console.error("Unable to find leader type " + leaderType + ". Are you low on kittens?");
-        }
-        try {
-            op();
-        } finally {
-            if (oldLeader && newLeader) highPerformanceSetLeader(oldLeader);
-        }
-    } else {
-        withTab("Village", () => {
-            var oldLeader = $('a:contains("★")');
-            var newLeader = $('div.panelContainer:contains("Census") > div.container > div:contains("' + leaderType + '") a:contains("☆")').first();
-            if (oldLeader.length && newLeader.length) newLeader[0].click(); else console.error("Unable to find leader type " + leaderType + ". Make sure to promote a kitten of that type so they appear on the first page.");
-            try {
-                op();
-            } finally {
-                if (oldLeader.length && newLeader.length) oldLeader[0].click();
-            }
-        });
-    }
-}
 getActiveTab = () => {
     return game.ui.activeTabId;
 }
@@ -2014,14 +2073,12 @@ faith reset without transcending
 improve performance at high speeds
 --lag indicator (ticks/sec)
 --sometimes causes Your kittens will DIE message (on the last tick of autumn)
---still sometimes has catnip full
 energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
 ----1/2: when none of your craft chain is reserved, become normal and go to end of queue
 ----2: queued twice
 --turn off Up Next, hide settings menu
-stop warning about resources full when waiting for another
 reserve ivory like furs
 early game needs:
 --job management
@@ -2030,15 +2087,16 @@ early game needs:
 ----set next job based on highest need in queue (measured in ticks)?
 ----unassign scholars when useless (reassign?)
 ----wood/geologist efficiency (for trade)
---first leader
-----promote leader
---first hunting (get efficiency)
+----job ratio, change ratio with upgrades?
+--promote leader
 --try harder to get rid of ivory??
 --don't spam First time crafting foobar if it's reduced to 0 (eg. negative production)
 add help menu
 organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
 --eg blueprint need, with enough compendiums, still reserves
+--kittens can still starve in cold winter??? doesn't seem to be reserving properly
+----might have been a race condition with the first day of winter
 log human actions?
 don't craft away Chronosphere resources
 check for updates
