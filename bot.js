@@ -1674,8 +1674,9 @@ game.tick = () => {
 /************** 
  * Interface
 **************/
-ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit", "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time crystals", "Feed elders"]
-ignoredPanels = ["Metaphysics", "Cryptotheology", "Challenges"]
+ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit", "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time crystals", "Feed elders", "Buy bcoin", "Sell bcoin"]
+//we could add support for void space and chronoforge, but meh
+ignoredPanels = ["Metaphysics", "Cryptotheology", "Challenges", "Void Space", "Chronoforge"]
 stateButtons = {
     "Send hunters": "autoHunt",
     "Steel": "autoSteel",
