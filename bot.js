@@ -703,9 +703,10 @@ getEffectiveResourcePerTick = (res, bestCaseTicks) => {
     var resourcePerTick = game.getResourcePerTick(res, true);
     var bestCaseDays = Math.ceil(bestCaseTicks * game.calendar.dayPerTick);
     var effectiveDaysPerTick = bestCaseTicks ? bestCaseDays / bestCaseTicks : game.calendar.dayPerTick;
-    //todo: doesn't account for metaphysics upgrades
+    var meteorRatio = game.prestige.getPerk("chronomancy").researched ? 1.1 : 1
+    var starRatio = meteorRatio * (game.prestige.getPerk("astromancy").researched ? 2 : 1)
     if (res === "science" || res === "starchart" && game.science.get("astronomy").researched) {
-        var astronomicalEventChance = bestCaseTicks ? 1 : Math.min((25 / 10000) + game.getEffect("starEventChance"), 1);
+        var astronomicalEventChance = bestCaseTicks ? 1 : Math.min(((25 / 10000) + game.getEffect("starEventChance")) * starRatio, 1);
         var eventsPerTick = astronomicalEventChance * effectiveDaysPerTick;
         var valuePerEvent;
         if (res === "science") {
@@ -717,7 +718,7 @@ getEffectiveResourcePerTick = (res, bestCaseTicks) => {
         resourcePerTick += eventsPerTick * valuePerEvent;
     }
     if (res === "minerals" || res === "science" && game.workshop.get("celestialMechanics").researched) {
-        var meteorChance = bestCaseTicks ? 1 : 10 / 10000;
+        var meteorChance = bestCaseTicks ? 1 : 10 / 10000 * meteorRatio;
         var eventsPerTick = meteorChance * effectiveDaysPerTick;
         var valuePerEvent;
         if (res === "minerals") {
@@ -2091,7 +2092,6 @@ early game needs:
 --promote leader
 --try harder to get rid of ivory??
 --don't spam First time crafting foobar if it's reduced to 0 (eg. negative production)
-add help menu
 organize code (but it has to be one file :/)
 reservations seems still not correct (crafting too early)
 --eg blueprint need, with enough compendiums, still reserves
