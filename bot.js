@@ -105,6 +105,10 @@ logFaith = () => {
     var totalFaith = game.religion.faith;
     addLog({ name: game.getDisplayValueExt(totalFaith) + " Faith", type: "Faith", faith: totalFaith});
 }
+logTrades = () => {
+    var totalTrades = state.totalTrades;
+    addLog({ name: game.getDisplayValueExt(totalTrades) + " Trades", type: "Trades", trades: totalTrades});
+}
 logReset = () => addLog({ name: "Reset", type: "Reset", kittens: game.village.sim.getKittens()});
 rotateLogs = () => {
     state.previousHistories.push(state.history);
@@ -1114,6 +1118,10 @@ Building.prototype.buy = function() {
     var bought = tabBuyButton(this.tab, this.name);
     if (bought) {
         state.populationIncrease += housingMap[this.name] || 0;
+        if (this.getPrices().some(price => price.name === "gold")) {
+            //log how many trades before buying a gold-cost building, so that in master plan mode, we can plan to buy at least that many trades first
+            logTrades();
+        }
     }
     return bought;
 }
@@ -1216,7 +1224,7 @@ Trade.prototype.buy = function(reserved) {
                     }
                     Object.entries(yieldResTotal).forEach(entry => state.tradeResourceTotal[entry[0]] = (state.tradeResourceTotal[entry[0]] || 0) + entry[1])
                     state.lastTradeQuantity += quantityTraded;
-                    state.tradeMessages = logTrades(state.tradeResourceTotal, state.lastTradeQuantity);
+                    state.tradeMessages = msgTrades(state.tradeResourceTotal, state.lastTradeQuantity);
                 }
             } else {
                 withTab("Trade", () => {
@@ -1242,6 +1250,7 @@ Trade.prototype.buy = function(reserved) {
             state.tradeTimer = 0;
         })
     }
+    state.totalTrades += quantityTraded;
     return quantityTraded;
 }
 Trade.prototype.getPrices = function() { return [{name: "manpower", val: 50}, {name: "gold", val: 15}].concat(getTradeData(this.panel).buys); }
@@ -1263,7 +1272,7 @@ Trade.prototype.ignoreSeason = function() {
 }
 gainTradeResources = yieldResTotal => Object.entries(yieldResTotal).forEach(entry => game.resPool.addResEvent(...entry))
 //from diplomacy.gainTradeRes
-logTrades = (yieldResTotal, amtTrade) => {
+msgTrades = (yieldResTotal, amtTrade) => {
     //add this return value
     var totalMessages = 1;
     for (var res in yieldResTotal){
@@ -1365,6 +1374,10 @@ Religion.prototype.buy = function() {
         withLeader("Philosopher", doBuy);
     } else {
         doBuy();
+    }
+    if (this.getPrices().some(price => price.name === "gold")) {
+        //log how many trades before buying a gold-cost building, so that in master plan mode, we can plan to buy at least that many trades first
+        logTrades();
     }
     return bought;
 }
