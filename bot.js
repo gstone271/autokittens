@@ -193,34 +193,41 @@ load = () => {
 }
 loadDefaults = () => {
     if (!window.state) state = {};
-    if (!state.defaultJob) state.defaultJob = "Woodcutter";
-    if (!state.populationIncrease) state.populationIncrease = 0;
-    if (!state.tradeTimer) state.tradeTimer = 0;
-    if (!state.speed) state.speed = 1;
-    if (!state.desiredTicksPerLoop) state.desiredTicksPerLoop = 8;
-    if (!state.queue) state.queue = [];
-    if (!state.ticks) state.ticks = game.ticks;
-    if (!state.history) state.history = [];
-    if (!state.previousHistories) state.previousHistories = [];
-    if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
-    if (!state.numKittens) state.numKittens = game.village.sim.getKittens();
-    if (!state.kittensAssigned) state.kittensAssigned = game.village.sim.getKittens();
-    if (!state.verboseQueue) state.verboseQueue = 0;
-    if (!state.disabledConverters) state.disabledConverters = {};
-    if (!state.tradeMessages) state.tradeMessages = 0;
-    if (!state.tradeResourceTotal) state.tradeResourceTotal = {};
-    if (!state.lastTradeSeason) state.lastTradeSeason = 0;
-    if (!state.lastTradeQuantity) state.lastTradeQuantity = 0;
-    if (!state.loopsUntilRun) state.loopsUntilRun = 0;
-    if (!state.ignoreNeeds) state.ignoreNeeds = {};
-    if (!state.ignoreSeason) state.ignoreSeason = {};
-    if (state.desiredApi === undefined) state.desiredApi = 1;
-    if (state.autoCraftLevel === undefined) state.autoCraftLevel = 1;
-    if (state.autoFarmer === undefined) state.autoFarmer = 1;
-    if (state.autoSeti === undefined) state.autoSeti = true;
-    if (state.autoConverters === undefined) state.autoConverters = true;
-    if (state.runInGameLoop === undefined) state.runInGameLoop = true;
     if (!window.botDebug) botDebug = {};
+    falseyDefaults = {
+        defaultJob: "Woodcutter",
+        populationIncrease: 0,
+        tradeTimer: 0,
+        speed: 1,
+        desiredTicksPerLoop: 8,
+        queue: [],
+        ticks: game.ticks,
+        history: [],
+        previousHistories: [],
+        numKittens: game.village.sim.getKittens(),
+        kittensAssigned: game.village.sim.getKittens(),
+        verboseQueue: 0,
+        disabledConverters: {},
+        tradeMessages: 0,
+        tradeResourceTotal: {},
+        totalTrades: 0,
+        lastTradeSeason: 0,
+        lastTradeQuantity: 0,
+        loopsUntilRun: 0,
+        ignoreNeeds: {},
+        ignoreSeason: {},
+    }
+    Object.entries(falseyDefaults).forEach(entry => state[entry[0]] = state[entry[0]] || entry[1]);
+    if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
+    undefinedDefaults = {
+        desiredApi: 1,
+        autoCraftLevel: 1,
+        autoFarmer: 1,
+        autoSeti: true,
+        autoConverters: true,
+        runInGameLoop: true,
+    }
+    Object.entries(undefinedDefaults).forEach(entry => { if (state[entry[0]] === undefined) state[entry[0]] = entry[1] });
 }
 initialize = () => {
     state.ticks = game.ticks;
@@ -2013,7 +2020,6 @@ early game needs:
 ----promote leader
 --first hunting (get efficiency)
 --try harder to get rid of ivory??
---smelter management (handle negative production)
 --don't spam First time crafting foobar if it's reduced to 0 (eg. negative production)
 add help menu
 organize code (but it has to be one file :/)
