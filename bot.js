@@ -2017,12 +2017,14 @@ getIncreasedFaith = (praised, faithBonus, ticks) => {
     var baseFaithProduction = getEffectiveResourcePerTick("faith") / (1 + getFaithProductionBonus(praised));
     var basePraisedProduction = baseFaithProduction * faithBonus;
     var totalPraised = praised;
+    var totalIncreasedProduction = 0;
     for (var ticksSoFar = 0; ticksSoFar < ticks;) {
         var ticksPassed = Math.min(ticksPerIteration, ticks - ticksSoFar);
+        totalIncreasedProduction += ticksPassed * (1 + getFaithProductionBonus(totalPraised));
         totalPraised += basePraisedProduction * ticksPassed * (1 + getFaithProductionBonus(totalPraised));
         ticksSoFar += ticksPassed;
     }
-    return totalPraised;
+    return { totalPraised, totalIncreasedProduction };
 }
 //if min or max is infinite, guess must be nonzero
 binarySearch = (lessThan, min, max, guess, maxIterations, precision) => {
@@ -2049,16 +2051,22 @@ displayFaithResetPayoff = () => {
         var increasedFaithBonus = getFaithBonus(game.religion.faithRatio + bonusRatioGained);
         var reducedPraised = getResourceMax("faith") * (1 + increasedFaithBonus);
         //alternative: don't reset faith
-        var alternativePraised = getIncreasedFaith(game.religion.faith, faithBonus, timeToMaxFaith);
+        var alternativePraised = getIncreasedFaith(game.religion.faith, faithBonus, timeToMaxFaith).totalPraised;
 
-        var faithPaidOff = ticks => getIncreasedFaith(reducedPraised, increasedFaithBonus, ticks)
-                > getIncreasedFaith(alternativePraised, faithBonus, ticks);
+        var faithPaidOff = ticks => getIncreasedFaith(reducedPraised, increasedFaithBonus, ticks).totalPraised
+                > getIncreasedFaith(alternativePraised, faithBonus, ticks).totalPraised;
+        var productionPaidOff = ticks => getIncreasedFaith(reducedPraised, increasedFaithBonus, ticks).totalIncreasedProduction
+                > getIncreasedFaith(alternativePraised, faithBonus, ticks).totalIncreasedProduction;
         var faithPayoffEstimate = binarySearch(faithPaidOff, 0, Infinity, timeToMaxFaith, 20, 1);
+        //don't want a zero or infinite guess
+        var productionPayoffGuess = faithPayoffEstimate.max === Infinity ? faithPayoffEstimate.min * 2 : faithPayoffEstimate.max * 2;
+        var productionPayoffEstimate = binarySearch(productionPaidOff, 0, Infinity, productionPayoffGuess, 20, 1);
 
         var getDisplay = estimate => estimate.max - estimate.min < 5 ? 
             ticksToDisplaySeconds(estimate.max) 
             : ticksToDisplaySeconds(estimate.min) + " - " + ticksToDisplaySeconds(estimate.max)
-        apocryphaInfo.text(" (" + getDisplay(faithPayoffEstimate) + " faith payback)")
+        apocryphaInfo.html(" (" + getDisplay(faithPayoffEstimate) + " faith payback)"
+            + "<br /> (" + getDisplay(productionPayoffEstimate) + " production payback)")
     }
 }
 displayApocryphaNeededToTranscend = () => {
