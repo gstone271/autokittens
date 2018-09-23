@@ -510,7 +510,7 @@ updateUpNext = priorities => {
         filter = plan => true;
         getHtml = plan => "<span" + (plan.viable ? "" : ' style="color: #999999"') + ">"
              + plan.bld.name
-             + " (" + (plan.ticksNeeded === Infinity ? "???" : game.toDisplaySeconds(plan.ticksNeeded / game.rate)) + ")"
+             + " (" + ticksToDisplaySeconds(plan.ticksNeeded) + ")"
              + " (" + Array.from(new Set(plan.limiting.concat(plan.unavailable))).map(getResourceTitle).join(", ") + ")</span>"
     } else {
         filter = plan => plan.viable;
@@ -679,7 +679,7 @@ haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(p
 isResourceFull = (res, additionalProduction) => getResourceOwned(res) >= getSafeStorage(res, Math.max(state.autoCraftLevel, 1), additionalProduction);
 
 getCraftingResourcePerTick = (res, reserved, forSteel) => {
-    var resourcePerTick = getEffectiveResourcePerTick(res, 0);
+    var resourcePerTick = getEffectiveResourcePerTick(res);
     if (canCraft(res)) {
         //special case steel: we always craft it
         var ignoreReservations = res === "steel" && state.autoSteel || !reserved;
@@ -700,6 +700,7 @@ getCraftingResourcePerTick = (res, reserved, forSteel) => {
  * bestCaseTicks: if nonzero, assume you will have this many ticks of the maximum possible astronomical events (for save storage calculation)
  */
 getEffectiveResourcePerTick = (res, bestCaseTicks) => {
+    if (!bestCaseTicks) bestCaseTicks = 0;
     var resourcePerTick = game.getResourcePerTick(res, true);
     var bestCaseDays = Math.ceil(bestCaseTicks * game.calendar.dayPerTick);
     var effectiveDaysPerTick = bestCaseTicks ? bestCaseDays / bestCaseTicks : game.calendar.dayPerTick;
@@ -1485,7 +1486,8 @@ Religion.prototype.getPrices = function() {
 }
 Religion.prototype.isEnabled = function() { 
     var data = this.getData();
-    return data.val === 0 || !data.noStackable;
+    var enoughFaith = this.panel !== "Order of the Sun" || game.religion.faith >= data.faith;
+    return enoughFaith && (data.val === 0 || !data.noStackable);
 }
 
 function PraiseSun(name, tab, panel) {
@@ -1800,6 +1802,7 @@ updateManagementButtons = () => {
     var tabCache = getActiveTab();
     $("p.botManage").each((idx, elem) => updateButton(elem, tabCache));
 }
+ticksToDisplaySeconds = ticks => ticks === Infinity ? "???" : game.toDisplaySeconds(ticks / game.rate)
 settingsMenu = [
     {
         name: "helpUpperRight",
@@ -1999,15 +2002,73 @@ displayPreviousHistoryInfo = () => {
         )
     }
 }
+getFaithProductionBonus = faith => {
+    //from religion.getProductionBonus; now accepts faith parameter
+    var rate = game.religion.getRU("solarRevolution").on ? game.getTriValue(faith, 1000) : 0;
+    var atheismBonus = game.challenges.getChallenge("atheism").researched ? game.religion.getTranscendenceLevel() * 0.1 : 0;
+    var blackObeliskBonus = game.religion.getTranscendenceLevel() * game.religion.getTU("blackObelisk").val * 0.005;
+    rate = game.getHyperbolicEffect(rate, 1000) * (1 + atheismBonus + blackObeliskBonus);
+    return rate;
+}
+getIncreasedFaith = (praised, faithBonus, ticks) => {
+    //try not to spend too much time on this math
+    var maxIterations = 20;
+    var ticksPerIteration = ticks / state.ticksPerLoop > maxIterations ? Math.ceil(ticks / maxIterations) : state.ticksPerLoop;
+    var baseFaithProduction = getEffectiveResourcePerTick("faith") / (1 + getFaithProductionBonus(praised));
+    var basePraisedProduction = baseFaithProduction * faithBonus;
+    var totalPraised = praised;
+    for (var ticksSoFar = 0; ticksSoFar < ticks;) {
+        var ticksPassed = Math.min(ticksPerIteration, ticks - ticksSoFar);
+        totalPraised += basePraisedProduction * ticksPassed * (1 + getFaithProductionBonus(totalPraised));
+        ticksSoFar += ticksPassed;
+    }
+    return totalPraised;
+}
+//if min or max is infinite, guess must be nonzero
+binarySearch = (lessThan, min, max, guess, maxIterations, precision) => {
+    if (maxIterations <= 0 || max - min < precision) {
+        return { min, max };
+    }
+    if (lessThan(guess)) {
+        var newGuess = min === -Infinity ? (guess > 0 ? -guess : guess * 2) : (guess + min) / 2;
+        return binarySearch(lessThan, min, guess, newGuess, maxIterations - 1, precision);
+    } else {
+        var newGuess = max === Infinity ? (guess > 0 ? guess * 2 : -guess) : (guess + max) / 2;
+        return binarySearch(lessThan, guess, max, newGuess, maxIterations - 1, precision);
+    }
+}
+displayFaithResetPayoff = () => {
+    //TODO double check this
+    if (game.religion.faith >= game.religion.getRU("apocripha").faith && getEffectiveResourcePerTick("faith") > 0) {
+        var apocryphaInfo = $("#apocryphaInfo");
+        if (!apocryphaInfo.length) { apocryphaInfo = $('<div id="apocryphaInfo" style="position: absolute; left: 270px; top: 7px; width: 270px; text-align: left">'); findButton("Apocrypha").prepend(apocryphaInfo); }
+        var timeToMaxFaith = Math.ceil(getResourceMax("faith") / getEffectiveResourcePerTick("faith"))
+        var getFaithBonus = faithRatio => game.religion.getTriValueReligion(faithRatio);
+        var bonusRatioGained = game.religion.getApocryphaResetBonus(1.01);
+        var faithBonus = game.religion.getFaithBonus();
+        var increasedFaithBonus = getFaithBonus(game.religion.faithRatio + bonusRatioGained);
+        var reducedPraised = getResourceMax("faith") * (1 + increasedFaithBonus);
+        //alternative: don't reset faith
+        var alternativePraised = getIncreasedFaith(game.religion.faith, faithBonus, timeToMaxFaith);
+
+        var faithPaidOff = ticks => getIncreasedFaith(reducedPraised, increasedFaithBonus, ticks)
+                > getIncreasedFaith(alternativePraised, faithBonus, ticks);
+        var faithPayoffEstimate = binarySearch(faithPaidOff, 0, Infinity, timeToMaxFaith, 20, 1);
+
+        var getDisplay = estimate => estimate.max - estimate.min < 5 ? 
+            ticksToDisplaySeconds(estimate.max) 
+            : ticksToDisplaySeconds(estimate.min) + " - " + ticksToDisplaySeconds(estimate.max)
+        apocryphaInfo.text(" (" + getDisplay(faithPayoffEstimate) + " faith payback)")
+    }
+}
 displayApocryphaNeededToTranscend = () => {
-    if (game.religion.getRU("transcendence").on) {
+    if (game.religion.faith >= game.religion.getRU("transcendence").faith) {
         var transcendenceInfo = $("#transcendenceInfo");
-        if (!transcendenceInfo.length) { transcendenceInfo = $('<div id="transcendenceInfo">'); findButton("Transcend").append(transcendenceInfo); }
-        var tclevel = religion.getTranscendenceLevel();
-        //Transcend one Level at a time
-        var apocryphaNeeded = religion.getTranscendenceRatio(tclevel+1) - religion.getTranscendenceRatio(tclevel);
+        if (!transcendenceInfo.length) { transcendenceInfo = $('<div id="transcendenceInfo" style="position: absolute; left: 270px; top: 7px; width: 270px; text-align: left">'); findButton("Transcendence").prepend(transcendenceInfo); }
+        var tclevel = game.religion.getTranscendenceLevel();
+        var apocryphaNeeded = game.religion.getTranscendenceRatio(tclevel+1) - game.religion.getTranscendenceRatio(tclevel);
         var percentageOwned = game.religion.faithRatio / apocryphaNeeded * 100;
-        transcendenceInfo.text(" (" + game.getDisplayValueExt(percentageOwned) + "% of apocrypha needed to trancend)");
+        transcendenceInfo.text(" (" + game.getDisplayValueExt(percentageOwned) + "% of apocrypha needed)");
     }
 }
 specialUis = {
@@ -2023,6 +2084,7 @@ specialUis = {
     },
     Religion: () => {
         displayApocryphaNeededToTranscend();
+        displayFaithResetPayoff();
     }
 }
 updateUi = () => {
@@ -2092,6 +2154,7 @@ energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
 ----1/2: when none of your craft chain is reserved, become normal and go to end of queue
+------maybe instead, only enabled when the resource is full, holding more than 2x the amount needed for the entire queue
 ----2: queued twice
 --turn off Up Next, hide settings menu
 reserve ivory like furs
