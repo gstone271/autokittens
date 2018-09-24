@@ -1978,7 +1978,7 @@ displayParagonInfo = () => {
         var paragonInfo = $("#paragonInfo");
         if (!paragonInfo.length) { paragonInfo = $('<div id="paragonInfo" style="float: right">'); $("#gameContainerId > div > div.panelContainer:nth-child(2) > div.toggle").after(paragonInfo); }
         paragonInfo.html("Best resets (local maxima of paragon/y): <br />"
-            + getBestResetPoint(state.history, true).slice(0, 3)
+            + getBestResetPoint(state.history, true).slice(0, 5)
                 .map(point => 
                     "Paragon: " + game.getDisplayValueExt(point.paragon)
                     + " Year: " +  game.getDisplayValueExt(point.year)
@@ -2186,4 +2186,6 @@ log human actions?
 don't craft away Chronosphere resources
 check for updates
 rename -> Simba
+payoff time for buildings
+fix once for buildings--check at time of buy
 */
