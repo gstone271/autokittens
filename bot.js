@@ -1180,7 +1180,7 @@ housingMap = {
 }
 //remove percentages, counts, and (complete)
 trimButtonText = text => text.replace(/(\(|\[)[^\])]*(\)|\])/g, "").trim()
-findButton = name => $('span:visible').filter((idx, button) => trimButtonText(button.innerText) === name).parents("div.btn")
+findButton = name => $('#gameContainerId span:visible').filter((idx, button) => trimButtonText(button.innerText) === name).parents("div.btn")
 //bonfire increase/decrease uses simple +/-, unlike jobs which use [] and en dash
 //make sure not to grab the -all button
 getBuildingDecreaseButton = button => button.find('a').filter((idx, elem) => elem.innerText.trim() === "-")[0];
