@@ -1022,11 +1022,18 @@ switchToJob = jobName => {
         console.error("Job " + jobName + " not unlocked yet!");
     }
 }
-resourceEffectNames = ["JobRatio", "GlobalRatio", "Ratio", "RatioReligion", "SuperRatio"]
+resourceEffectNames = ["GlobalRatio", "Ratio", "RatioReligion", "SuperRatio"]
 /**
  * Get the relative production ratio of assigning a kitten to a job producing resInternalName. Doesn't include festivals. Not for engineers.
  */
 getResourceKittenRatio = resInternalName => {
+    var totalRatio = getResourceProductionRatio(resInternalName);
+    totalRatio *= 1 + game.getEffect(resInternalName + "JobRatio");
+    totalRatio *= game.village.happiness;
+    return totalRatio;
+}
+//production ratio for all regular (not conversion) production. Doesn't include space production bonuses
+getResourceProductionRatio = resInternalName => {
     var totalRatio = resourceEffectNames
         .map(effect => game.getEffect(resInternalName + effect))
         .reduce((total, ratioAdded) => total * (1 + ratioAdded), 1);
@@ -1036,7 +1043,7 @@ getResourceKittenRatio = resInternalName => {
     if (steamworks.on > 0 && swEffectGlobal) {
         totalRatio *= 1 + swEffectGlobal;
     }
-    totalRatio *= game.village.happiness * (1 + game.prestige.getParagonProductionRatio());
+    totalRatio *= 1 + game.prestige.getParagonProductionRatio();
     return totalRatio;
 }
 //production ratio component for both buildings and kittens
@@ -1426,7 +1433,7 @@ Science.prototype.getData = function() { return scienceData[this.tab].filter(dat
 Science.prototype.getPrices = function() { 
     var data = this.getData(); 
     var prices = this.tab === "Space" ? classes.ui.space.PlanetBuildingBtnController.prototype.getPrices.call(game.space, {metadata: data}) : data.prices;
-    return prices//.map(fixPriceTitle);     
+    return prices; 
 }
 Science.prototype.isEnabled = function() { var data = this.getData(); return data.unlocked && !data.researched; }
 
@@ -1902,6 +1909,7 @@ createSettingsMenu = () => {
 updateSettingsMenu = () => {
     settingsMenu.forEach(item => $('#' + item.name).html(item.getHtml()));
 }
+var rightOfButtonStyle = ' style="position: absolute; left: 270px; top: 7px; width: 270px; text-align: left"'
 displayTradeValues = () => {
     $("#gameContainerId div.trade-race > .left > div").toArray().forEach(div => {
         var elem = $(div);
@@ -2043,7 +2051,7 @@ displayFaithResetPayoff = () => {
     //TODO double check this
     if (game.religion.faith >= game.religion.getRU("apocripha").faith && getEffectiveResourcePerTick("faith") > 0) {
         var apocryphaInfo = $("#apocryphaInfo");
-        if (!apocryphaInfo.length) { apocryphaInfo = $('<div id="apocryphaInfo" style="position: absolute; left: 270px; top: 7px; width: 270px; text-align: left">'); findButton("Apocrypha").prepend(apocryphaInfo); }
+        if (!apocryphaInfo.length) { apocryphaInfo = $('<div id="apocryphaInfo"' + rightOfButtonStyle + '>'); findButton("Apocrypha").prepend(apocryphaInfo); }
         var timeToMaxFaith = Math.ceil(getResourceMax("faith") / getEffectiveResourcePerTick("faith"))
         var getFaithBonus = faithRatio => game.religion.getTriValueReligion(faithRatio);
         var bonusRatioGained = game.religion.getApocryphaResetBonus(1.01);
@@ -2072,12 +2080,30 @@ displayFaithResetPayoff = () => {
 displayApocryphaNeededToTranscend = () => {
     if (game.religion.faith >= game.religion.getRU("transcendence").faith) {
         var transcendenceInfo = $("#transcendenceInfo");
-        if (!transcendenceInfo.length) { transcendenceInfo = $('<div id="transcendenceInfo" style="position: absolute; left: 270px; top: 7px; width: 270px; text-align: left">'); findButton("Transcendence").prepend(transcendenceInfo); }
+        if (!transcendenceInfo.length) { transcendenceInfo = $('<div id="transcendenceInfo"' + rightOfButtonStyle + '>'); findButton("Transcendence").prepend(transcendenceInfo); }
         var tclevel = game.religion.getTranscendenceLevel();
         var apocryphaNeeded = game.religion.getTranscendenceRatio(tclevel+1) - game.religion.getTranscendenceRatio(tclevel);
         var percentageOwned = game.religion.faithRatio / apocryphaNeeded * 100;
         transcendenceInfo.text(" (" + game.getDisplayValueExt(percentageOwned) + "% of apocrypha needed)");
     }
+}
+var starchartBuildings = ["Satellite", "Research Vessel", "Space Beacon"]
+displayStarchartPayoffs = () => {
+    starchartBuildings.forEach(name => {
+        var button = findButton(name);
+        if (button.length) {
+            var panel = getPanelTitle(button);
+            var bld = new Science(name, "Space", panel);
+            var starchartPrice = getPrice(bld.getPrices(), "starchart")
+            var starchartProduction = bld.getData().effects.starchartPerTickBaseSpace * getResourceProductionRatio("starchart");
+            var starchartPayoff = starchartPrice / starchartProduction;
+            
+            var starchartInfo = button.children(".starchartInfo");
+            if (!starchartInfo.length) { starchartInfo = $('<div class="starchartInfo"' + rightOfButtonStyle + '>'); button.append(starchartInfo); }
+
+            starchartInfo.text("Starchart payoff: " + ticksToDisplaySeconds(starchartPayoff))
+        }
+    })
 }
 specialUis = {
     Trade: () => {
@@ -2093,6 +2119,9 @@ specialUis = {
     Religion: () => {
         displayApocryphaNeededToTranscend();
         displayFaithResetPayoff();
+    },
+    Space: () => {
+        displayStarchartPayoffs();
     }
 }
 updateUi = () => {
