@@ -124,6 +124,7 @@ game.resetAutomatic = () => {
     state.queue = []; //todo reload master plan
     state.numKittens = 0;
     state.kittensAssigned = 0;
+    state.populationIncrease = 0;
     state.autoHunt = false;
     state.autoSteel = false;
     if (window.usingBotStarter) {
@@ -2217,4 +2218,5 @@ check for updates
 rename -> Simba
 payoff time for buildings
 fix once for buildings--check at time of buy
+populationIncrease has problems, ever since the kittensAssigned added
 */
