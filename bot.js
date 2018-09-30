@@ -215,13 +215,15 @@ loadDefaults = () => {
         verboseQueue: 0,
         disabledConverters: {},
         tradeMessages: 0,
-        tradeResourceTotal: {},
+        tradeResourceTotal: {}, 
         totalTrades: 0,
         lastTradeSeason: 0,
         lastTradeQuantity: 0,
         loopsUntilRun: 0,
         ignoreNeeds: {},
         ignoreSeason: {},
+        masterPlanMode: 0,
+        smartStorage: 0,
     }
     Object.entries(falseyDefaults).forEach(entry => state[entry[0]] = state[entry[0]] || entry[1]);
     if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
@@ -1108,6 +1110,7 @@ clickSetLeader = (newLeader, job) => {
 assignFirstLeader = () => {
     if (!state.leaderAssigned && game.science.get("civil").researched) {
         if (game.village.leader) {
+            //TODO does the game just automake a leader when you get civil???
             state.leaderAssigned = true;
         } else {
             var isArtisan = kitten => kitten.trait.name === "engineer";
@@ -1176,6 +1179,56 @@ withLeader = (leaderType, op) => {
     }
 }
 
+/************** 
+ * Master Plan
+**************/
+//buildings using common, limited-storage resources, with normal or low price ratios
+var commonBuildings = ["aqueduct", "logHouse", "library", "mine", "smelter", "workshop"];
+var isStorageLimited = (smartStorageMode) => {
+    switch (smartStorageMode) {
+        case 0:
+            return true;
+        case 1:
+            //aggressive--some building or upgrade must be limited
+            return state.queue
+                .filter(bld => commonBuildings.includes(bld.internalName) || bld.constructor.name == "Science")
+                .map(bld => bld.getPrices())
+                .some(prices => prices.some(price => price.val > getSafeStorage(price.name) && price.name !== "science"))
+        case 2: 
+            //conservative--all buildings must be limited
+
+            return commonBuildings
+                    .filter(name => game.bld.get(name).unlocked && findQueue(getBuildingLabel(name)))
+                    .map(name => game.bld.getPrices(name))
+                    .every(prices => prices.some(price => price.val > getSafeStorage(price.name)))
+        default:
+            throw new Error("Unknown smart storage mode")
+    }
+}
+var getMaxProductionTicksNeeded = (prices) => {
+    return Math.max(...prices.map(price =>
+        price.val / getCraftingResourcePerTick(price.name, new Reservations({}), true)
+    ));
+}
+var getUnresearched = buildings => buildings.filter(data => data.unlocked && !(data.researched || data.val))
+var uselessBuilds = [
+    "mint", "ziggurat", "barges", "steelPlants", "factoryAutomation", "advancedAutomation", "pneumaticPress",
+     "factoryOptimization", "factoryRobotics", "seti", "ecology", "unicornSelection", "ai", "chronophysics",
+     "metaphysics", "cryptotheology", "thorium", "advExogeology", "superconductors"
+]
+var isUseful = bld => !uselessBuilds.includes(bld.name);
+//luckily we're only concerned with the first copy of a building, so we don't need to worry about price ratios
+var notTooExpensive = bld => getMaxProductionTicksNeeded(bld.prices) <= maxProductionCostToEnable;
+var maxProductionCostToEnable = 5 * 60 * 60; //1 hour
+//TODO only add each thing once
+var queueNewTechs = () => {
+    ["Science", "Workshop"].forEach(tab => {
+        getUnresearched(scienceData[tab]).filter(isUseful).filter(notTooExpensive).forEach(bld => {
+            if (!findQueue(bld.label))
+                enable(bld.label, tab, undefined);
+        })
+    })
+}
 
 /************** 
  * Queueables
@@ -1209,8 +1262,11 @@ tabBuyButton = (tab, name) => {
     return bought;
 }
 
+getBuildingLabel = internalName => {
+    var data = game.bld.get(internalName);
+    return data.label || data.stages[data.stage].label;
+}
 internalBuildingNames = flattenArr(game.bld.buildingsData.map(data => { if (data.stages) return (data.stages.map(stage => { return { name: data.name, label: stage.label }; })); return data; }))
-getBuildingPrices = name => internalBuildingNames.filter(bld => bld.label === name).map(data => game.bld.getPrices(data.name))[0] || []
 getPrice = (prices, res) => (prices.filter(price => price.name === res)[0] || {val: 0}).val
 function Building(name, tab, panel) {
     this.name = name;
@@ -1240,7 +1296,9 @@ Building.prototype.getPrices = function() {
     return prices;
 }
 Building.prototype.isEnabled = function() {
-    return game.bld.get(this.internalName).unlocked && !state.disabledConverters[this.internalName];
+    return game.bld.get(this.internalName).unlocked
+        && !state.disabledConverters[this.internalName]
+        && (!["Barn", "Warehouse", "Harbour"].includes(this.name) || isStorageLimited(state.smartStorage))
 }
 
 function Craft(name, tab, panel) {
@@ -1856,10 +1914,22 @@ settingsMenu = [
         getHtml: () => "API: " + (state.desiredApi ? "some" : state.api ? "(some)" : "none")
     },
     {
+        name: "masterPlanMode",
+        leftClick: () => state.masterPlanMode = 1,
+        rightClick: () => state.masterPlanMode = 0,
+        getHtml: () => "Master Plan: " + (state.masterPlanMode ? "naive" : "off")
+    },
+    {
         name: "queueVerbosity",
         leftClick: moreVerbose,
         rightClick: lessVerbose,
         getHtml: () => "Up Next: " + (state.verboseQueue ? "verbose" : "concise")
+    },
+    {
+        name: "smartStorage",
+        leftClick: () => state.smartStorage = Math.min(2, state.smartStorage + 1),
+        rightClick: () => state.smartStorage = Math.max(0, state.smartStorage - 1),
+        getHtml: () => "Smart storage: " + ["off", "<br />aggressive", "<br />conservative"][state.smartStorage]
     },
     {
         name: "autoCraft",
@@ -2219,4 +2289,5 @@ rename -> Simba
 payoff time for buildings
 fix once for buildings--check at time of buy
 populationIncrease has problems, ever since the kittensAssigned added
+deal with building upgrades (or maybe just don't; might be optimal)
 */
