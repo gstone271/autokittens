@@ -1,7 +1,7 @@
 //Paste the contents of this file directly into the developer console
 $("#botHelp").remove()
 $('#helpDiv').prepend($(`<div id="botHelp">
-<h2>Autokittens by Griffin Stone</h2>
+<h2>Simba by Griffin Stone</h2>
 <p>This program adds queueing buttons to the left of tasks you can automate, settings in the upper right, and queue information in the lower right.</p>
 <p>Left click to increase a value, right click to decrease a value.</p>
 <p>Queueing buttons are displayed as a 0, 1, or ∞ to the left of a button. <ul>
@@ -49,7 +49,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     <li>The bot will not make trades for resources that you have a lot of already, unless you enable ignoreNeeds.</li>
     <li>It will only trade during optimal seasons, unless you enable ignoreSeasons.</li>
 </ul>Next to tradeable resources, the bot will display the amount of time it would take one no-skill kitten to produce that much resource (in cats*ticks), or if kittens can't produce it, the amount of time it would take all your production to produce it (in ticks).</p>
-<p>Compatibility: Autokittens requires a modern browser (with HTML5 and ES6) and is currently only compatible with the English version of the game.</p>
+<p>Compatibility: Simba requires a modern browser (with HTML5 and ES6) and is currently only compatible with the English version of the game.</p>
 <hr />
 <h3>Kittens Game Official "Help"</h3>
 </div>`))
@@ -176,7 +176,7 @@ getBestResetPoint = (history, onlyLocalMaxima) =>
 /************** 
  * Save/Load
 **************/
-save = () => { localStorage.setItem("autokittens.state", exportSave()); console.log("Bot state saved"); }
+save = () => { localStorage.setItem("simba.state", exportSave()); console.log("Bot state saved"); }
 loadString = string => {
     var parsed = JSON.parse(LZString.decompressFromBase64(string));
     var rawQueue = parsed.queue;
@@ -200,12 +200,22 @@ reloadQueue = queue => {
     queue.forEach(item => enable(item.name, item.tab, item.panel, item.maxPriority));
 }
 load = () => {
-    data = localStorage.getItem("autokittens.state");
+    var data = localStorage.getItem("simba.state");
+    var removeOldSave = false;
+    if (!data) {
+      data = localStorage.getItem("autokittens.state");
+      if (data) {
+        removeOldSave = true;
+      }
+    }
     if (data) {
         loadString(data);
     }
     loadDefaults();
     initialize();
+    if (removeOldSave) {
+      localStorage.removeItem("autokittens.state");
+    }
 }
 loadDefaults = () => {
     if (!window.state) state = {};
@@ -264,7 +274,7 @@ game.console.save = (data) => {
     }
     game.console.realSave(data);
 }
-wipeBotSave = () => localStorage.removeItem("autokittens.state");
+wipeBotSave = () => localStorage.removeItem("simba.state");
 if (!game.real_wipe) game.real_wipe = game._wipe;
 game._wipe = () => {
     if (window.usingBotStarter) {
@@ -2245,7 +2255,7 @@ if (window.state) {
 } else {
     load();
 }
-log("Autokittens loaded")
+log("Simba loaded")
 /*
 todo:
 buy script (-> genetic algorithm)
@@ -2317,7 +2327,6 @@ reservations seems still not correct (crafting too early)
 log human actions?
 don't craft away Chronosphere resources
 check for updates
-rename -> Simba
 payoff time for buildings
 fix once for buildings--check at time of buy
 populationIncrease has problems, ever since the kittensAssigned added
