@@ -2005,6 +2005,11 @@ updateSettingsMenu = () => {
     settingsMenu.forEach(item => $('#' + item.name).html(item.getHtml()));
 }
 var rightOfButtonStyle = ' style="position: absolute; left: 270px; top: 7px; width: 270px; text-align: left"'
+displayJobQueue = () => {
+    var jobInfo = $("#jobInfo")
+    if (!jobInfo.length) { jobInfo = $('<div id="jobInfo" style="float: right;">'); $("#gameContainerId > div.tabInner > div:nth-child(1) > div.container > table").after(jobInfo); }
+    jobInfo.html("Job Queue: " + state.jobQueue.map(job => "<br />" + getJobLongName(job)).join(''))
+}
 displayTradeValues = () => {
     $("#gameContainerId div.trade-race > .left > div").toArray().forEach(div => {
         var elem = $(div);
@@ -2201,15 +2206,14 @@ displayStarchartPayoffs = () => {
     })
 }
 specialUis = {
+    Village: () => {
+        displayJobQueue();
+    },
     Trade: () => {
         displayTradeValues();
         displayGoldValue();
         displayBlueprintValue();
         displayTradeAgressionSettings();
-    },
-    Time: () => {
-        displayParagonInfo();
-        displayPreviousHistoryInfo();
     },
     Religion: () => {
         displayApocryphaNeededToTranscend();
@@ -2217,7 +2221,11 @@ specialUis = {
     },
     Space: () => {
         displayStarchartPayoffs();
-    }
+    },
+    Time: () => {
+        displayParagonInfo();
+        displayPreviousHistoryInfo();
+    },
 }
 updateUi = () => {
     updateManagementButtons();
