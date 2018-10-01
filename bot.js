@@ -88,6 +88,17 @@ Object.fromEntries = Object.fromEntries || function(arr) {
     })
     return result;
 }
+removeOne = (arr, match) => {
+    var found = false;
+    return arr.filter(item => {
+        if (item === match && !found) {
+            found = true;
+            return false;
+        } else {
+            return true;
+        }
+    });
+}
 
 /************** 
  * Logging
@@ -200,7 +211,7 @@ loadDefaults = () => {
     if (!window.state) state = {};
     if (!window.botDebug) botDebug = {};
     falseyDefaults = {
-        defaultJob: "Woodcutter",
+        jobQueue: [],
         populationIncrease: 0,
         tradeTimer: 0,
         speed: 1,
@@ -566,9 +577,14 @@ additionalActions = [
     },
     () => {
         if (state.populationIncrease > 0 && game.village.isFreeKittens() && game.village.sim.getKittens() > state.kittensAssigned) {
-            var job = getJobShortName(state.defaultJob);
+            var job = state.jobQueue.find(job => isJobEnabled(job))
+            if (job) {
+                state.jobQueue = removeOne(state.jobQueue, job);
+                state.jobQueue.push(job);
+            } else {
+                job = "woodcutter";
+            }
             //it's actually possible to cheat and click on a button that hasn't been revealed yet
-            if (!isJobEnabled(job)) job = "woodcutter";
             withTab("Village", () => {
                 getJobButton(job).click();
                 log("Assigned new kitten to " + job);
@@ -1191,6 +1207,7 @@ var isStorageLimited = (smartStorageMode) => {
         case 1:
             //aggressive--some building or upgrade must be limited
             return state.queue
+                //TODO for master plan mode, check that bld is unlocked (can't use isEnabled--infinite loop)
                 .filter(bld => commonBuildings.includes(bld.internalName) || bld.constructor.name == "Science")
                 .map(bld => bld.getPrices())
                 .some(prices => prices.some(price => price.val > getSafeStorage(price.name) && price.name !== "science"))
@@ -1210,7 +1227,8 @@ var getMaxProductionTicksNeeded = (prices) => {
         price.val / getCraftingResourcePerTick(price.name, new Reservations({}), true)
     ));
 }
-var getUnresearched = buildings => buildings.filter(data => data.unlocked && !(data.researched || data.val))
+//ok to queue things that aren't unlocked yet
+var getUnresearched = buildings => buildings.filter(data => !(data.researched || data.val))
 var uselessBuilds = [
     "mint", "ziggurat", "barges", "steelPlants", "factoryAutomation", "advancedAutomation", "pneumaticPress",
      "factoryOptimization", "factoryRobotics", "seti", "ecology", "unicornSelection", "ai", "chronophysics",
@@ -1290,7 +1308,7 @@ Building.prototype.getRealPrices = function() {
 }
 Building.prototype.getPrices = function() { 
     var prices = this.getRealPrices();
-    if (housingMap[this.name] && !(game.science.get("agriculture").researched && (state.autoFarmer || state.defaultJob === "Farmer"))) {
+    if (housingMap[this.name] && !(game.science.get("agriculture").researched && state.autoFarmer)) {
         prices = prices.concat({name: "catnip", val: getAdditionalCatnipNeeded(true, housingMap[this.name])});
     }
     return prices;
@@ -1829,8 +1847,9 @@ updateButton = (elem, tab) => {
         var asInt = bool => bool ? 1 : 0;
         if (stateButtons[item] && tab !== "Science") {
             value = asInt(state[stateButtons[item]]);
-        } else if (tab === "Village" && !specialBuys[item]) {
-            value = asInt(state.defaultJob === item);
+        } else if (tab === "Village" && panel === "Jobs") {
+            var jobName = getJobShortName(item);
+            value = state.jobQueue.filter(job => job === jobName).length;
         } else if (tab === "Trade" && !specialBuys[item]) {
             value = getPriority(panel);
         //Bonfire page refine button has a lowercase c
@@ -1853,7 +1872,12 @@ buttonClick = (elem, leftClick) => {
     if (stateButtons[item] && tab !== "Science") {
         state[stateButtons[item]] = leftClick;
     } else if (panel === "Jobs") {
-        if (leftClick) state.defaultJob = item;
+        var jobName = getJobShortName(item);
+        if (leftClick) {
+            state.jobQueue.push(jobName);
+        } else {
+            state.jobQueue = removeOne(state.jobQueue, jobName);
+        }
     } else {
         if (leftClick) {
             increasePriority(item, tab, panel);
@@ -1972,7 +1996,7 @@ createSettingsButton = data => {
 }
 createSettingsMenu = () => {
     $("#botSettings").remove()
-    var botSettings = $('<div id="botSettings" style="position: absolute; top: 50px; right: 10px;">');
+    var botSettings = $('<div id="botSettings" style="position: absolute; top: 50px; right: 10px; z-index: 1">');
     settingsMenu.map(createSettingsButton).forEach(button => botSettings.append(button));
     $('#gamePageContainer').append(botSettings);
     updateSettingsMenu();
@@ -2289,5 +2313,6 @@ rename -> Simba
 payoff time for buildings
 fix once for buildings--check at time of buy
 populationIncrease has problems, ever since the kittensAssigned added
+--fix when two kittens arrive in one loop
 deal with building upgrades (or maybe just don't; might be optimal)
 */
