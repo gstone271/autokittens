@@ -23,6 +23,11 @@ $('#helpDiv').prepend($(`<div id="botHelp">
         <br />In Verbose mode, enqueued items you have enough storage to buy are displayed, followed by the estimated time until it is bought and the resources you need more of to buy them. In Concise, the time and resources are not displayed.
         <br />If one of the needed resources is reserved by an item higher in the queue, this item is grayed out. In Concise, it is hidden instead.
     </li>
+    <li>Smart Storage: Don't buy storage (barn, warehouse, harbour) you don't need.<ul>
+        <li>off: Buy storage as normal. The bot may buy too much storage, especially warehouses.</li>
+        <li>aggressive: Only buy storage if you don't have enough to buy a queued upgrade or normal building (aqueduct, log house, library, mine, smelter, or workshop). Recommended in the early game.</li>
+        <li>conservative: Only buy storage if you don't have enough to buy any of your queued normal buildings. Recommended in the mid and late game.</li>
+    </ul></li>
     <li>Auto Craft: Automatically craft resouces that are near their max storage capacity. The bot won't attempt to buy buildings whose cost is so near your storage capacity that a needed resouce would be auto crafted.<ul>
         <li>off: Don't auto craft.</li>
         <li>normal: Craft resources that would be full by the time the bot plans to run again.</li>
@@ -701,9 +706,6 @@ getSafeStorage = (res, autoCraftLevel, additionalProduction) => {
     var max = getResourceMax(res);
     return max === Infinity ? max : max - autoCraftLevel * state.ticksPerLoop * (getEffectiveResourcePerTick(res, state.ticksPerLoop) + additionalProduction);
 }
-//TODO don't use this for upgrades--particularly, photolithography will be delayed
-//--when all resources are close to full, allow them to become completely full
-//--don't include resources that can't be crafted yet
 haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(price.name) >= price.val + (reserved ? reserved.get(price.name).current : 0))
 isResourceFull = (res, additionalProduction) => getResourceOwned(res) >= getSafeStorage(res, Math.max(state.autoCraftLevel, 1), additionalProduction);
 
@@ -2333,5 +2335,7 @@ populationIncrease has problems, ever since the kittensAssigned added
 --fix when two kittens arrive in one loop
 deal with building upgrades (or maybe just don't; might be optimal)
 mode to not craft compendiums
-add extra info, smart storage to help
+add extra info to help
+allow buying stuff with cost between safe storage and actual storage
+--when all resources are close to full, allow them to become completely full
 */
