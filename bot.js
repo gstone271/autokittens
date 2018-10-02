@@ -40,7 +40,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     <li>Send Hunters: Send hunters whenever your catpower is full or you have nothing else in the queue which needs catpower</li>
     <li>Steel (in Workshop): Always make as much steel as possible (to prevent wasting coal, even if your queue needs more iron than coal)</li>
     <li>Transcend: Wait for faith to be full, then click Transcend once, then click Faith Reset, then Praise the Sun.</li>
-    <li>Jobs: In the Jobs panel, left click a job to set it as the job to assign new kittens to whenever the bot buys housing. The bot will not assign new kittens when you buy housing manually.</li>
+    <li>Jobs: In the Jobs panel, left click a job to add it to the job queue; right click to remove. Whenever the bot buys housing, it will assign the new kitten to next job in the queue, then send that job to the end of the queue. The bot will not assign new kittens when you buy housing manually.</li>
 </ul></p>
 <p>Leaders: It is recommended that you make an Artisan your leader. For all tasks except crafting, if you already have a leader, the bot will automatically switch to a leader of the appropriate type. If API is set to none, a leader of the appropriate type must appear on the first page of kittens (you may need to promote one).</p>
 <p>Trade: Sending trade caravans is queued like buildings. <ul>
@@ -2261,7 +2261,6 @@ todo:
 buy script (-> genetic algorithm)
 --master plan mode
 ----separate state and config variables
-----job assignment in queue
 ----goals: concrete, moon, eludium, beyond
 ----big queue of jobs, techs, upgrades
 ------techs and upgrades built from (queue slots since unlock, isBought)
@@ -2307,6 +2306,7 @@ improve interface
 ------maybe instead, only enabled when the resource is full, holding more than 2x the amount needed for the entire queue
 ----2: queued twice
 --turn off Up Next, hide settings menu
+--right click a job in the queue to remove it
 reserve ivory like furs
 early game needs:
 --job management
@@ -2332,4 +2332,6 @@ fix once for buildings--check at time of buy
 populationIncrease has problems, ever since the kittensAssigned added
 --fix when two kittens arrive in one loop
 deal with building upgrades (or maybe just don't; might be optimal)
+mode to not craft compendiums
+add extra info, smart storage to help
 */
