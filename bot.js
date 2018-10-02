@@ -138,6 +138,7 @@ game.resetAutomatic = () => {
     logReset();
     rotateLogs();
     state.queue = []; //todo reload master plan
+    state.jobQueue = [];
     state.numKittens = 0;
     state.kittensAssigned = 0;
     state.populationIncrease = 0;
@@ -1219,13 +1220,11 @@ var isStorageLimited = (smartStorageMode) => {
         case 1:
             //aggressive--some building or upgrade must be limited
             return state.queue
-                //TODO for master plan mode, check that bld is unlocked (can't use isEnabled--infinite loop)
-                .filter(bld => commonBuildings.includes(bld.internalName) || bld.constructor.name == "Science")
+                .filter(bld => (commonBuildings.includes(bld.internalName) || bld.constructor.name == "Science") && bld.isUnlocked())
                 .map(bld => bld.getPrices())
                 .some(prices => prices.some(price => price.val > getSafeStorage(price.name) && price.name !== "science"))
         case 2: 
             //conservative--all buildings must be limited
-
             return commonBuildings
                     .filter(name => game.bld.get(name).unlocked && findQueue(getBuildingLabel(name)))
                     .map(name => game.bld.getPrices(name))
@@ -1252,12 +1251,15 @@ var notTooExpensive = bld => getMaxProductionTicksNeeded(bld.prices) <= maxProdu
 var maxProductionCostToEnable = 5 * 60 * 60; //1 hour
 //TODO only add each thing once
 var queueNewTechs = () => {
-    ["Science", "Workshop"].forEach(tab => {
+    ["Workshop", "Science"].forEach(tab => {
         getUnresearched(scienceData[tab]).filter(isUseful).filter(notTooExpensive).forEach(bld => {
             if (!findQueue(bld.label))
-                enable(bld.label, tab, undefined);
+                enable(bld.label, tab, undefined, false, true);
         })
     })
+}
+var clearMasterPlan = () => {
+    state.queue = state.queue.filter(bld => !bld.masterPlan);
 }
 
 /************** 
@@ -1325,10 +1327,13 @@ Building.prototype.getPrices = function() {
     }
     return prices;
 }
+Building.prototype.isUnlocked = function() {
+    return game.bld.get(this.internalName).unlocked;
+}
 Building.prototype.isEnabled = function() {
-    return game.bld.get(this.internalName).unlocked
+    return this.isUnlocked()
         && !state.disabledConverters[this.internalName]
-        && (!["Barn", "Warehouse", "Harbour"].includes(this.name) || isStorageLimited(state.smartStorage))
+        && (!["Barn", "Warehouse", "Harbour"].includes(this.name) || isStorageLimited(state.smartStorage));
 }
 
 function Craft(name, tab, panel) {
@@ -1340,6 +1345,7 @@ function Craft(name, tab, panel) {
 Craft.prototype.buy = function() { return craftOne(this.resName); }
 Craft.prototype.getPrices = function() { return getCraftPrices(this.resName); }
 Craft.prototype.isEnabled = function() { return canCraft(this.resName); }
+Craft.prototype.isUnlocked = Craft.prototype.isEnabled
 
 tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains("Send caravan")').click()
 getTradeButtons = race => $('div.panelContainer:contains("' + race + '") div.btnContent').children(":visible")
@@ -1525,6 +1531,7 @@ Science.prototype.getPrices = function() {
     return prices; 
 }
 Science.prototype.isEnabled = function() { var data = this.getData(); return data.unlocked && !data.researched; }
+Science.prototype.isUnlocked = Science.prototype.isEnabled
 
 religionData = {
     "Order of the Sun": game.religion.religionUpgrades,
@@ -1678,7 +1685,7 @@ increasePriority = (name, tab, panel) => {
         enable(name, tab, panel);
     }
 }
-enable = (name, tab, panel, maxPriority) => {
+enable = (name, tab, panel, maxPriority, masterPlan) => {
     var type;
     if (specialBuys[name]) type = specialBuys[name];
     else if (tab === "Bonfire") type = Building;
@@ -1689,6 +1696,7 @@ enable = (name, tab, panel, maxPriority) => {
     else console.error(tab + " tab not supported yet!");
     var created = new type(name, tab, panel);
     if (maxPriority) created.maxPriority = true;
+    if (masterPlan) created.masterPlan = true;
     state.queue.push(created);
 }
 
