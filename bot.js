@@ -683,7 +683,6 @@ getResourceTitle = resInternalName => resourceTitleCache[resInternalName].title;
 getResourceInternalName = resTitle => resourceNameCache[resTitle].name;
 fixPriceTitle = price => ({ val: price.val, name: getResourceTitle(price.name) });
 //TODO calculate if resource production is zero (getEffectiveProduction -- make sure all events are ok)
-//TODO if res is full and its crafts are not demanded but its conversion components are, shutoff conversion to res (and disable production of more conversion?)
 getTotalDemand = res => {
     //this could be optimized a lot...
     var prices = flattenArr(state.queue.map(bld => bld.getPrices()).filter(prices => haveEnoughStorage(prices)));
@@ -956,7 +955,7 @@ getTotalCraftPrices = (res) => {
 **************/
 //todo: all of this is wrong in accelerated time
 //but the calendar speed is also bugged in accelerated time, wait for fix
-canHaveColdSeason = () => game.calendar.year < 4;
+canHaveColdSeason = () => game.calendar.year > 3;
 getWinterCatnipProduction = isCold => {
     return getSeasonalCatnipProduction(isCold ? .1 : .25);
 }
@@ -964,7 +963,12 @@ getSeasonalCatnipProduction = weatherMod => {
     //calcResourcePerTick always uses the current weather--adjust this away
     var currentWeather = game.calendar.getWeatherMod();
     var adjustedSeason = { modifiers: { catnip: weatherMod - currentWeather } }
-    return game.calcResourcePerTick("catnip", adjustedSeason) + game.getResourcePerTickConvertion("catnip");
+    return getTrueResourcePerTick("catnip", adjustedSeason);
+}
+//season is optional
+//get the up-to-date, rather than cached, per-tick value
+getTrueResourcePerTick = (res, season) => {
+    return game.calcResourcePerTick(res, season) + game.getResourcePerTickConvertion(res);
 }
 ticksPerSeason = () => 100 / game.calendar.dayPerTick;
 ticksLeftInSeason = () => (100 - game.calendar.day) / game.calendar.dayPerTick;
@@ -973,13 +977,12 @@ getExpectedCatnipBeforeWinter = () => {
     return game.getResourcePerTick("catnip", true) * ticksLeftInSeason()
         + (2 - game.calendar.season) * getSeasonalCatnipProduction(1) * ticksPerSeason();
 }
-//todo: warn when you don't have enough catnip
-getWinterCatnipStockNeeded = (isCold, additionalConsumption) => {
+getWinterCatnipStockNeeded = (isCold, additionalConsumption, ignorePopulationIncrease) => {
     if (!additionalConsumption) additionalConsumption = 0;
     //we could base this off actual kitten capacity, but if the kittens have already starved we might just need to let them starve
-    additionalConsumption += state.populationIncrease * -game.village.catnipPerKitten;
+    if (!ignorePopulationIncrease) additionalConsumption += state.populationIncrease * -game.village.catnipPerKitten;
     if (game.calendar.season === 3) {
-        return Math.max(0, -(game.getResourcePerTick("catnip", true) - additionalConsumption) * ticksLeftInSeason())
+        return Math.max(0, -(getTrueResourcePerTick("catnip") - additionalConsumption) * ticksLeftInSeason())
     } else {
         return Math.max(0, -(getWinterCatnipProduction(isCold) - additionalConsumption) * ticksPerSeason() - getExpectedCatnipBeforeWinter())
     }
@@ -1005,8 +1008,8 @@ gatherIntialCatnip = () => {
     }
 }
 preventStarvation = () => {
-    if (getResourceOwned("catnip") < getWinterCatnipStockNeeded(false) && game.science.get("agriculture").researched) {
-        log("Making a farmer to prevent starvation (needed " + game.getDisplayValueExt(getWinterCatnipStockNeeded(false)) + " catnip)")
+    if (getResourceOwned("catnip") < getWinterCatnipStockNeeded(false, 0, true) && game.science.get("agriculture").researched) {
+        log("Making a farmer to prevent starvation (needed " + game.getDisplayValueExt(getWinterCatnipStockNeeded(false, 0, true)) + " catnip)")
         switchToJob("farmer");
     }
 }
