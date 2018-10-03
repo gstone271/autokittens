@@ -23,6 +23,10 @@ $('#helpDiv').prepend($(`<div id="botHelp">
         <br />In Verbose mode, enqueued items you have enough storage to buy are displayed, followed by the estimated time until it is bought and the resources you need more of to buy them. In Concise, the time and resources are not displayed.
         <br />If one of the needed resources is reserved by an item higher in the queue, this item is grayed out. In Concise, it is hidden instead.
     </li>
+    <li>Master Plan: Try to move upwards through the tech tree automatically.<ul>
+        <li>off: Don't queue anything you haven't asked for. Recommended to still have an idle game experience, but with less management.</li>
+        <li>naive: Automatically enqueue technologies and upgrades that aren't useless or dangerous once the time to produce them is less than 30 minutes.</li>
+    </ul></li>
     <li>Smart Storage: Don't buy storage (barn, warehouse, harbour) you don't need.<ul>
         <li>off: Buy storage as normal. The bot may buy too much storage, especially warehouses.</li>
         <li>aggressive: Only buy storage if you don't have enough to buy a queued upgrade or normal building (aqueduct, log house, library, mine, smelter, or workshop). Recommended in the early game.</li>
@@ -577,6 +581,7 @@ mainLoop = () => {
     if (state.autoConverters) manageConverters();
     doAutoCraft();
     additionalActions.forEach(action => action());
+    if (state.masterPlanMode) queueNewTechs();
     updateUi();
     var ticksPassed = game.ticks - state.ticks;
     if (ticksPassed !== state.ticksPerLoop) console.log(ticksPassed + " ticks passed (expected " + state.ticksPerLoop + ")")
@@ -1246,12 +1251,18 @@ var getUnresearched = buildings => buildings.filter(data => !(data.researched ||
 var uselessBuilds = [
     "mint", "ziggurat", "barges", "steelPlants", "factoryAutomation", "advancedAutomation", "pneumaticPress",
      "factoryOptimization", "factoryRobotics", "seti", "ecology", "unicornSelection", "ai", "chronophysics",
-     "metaphysics", "cryptotheology", "thorium", "advExogeology", "superconductors"
+     "metaphysics", "cryptotheology", "thorium", "advExogeology", "superconductors", "spaceEngineers"
 ]
-var isUseful = bld => !uselessBuilds.includes(bld.name);
+//can be built, but might be detrimental
+var dangerousBuilds = [
+    "pumpjack"
+]
+var isUseful = bld => {
+    return !uselessBuilds.includes(bld.name) && !dangerousBuilds.includes(bld.name);
+}
 //luckily we're only concerned with the first copy of a building, so we don't need to worry about price ratios
 var notTooExpensive = bld => getMaxProductionTicksNeeded(bld.prices) <= maxProductionCostToEnable;
-var maxProductionCostToEnable = 5 * 60 * 60; //1 hour
+var maxProductionCostToEnable = game.rate * 60 * 30; //30 minutes
 //TODO only add each thing once
 var queueNewTechs = () => {
     ["Workshop", "Science"].forEach(tab => {
@@ -1963,7 +1974,7 @@ settingsMenu = [
     {
         name: "masterPlanMode",
         leftClick: () => state.masterPlanMode = 1,
-        rightClick: () => state.masterPlanMode = 0,
+        rightClick: () => { state.masterPlanMode = 0; clearMasterPlan() },
         getHtml: () => "Master Plan: " + (state.masterPlanMode ? "naive" : "off")
     },
     {
