@@ -25,7 +25,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     </li>
     <li>Master Plan: Try to move upwards through the tech tree automatically.<ul>
         <li>off: Don't queue anything you haven't asked for. Recommended to still have an idle game experience, but with less management.</li>
-        <li>naive: Automatically enqueue technologies and upgrades that aren't useless or dangerous once the time to produce them is less than 30 minutes.</li>
+        <li>naive: Automatically enqueue technologies and upgrades that aren't useless or dangerous once the time to produce them is less than 15 minutes. Not recommended if you're actively managing the bot (and can make better decisions).</li>
     </ul></li>
     <li>Smart Storage: Don't buy storage (barn, warehouse, harbour) you don't need.<ul>
         <li>off: Buy storage as normal. The bot may buy too much storage, especially warehouses.</li>
@@ -1249,7 +1249,7 @@ var getMaxProductionTicksNeeded = (prices) => {
 //ok to queue things that aren't unlocked yet
 var getUnresearched = buildings => buildings.filter(data => !(data.researched || data.val))
 var uselessBuilds = [
-    "mint", "ziggurat", "barges", "steelPlants", "factoryAutomation", "advancedAutomation", "pneumaticPress",
+    "ziggurat", "barges", "steelPlants", "factoryAutomation", "advancedAutomation", "pneumaticPress",
      "factoryOptimization", "factoryRobotics", "seti", "ecology", "unicornSelection", "ai", "chronophysics",
      "metaphysics", "cryptotheology", "thorium", "advExogeology", "superconductors", "spaceEngineers"
 ]
@@ -1258,11 +1258,19 @@ var dangerousBuilds = [
     "pumpjack"
 ]
 var isUseful = bld => {
+    var specialCases = {
+        satelliteRadio: () => game.bld.get("amphitheatre").stage === 1 && game.space.getBuilding("sattelite").val >= 5,
+        enrichedUranium: () => game.bld.get("reactor").val >= 5,
+        hydroPlantTurbines: () => game.bld.get("aqueduct").stage === 1,
+        hubbleTelescope: () => (game.space.getBuilding("sattelite").val + game.space.getBuilding("researchVessel").val * 10) >= 3,
+        mint: () => getResourceMax("manpower") > 20000,
+    }
+    if (specialCases[bld.name]) return specialCases[bld.name]();
     return !uselessBuilds.includes(bld.name) && !dangerousBuilds.includes(bld.name);
 }
 //luckily we're only concerned with the first copy of a building, so we don't need to worry about price ratios
 var notTooExpensive = bld => getMaxProductionTicksNeeded(bld.prices) <= maxProductionCostToEnable;
-var maxProductionCostToEnable = game.rate * 60 * 30; //30 minutes
+var maxProductionCostToEnable = game.rate * 60 * 15; //15 minutes
 //TODO only add each thing once
 var queueNewTechs = () => {
     ["Workshop", "Science"].forEach(tab => {
