@@ -786,7 +786,8 @@ var getFursPerHunt = () => {
 /************** 
  * Crafting
 **************/
-getCraftPrices = craft => { return game.workshop.getCraft(craft).prices }
+//getCraft(craft).prices doesn't account for starchart discount on ships
+getCraftPrices = craft => { return game.workshop.getCraftPrice(game.workshop.getCraft(craft)) }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
 craftTableElem = $('.craftTable');
 getCraftTableElem = () => {
@@ -814,6 +815,13 @@ craftAll = name => {
         if (button) button.click(); 
     }
 }
+var craftButtonRatios = [
+    //data from WCraftRow
+    { min: 1, ratio: 0.01 },
+    { min: 25, ratio: 0.05 },
+    { min: 100, ratio: 0.1 },
+    //we could include the all as {ratio: 1} and treat it the same as the rest if we wanted
+]
 findCraftButtonValues = (craft, craftRatio) => {
     if (!canCraft(craft)) {
         return [];
@@ -822,13 +830,16 @@ findCraftButtonValues = (craft, craftRatio) => {
     } else if (getResourceOwned(craft) === 0) {
         return [{click: () => craftFirstTime(craft), times: 1, amount: craftRatio}]
     } else {
-        //TODO finding these buttons is significant performance (28% of total); just bypass them in api: some
         var craftAllButton = findCraftAllButton(craft);
         var craftAllTimes = Math.min(...getCraftPrices(craft).map(price => Math.floor(getResourceOwned(price.name) / price.val)));
-        return findCraftButtons(craft).toArray().map((button) => {
-            var craftTimes = Math.round($(button).text() / craftRatio);
+        return craftButtonRatios.filter(ratio => craftAllTimes >= ratio.min).map((ratio, idx) => {
+            var craftTimes = Math.max(ratio.min, Math.floor(craftAllTimes * ratio.ratio))
             var craftAmount = craftTimes * craftRatio
-            return {click: button.click.bind(button), times: craftTimes, amount: craftAmount};
+            return { 
+                click: () => { var button = findCraftButtons(craft)[idx]; if (button) button.click(); },
+                times: craftTimes, 
+                amount: craftAmount
+            };
         }).concat(craftAllButton ? {click: () => craftAllButton.click(), times: craftAllTimes, amount: craftAllTimes * craftRatio } : []);
     }
 }
@@ -865,9 +876,14 @@ doAutoCraft = () => {
     });
 }
 craftMultiple = (craft, timesToCraft) => {
+    if (timesToCraft <= 0) {
+        return;
+    }
+    if (state.api >= 1) {
+        game.craft(craft.name, timesToCraft);
+    } else {
     var craftRatio = getCraftRatio(craft.name);
-    //TODO reduce logic duplication with makeCraft
-    var maxClicks = 10; //don't expect to need this many clicks, prevent something bad
+        var maxClicks = 20; //don't expect to need this many clicks, prevent something bad
     while (timesToCraft > 0 && maxClicks--) {
         var craftButtons = findCraftButtonValues(craft.name, craftRatio);
         if (!craftButtons.length) {
@@ -889,6 +905,7 @@ craftMultiple = (craft, timesToCraft) => {
         targetButton.click();
         timesToCraft -= targetButton.times;
     }
+}
 }
 setAutoCrafting = level => {
     if (level >= 0 && level <= 2) {
@@ -919,20 +936,7 @@ makeCraft = (craft, amountNeeded, reserved) => {
     var totalPrices = multiplyPrices(prices, timesToCraft);
     craftAdditionalNeeded(totalPrices, reserved);
     if (canAfford(totalPrices, reserved)) {
-        var maxClicks = 20;
-        while (maxClicks > 0 && timesToCraft > 0) {
-            var craftButtons = findCraftButtonValues(craft, craftRatio);
-            if (!craftButtons.length) {
-                //button hasn't shown up yet (we just crafted one of the requirements)
-                break;
-            }
-            var targetButton = craftButtons.reduce((smallerButton, biggerButton) => 
-                biggerButton.times < timesToCraft ? biggerButton : smallerButton
-            )
-            targetButton.click();
-            timesToCraft -= targetButton.times;
-            maxClicks--;
-        }
+        craftMultiple(game.workshop.getCraft(craft), timesToCraft);
     } else if (prices.every(price => !reserved.get(price.name).current)) {
         craftAll(craft);
     }
@@ -2368,4 +2372,5 @@ mode to not craft compendiums
 add extra info to help
 allow buying stuff with cost between safe storage and actual storage
 --when all resources are close to full, allow them to become completely full
+can't get religion bonus while on religion tab
 */
