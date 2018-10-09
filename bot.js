@@ -397,7 +397,7 @@ getEffectivePrices = (prices, reserved) => {
 }
 getTicksNeeded = (effectivePrices, originalPrices, reserved) => {
     var unaffordablePrices = effectivePrices.filter(price => !canAffordOne(price, reserved));
-    return Math.max(...unaffordablePrices
+    return Math.max(0, ...unaffordablePrices
         .filter(price => originalPrices.some(originalPrice => price.name === originalPrice.name))
         .map(price => getTicksToEnough(price, reserved))
     );
