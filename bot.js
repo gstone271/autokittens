@@ -863,6 +863,13 @@ getEnoughCraft = res =>
 autoCrafts = game.workshop.crafts
     //parchment is needed to spend culture and science autocrafting, and there's no other craft for furs
     .filter(craft => craft.prices.some(price => getResourceMax(price.name) < Infinity || craft.name === "parchment"))
+preferSteelCrafting = () => {
+    //prefer steel over plate
+    var steelIndex = autoCrafts.findIndex(craft => craft.name === "steel")
+    var steelCraft = autoCrafts.splice(steelIndex, 1)[0];
+    autoCrafts.unshift(steelCraft);
+}
+preferSteelCrafting();
 doAutoCraft = () => {
     autoCrafts.forEach(craft => {
         if (canCraft(craft.name)) {
