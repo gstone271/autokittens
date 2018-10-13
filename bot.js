@@ -1611,11 +1611,17 @@ Religion.prototype.buy = function() {
             var prices = this.getRealPrices();
             var maxClicks = 25;
             var tearsNeeded = prices.filter(price => price.name === "tears").map(price => price.val - getResourceOwned("tears"))[0] || 0;
-            while (maxClicks > 0 && tearsNeeded > 0) {
-                findButton("Sacrifice Unicorns").click();
-                maxClicks--;
-                tearsNeeded -= game.bld.get("ziggurat").val;
-                //we will probably need to wait 1 tick after making tears
+            if (state.api >= 1) {
+                if (tearsNeeded > 0) {
+                    game.religionTab.sacrificeBtn.controller.sacrifice(game.religionTab.sacrificeBtn.model, math.ceil(tearsNeeded / game.bld.get("ziggurat").val))
+                }
+            } else {
+                while (maxClicks > 0 && tearsNeeded > 0) {
+                    findButton("Sacrifice Unicorns").click();
+                    maxClicks--;
+                    tearsNeeded -= game.bld.get("ziggurat").val;
+                    //we will probably need to wait 1 tick after making tears
+                }
             }
         }
         bought = buyButton(this.name);
