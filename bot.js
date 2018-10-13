@@ -2276,6 +2276,28 @@ displayStarchartPayoffs = () => {
         }
     })
 }
+var spaceProductionBonusBuildings = ["Space Elevator", "Orbital Array"]
+displayUnobtainiumPayoffs = () => {
+    spaceProductionBonusBuildings.forEach(name => {
+        var button = findButton(name);
+        if (button.length) {
+            var panel = getPanelTitle(button);
+            var bld = new Science(name, "Space", panel);
+            var unobtainiumPrice = getPrice(bld.getPrices(), "unobtainium") + getIngredientsNeeded({name: "eludium", val: getPrice(bld.getPrices(), "eludium")})[0].val
+            var spaceProductionBonus = bld.getData().effects.spaceRatio;
+            //spaceRatio calculation from calcResourcePerTick
+            spaceProductionBonus *= 1 + game.workshop.get("spaceManufacturing").researched * game.bld.get("factory").on * game.bld.get("factory").effects.craftRatio * .75;
+            //assumes all unobtainium is produced from PerTickSpace sources, like Lunar Outpost
+            var unobtainiumProduction = spaceProductionBonus * game.getEffect("unobtainiumPerTickSpace");
+            var unobtainiumPayoff = unobtainiumPrice / unobtainiumProduction;
+            
+            var unobtainiumInfo = button.children(".unobtainiumInfo");
+            if (!unobtainiumInfo.length) { unobtainiumInfo = $('<div class="unobtainiumInfo"' + rightOfButtonStyle + '>'); button.append(unobtainiumInfo); }
+
+            unobtainiumInfo.text("Unobtainium payoff: " + ticksToDisplaySeconds(unobtainiumPayoff))
+        }
+    })
+}
 specialUis = {
     Village: () => {
         displayJobQueue();
@@ -2292,6 +2314,7 @@ specialUis = {
     },
     Space: () => {
         displayStarchartPayoffs();
+        displayUnobtainiumPayoffs();
     },
     Time: () => {
         displayParagonInfo();
