@@ -44,7 +44,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     <li>Farmer ratio: Calculates the ratio of wood per farmer to wood per woodcutter. If this ratio is greater than one, you should switch all your woodcutters to farmers.</li>
     <li>Auto Converters: When on, automatically turns off any conversion buildings (eg. smelter) if all of the conversion products are full and nothing in the queue needs the resources you can craft from them. The disabled buildings will be listed below, and won't be purchased.</li>
     <li>Auto SETI: When on, automatically observe the sky. Doesn't work during redshift; if you have offline progression enabled, consider buying SETI to get more starcharts.</li>
-</ul>If one setting is being overridden by another, its effective value will be displayed in parentheses. For example, Bot Speed currently cannot be faster than 1/Game Speed.</p>
+</ul>If one setting is being overridden by another, its effective value will be displayed in parentheses. For example, Bot Speed currently cannot be faster than 1/Game Speed, unless Bot Timer is set to game.</p>
 <p>Special buttons: These queueing buttons look normal but have a special effect when enabled, and may not actually use the queue.<ul>
     <li>Send Hunters: Send hunters whenever your catpower is full or you have nothing else in the queue which needs catpower</li>
     <li>Steel (in Workshop): Always make as much steel as possible (to prevent wasting coal, even if your queue needs more iron than coal)</li>
@@ -1613,7 +1613,7 @@ Religion.prototype.buy = function() {
             var tearsNeeded = prices.filter(price => price.name === "tears").map(price => price.val - getResourceOwned("tears"))[0] || 0;
             if (state.api >= 1) {
                 if (tearsNeeded > 0) {
-                    game.religionTab.sacrificeBtn.controller.sacrifice(game.religionTab.sacrificeBtn.model, math.ceil(tearsNeeded / game.bld.get("ziggurat").val))
+                    game.religionTab.sacrificeBtn.controller.sacrifice(game.religionTab.sacrificeBtn.model, Math.ceil(tearsNeeded / game.bld.get("ziggurat").val))
                 }
             } else {
                 while (maxClicks > 0 && tearsNeeded > 0) {
@@ -1805,7 +1805,7 @@ setDesiredTicksPerLoop = desired => {
 setSpeed = spd => {
     if (spd >= 1) {
         state.speed = spd;
-        state.ticksPerLoop = Math.max(state.desiredTicksPerLoop, spd);
+        state.ticksPerLoop = state.runInGameLoop ? state.desiredTicksPerLoop : Math.max(state.desiredTicksPerLoop, spd);
         state.delay = 200 * state.ticksPerLoop / spd
         updateApiLevel();
     }
@@ -1816,7 +1816,7 @@ slowDown = () => setSpeed(state.speed / 2);
 if (!game.realUpdateModel) game.realUpdateModel = game.updateModel;
 game.updateModel = () => {
     if (!(state.disableTimeskip && game.isRendering)) {
-        for (var i = 0; i < state.speed; i++) { 
+        for (var i = 0; i < Math.min(state.speed, state.ticksPerLoop); i++) { 
             if (i !== 0) {
                 game.calendar.tick();
                 //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
@@ -1883,13 +1883,17 @@ startLoop = () => {
 }
 if (!game.realTick) game.realTick = game.tick;
 game.tick = () => {
-    game.realTick();
-    if (state.running && state.runInGameLoop) {
-        if (state.loopsUntilRun <= 0) {
-            mainLoop();
-            state.loopsUntilRun = state.ticksPerLoop / state.speed - 1;
-        } else {
-            state.loopsUntilRun--;
+    var runLoop = state.running && state.runInGameLoop;
+    var ticks = runLoop ? state.speed / state.ticksPerLoop : 1;
+    for (var tick = 0; tick < ticks; tick++) {
+        game.realTick();
+        if (runLoop) {
+            if (state.loopsUntilRun <= 0) {
+                mainLoop();
+                state.loopsUntilRun = state.ticksPerLoop / state.speed - 1;
+            } else {
+                state.loopsUntilRun--;
+            }
         }
     }
 }
@@ -1998,8 +2002,8 @@ settingsMenu = [
     },
     {
         name: "mainLoopMode",
-        leftClick: () => { state.runInGameLoop = true; setRunning(state.running) },
-        rightClick: () => { state.runInGameLoop = false; setRunning(state.running) },
+        leftClick: () => { state.runInGameLoop = true; setSpeed(state.speed) },
+        rightClick: () => { state.runInGameLoop = false; setSpeed(state.speed) },
         getHtml: () => "Bot Timer: " + (state.runInGameLoop ? "game" : "independent")
     },
     {
@@ -2381,6 +2385,9 @@ buy script (-> genetic algorithm)
 trade calculations -> needsResource function
 --can get stuck needing titanium but with too much iron
 ----compare the ticks produced to decide titanium is more important?
+--can get stuck with max titanium and no steel
+----trade with dragons? low quantity might not be worth it
+----better to keep trading with zebras than to trade with griffins sometimes
 --trade more like crafting
 ----like faith, log how many trades were made before a building costing gold was bought; reserve that much gold
 ------need to figure out how to have the gold reserved from the building but not the trade
@@ -2388,7 +2395,6 @@ trade calculations -> needsResource function
 faith reset without transcending
 improve performance at high speeds
 --lag indicator (ticks/sec)
---sometimes causes Your kittens will DIE message (on the last tick of autumn)
 energy calculations
 improve interface
 --buy quantity: 0, 1/2, 1, 2, infinity
