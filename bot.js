@@ -207,7 +207,7 @@ importSave = saveString => {
 }
 reloadQueue = queue => {
     state.queue = [];
-    queue.forEach(item => enable(item.name, item.tab, item.panel, item.maxPriority));
+    queue.forEach(item => enable(item.name, item.tab, item.panel, item.maxPriority, item.masterPlan));
 }
 load = () => {
     var data = localStorage.getItem("simba.state");
@@ -889,30 +889,30 @@ craftMultiple = (craft, timesToCraft) => {
     if (state.api >= 1) {
         game.craft(craft.name, timesToCraft);
     } else {
-    var craftRatio = getCraftRatio(craft.name);
+        var craftRatio = getCraftRatio(craft.name);
         var maxClicks = 20; //don't expect to need this many clicks, prevent something bad
-    while (timesToCraft > 0 && maxClicks--) {
-        var craftButtons = findCraftButtonValues(craft.name, craftRatio);
-        if (!craftButtons.length) {
-            //button hasn't shown up yet (we just crafted one of the requirements)
-            break;
-        }
-        var targetButton = craftButtons.reduce((smallerButton, biggerButton) => 
-            biggerButton.times < timesToCraft ? biggerButton : smallerButton
-        )
-        if (craft.name === "wood") {
-            //special case: only craftable resource where the craft target has a max capacity
-            var maxBeamCrafts = 10; //also useful in case we try to autocraft catnip before we have a workshop
-            while (getResourceOwned(craft.name) + targetButton.amount > getResourceMax(craft.name) && maxBeamCrafts--) {
-                craftOne("beam");
+        while (timesToCraft > 0 && maxClicks--) {
+            var craftButtons = findCraftButtonValues(craft.name, craftRatio);
+            if (!craftButtons.length) {
+                //button hasn't shown up yet (we just crafted one of the requirements)
+                break;
             }
+            var targetButton = craftButtons.reduce((smallerButton, biggerButton) => 
+                biggerButton.times < timesToCraft ? biggerButton : smallerButton
+            )
+            if (craft.name === "wood") {
+                //special case: only craftable resource where the craft target has a max capacity
+                var maxBeamCrafts = 10; //also useful in case we try to autocraft catnip before we have a workshop
+                while (getResourceOwned(craft.name) + targetButton.amount > getResourceMax(craft.name) && maxBeamCrafts--) {
+                    craftOne("beam");
+                }
+            }
+            craft.prices.filter(price => getResourceOwned(price.name) === getResourceMax(price.name) && price.name !== "culture")
+                .forEach(price => console.log("Warning: " + price.name + " full " + (price.name === "science" ? "(do you have enough manuscripts?)" : "(did the bot lag?)")))
+            targetButton.click();
+            timesToCraft -= targetButton.times;
         }
-        craft.prices.filter(price => getResourceOwned(price.name) === getResourceMax(price.name) && price.name !== "culture")
-            .forEach(price => console.log("Warning: " + price.name + " full " + (price.name === "science" ? "(do you have enough manuscripts?)" : "(did the bot lag?)")))
-        targetButton.click();
-        timesToCraft -= targetButton.times;
     }
-}
 }
 setAutoCrafting = level => {
     if (level >= 0 && level <= 2) {
@@ -1254,7 +1254,7 @@ var isStorageLimited = (smartStorageMode) => {
 }
 var getMaxProductionTicksNeeded = (prices) => {
     return Math.max(...prices.map(price =>
-        price.val / getCraftingResourcePerTick(price.name, new Reservations({}), true)
+        price.val / Math.max(0, getCraftingResourcePerTick(price.name, new Reservations({}), true))
     ));
 }
 //ok to queue things that aren't unlocked yet
@@ -1262,30 +1262,47 @@ var getUnresearched = buildings => buildings.filter(data => !(data.researched ||
 var uselessBuilds = [
     "ziggurat", "barges", "steelPlants", "factoryAutomation", "advancedAutomation", "pneumaticPress",
      "factoryOptimization", "factoryRobotics", "seti", "ecology", "unicornSelection", "ai", "chronophysics",
-     "metaphysics", "cryptotheology", "thorium", "advExogeology", "superconductors", "spaceEngineers"
+     "metaphysics", "cryptotheology", "thorium", "advExogeology", "superconductors", "spaceEngineers",
+     "photovoltaic"
 ]
 //can be built, but might be detrimental
 var dangerousBuilds = [
-    "pumpjack"
+    "pumpjack", //you might prefer to have energy-free oil
+    "warehouse" //too many >.<
+]
+//build at any cost (technically infinite cost when you have no income)
+var priorityBuilds = [
+    "calciner",
+    "accelerator"
 ]
 var isUseful = bld => {
     var specialCases = {
+        mineralHoes: () => getJobCounts().find(job => job.name === "farmer").val,
+        ironHoes: () => specialCases.mineralHoes(),
+        register: () => game.challenges.currentChallenge !== "anarchy",
         satelliteRadio: () => game.bld.get("amphitheatre").stage === 1 && game.space.getBuilding("sattelite").val >= 5,
         enrichedUranium: () => game.bld.get("reactor").val >= 5,
         hydroPlantTurbines: () => game.bld.get("aqueduct").stage === 1,
         hubbleTelescope: () => (game.space.getBuilding("sattelite").val + game.space.getBuilding("researchVessel").val * 10) >= 3,
+        solarSatellites: () => game.space.getBuilding("sattelite").val >= 5,
+        hut: () => game.space.getBuilding("field").val >= 20,
         mint: () => getResourceMax("manpower") > 20000,
+        mansion: () => game.bld.get("calciner").val >= 20,
+        biolab: () => specialCases.mansion(),
+        workshop: () => game.science.get("writing").researched,
     }
     if (specialCases[bld.name]) return specialCases[bld.name]();
     return !uselessBuilds.includes(bld.name) && !dangerousBuilds.includes(bld.name);
 }
 //luckily we're only concerned with the first copy of a building, so we don't need to worry about price ratios
-var notTooExpensive = bld => getMaxProductionTicksNeeded(bld.prices) <= maxProductionCostToEnable;
+var notTooExpensive = bld => priorityBuilds.includes(bld.name) || getMaxProductionTicksNeeded(bld.prices) <= maxProductionCostToEnable;
+//todo base this on the max production cost of the cheapest queued building sharing a resource price with it?
 var maxProductionCostToEnable = game.rate * 60 * 15; //15 minutes
-//TODO only add each thing once
+//TODO only add each thing once (if human intervenes)
 var queueNewTechs = () => {
     ["Workshop", "Science"].forEach(tab => {
         getUnresearched(scienceData[tab]).filter(isUseful).filter(notTooExpensive).forEach(bld => {
+            //todo require that it's enabled???
             if (!findQueue(bld.label))
                 enable(bld.label, tab, undefined, false, true);
         })
@@ -1539,6 +1556,7 @@ clearTradeLogs = (expectedTradeMessages) => {
 }
 
 scienceData = {
+    Bonfire: game.bld.buildingsData,
     Science: Object.values(game.science.metaCache),
     Workshop: game.workshop.upgrades,
     Space: Object.values(game.space.metaCache),
