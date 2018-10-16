@@ -58,6 +58,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     <li>The bot will not make trades for resources that you have a lot of already, unless you enable ignoreNeeds.</li>
     <li>It will only trade during optimal seasons, unless you enable ignoreSeasons.</li>
 </ul>Next to tradeable resources, the bot will display the amount of time it would take one no-skill kitten to produce that much resource (in cats*ticks), or if kittens can't produce it, the amount of time it would take all your production to produce it (in ticks).</p>
+<p>Auto Faith Reset: In the Order of the Sun panel, you can set Auto Reset to a percentage. When your base faith bonus (before Black Obelisk and Atheism bonuses) reaches this percentage, Simba will automatically store maximum faith, then reset praised faith (with apocrypha), then praise the sun.</p>
 <p>Compatibility: Simba requires a modern browser (with HTML5 and ES6) and is currently only compatible with the English version of the game.</p>
 <hr />
 <h3>Kittens Game Official "Help"</h3>
@@ -255,6 +256,7 @@ loadDefaults = () => {
         ignoreSeason: {},
         masterPlanMode: 0,
         smartStorage: 0,
+        autoReset: 1000, //should never be 0
     }
     Object.entries(falseyDefaults).forEach(entry => state[entry[0]] = state[entry[0]] || entry[1]);
     if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
@@ -615,6 +617,15 @@ additionalActions = [
         }
     },
     () => state.tradeTimer++,
+    () => {
+        if (state.autoReset < 1000 && state.autoReset < getBaseFaithProductionBonus(game.religion.faith)) {
+            if (!findQueue("Transcend") && !findQueue("Faith Reset")) {
+                enable("Faith Reset", "Religion", "Order of the Sun");
+            }
+        } else {
+            disable("Faith Reset");
+        }
+    }
 ]
 
 /************** 
@@ -1677,10 +1688,11 @@ function Transcend(name, tab, panel) {
     this.tab = tab;
     this.panel = panel;
     this.buy = () => withTab("Religion", () => { 
+        var faithResetOnly = this.name !== "Transcend";
         var realConfirm = window.confirm;
         try {
             window.confirm = () => true;
-            findButton(this.name).click();
+            if (!faithResetOnly) findButton(this.name).click();
             $('a:contains("[Faith Reset]")')[0].click();
             $('#fastPraiseContainer > a').click();
         } finally {
@@ -1916,6 +1928,7 @@ stateButtons = {
 }
 specialBuys = {
     "Hold Festival": HoldFestival,
+    "Faith Reset": Transcend,
     "Transcend": Transcend,
     "Praise the sun!": PraiseSun,
     //allow refine catnip from Bonfire
@@ -2197,13 +2210,15 @@ displayPreviousHistoryInfo = () => {
         )
     }
 }
+getBaseFaithProductionBonus = faith => {
+    var rate = game.religion.getRU("solarRevolution").on ? game.getTriValue(faith, 1000) : 0;
+    return game.getHyperbolicEffect(rate, 1000);
+}
 getFaithProductionBonus = faith => {
     //from religion.getProductionBonus; now accepts faith parameter
-    var rate = game.religion.getRU("solarRevolution").on ? game.getTriValue(faith, 1000) : 0;
     var atheismBonus = game.challenges.getChallenge("atheism").researched ? game.religion.getTranscendenceLevel() * 0.1 : 0;
     var blackObeliskBonus = game.religion.getTranscendenceLevel() * game.religion.getTU("blackObelisk").val * 0.005;
-    rate = game.getHyperbolicEffect(rate, 1000) * (1 + atheismBonus + blackObeliskBonus);
-    return rate;
+    return getBaseFaithProductionBonus(faith) * (1 + atheismBonus + blackObeliskBonus);
 }
 getIncreasedFaith = (praised, faithBonus, ticks) => {
     //try not to spend too much time on this math
@@ -2274,6 +2289,28 @@ displayApocryphaNeededToTranscend = () => {
         transcendenceInfo.text(" (" + game.getDisplayValueExt(percentageOwned) + "% of apocrypha needed)");
     }
 }
+displayAutoResetSettings = () => {
+    if (game.religion.getRU("apocripha").val) {
+        $("#gameContainerId div.panelContainer > .title").toArray().forEach(div => {
+            var elem = $(div);
+            if (getPanelTitle(elem) !== "Order of the Sun") return;
+            var autoResetButton = $("#autoResetButton");
+            if (!autoResetButton.length) {
+                var updateButton = () => $("#autoResetButton").html(buttonData.getHtml());
+                var buttonData = {
+                    name: "autoResetButton",
+                    leftClick: () => { state.autoReset = Math.min(1000, state.autoReset + 100); updateButton(); },
+                    rightClick: () => { state.autoReset = Math.max(100, state.autoReset - 100); updateButton(); },
+                    getHtml: () => "Auto Reset: " + (state.autoReset === 1000 ? "never" : state.autoReset + "%")
+                }
+                autoResetButton = createSettingsButton(buttonData);
+                autoResetButton.css("float", "right");
+                elem.append(autoResetButton);
+                updateButton();
+            }
+        })
+    }
+}
 var starchartBuildings = ["Satellite", "Research Vessel", "Space Beacon"]
 displayStarchartPayoffs = () => {
     starchartBuildings.forEach(name => {
@@ -2327,6 +2364,7 @@ specialUis = {
     Religion: () => {
         displayApocryphaNeededToTranscend();
         displayFaithResetPayoff();
+        displayAutoResetSettings();
     },
     Space: () => {
         displayStarchartPayoffs();
