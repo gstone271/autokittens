@@ -1616,10 +1616,14 @@ Religion.prototype.buy = function() {
             if (state.api >= 1) {
                 if (tearsNeeded > 0) {
                     game.religionTab.sacrificeBtn.controller.sacrifice(game.religionTab.sacrificeBtn.model, Math.ceil(tearsNeeded / game.bld.get("ziggurat").val))
+                    if (state.disableTimeskip) {
+                        //we need the button to be activated, but shouldn't use the API to speed up time
+                        game.render();
+                }
                 }
             } else {
                 while (maxClicks > 0 && tearsNeeded > 0) {
-                    findButton("Sacrifice Unicorns").click();
+                    buyButton("Sacrifice Unicorns");
                     maxClicks--;
                     tearsNeeded -= game.bld.get("ziggurat").val;
                     //we will probably need to wait 1 tick after making tears
