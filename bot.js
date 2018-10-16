@@ -1466,7 +1466,7 @@ Trade.prototype.buy = function(reserved) {
                     quantityTraded++;
                 }
                 if (yieldResTotal) {
-                    gainTradeResources(yieldResTotal);
+                    yieldResTotal = gainTradeResources(yieldResTotal);
                     var tradeSeason = game.calendar.year + game.calendar.season / 4;
                     if (tradeSeason !== state.lastTradeSeason) {
                         //make new logs each season
@@ -1515,7 +1515,11 @@ Trade.prototype.buy = function(reserved) {
 Trade.prototype.getPrices = function() { return [{name: "manpower", val: 50}, {name: "gold", val: 15}].concat(getTradeData(this.panel).buys); }
 Trade.prototype.needProduct = function(quantity, resourcesSoFar) {
     if (!resourcesSoFar) resourcesSoFar = {};
-    return getTradeValue(this.panel, true).every(sell => getResourceOwned(sell.name) * (this.overrideNeeds() ? 1 : 1.1) + sell.val * quantity + (resourcesSoFar[sell.name] || 0) < getResourceMax(sell.name));
+    return getTradeValue(this.panel, true).every(sell => 
+        getResourceOwned(sell.name) * (this.overrideNeeds() ? 1 : 1.1)
+                + sell.val * quantity + (resourcesSoFar[sell.name] || 0)
+            < getResourceMax(sell.name)
+        || sell.name === "sorrow");
 }
 Trade.prototype.bestSeason = function() {
     return getTradeData(this.panel).sells[0].seasons[seasonNames[game.calendar.season]] >= Math.max(...Object.values(getTradeData(this.panel).sells[0].seasons))
@@ -1531,7 +1535,7 @@ Trade.prototype.overrideNeeds = function() {
 Trade.prototype.ignoreSeason = function() {
     return isResourceFull("gold") && state.ignoreSeason[this.panel] || state.ignoreSeason[this.panel] >= 2;
 }
-gainTradeResources = yieldResTotal => Object.entries(yieldResTotal).forEach(entry => game.resPool.addResEvent(...entry))
+gainTradeResources = yieldResTotal => Object.fromEntries(Object.entries(yieldResTotal).map(entry => [entry[0], game.resPool.addResEvent(...entry)]))
 //from diplomacy.gainTradeRes
 msgTrades = (yieldResTotal, amtTrade) => {
     //add this return value
