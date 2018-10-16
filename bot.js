@@ -1510,7 +1510,9 @@ Trade.prototype.bestSeason = function() {
     return getTradeData(this.panel).sells[0].seasons[seasonNames[game.calendar.season]] >= Math.max(...Object.values(getTradeData(this.panel).sells[0].seasons))
 }
 Trade.prototype.isEnabled = function() { 
-    return (this.needProduct(1) || this.overrideNeeds()) && (this.bestSeason() || this.ignoreSeason());
+    return (this.needProduct(1) || this.overrideNeeds())
+        && (this.bestSeason() || this.ignoreSeason())
+        && (this.name !== "Leviathans" || game.diplomacy.get("leviathans").duration);
 }
 Trade.prototype.overrideNeeds = function() {
     return isResourceFull("gold") && state.ignoreNeeds[this.panel] || state.ignoreNeeds[this.panel] >= 2;
