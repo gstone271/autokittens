@@ -797,6 +797,43 @@ var getFursPerHunt = () => {
 /************** 
  * Crafting
 **************/
+Recipe = class {
+    constructor(data) {
+        //assumes that changes in game state are automatically reflected in data object
+        //if this changes, we'll need to instead save the name and make the data a getter property
+        this.data = data;
+    }
+    get name() {
+        return this.data.name;
+    }
+    //sidebar
+    get title() {
+        return this.data.label;
+    }
+    //Workshop tab craft button
+    get longTitle() {
+        return getResourceLongTitle(this.name);
+    }
+    get prices() {
+        return game.workshop.getCraftPrice(this.data);
+    }
+    get canCraft() {
+        return this.data.unlocked 
+            //construction required for first craft, though it is possible to cheat and click the buttons before they're shown 
+            && ((game.bld.get("workshop").val && game.science.get("construction").researched) || this.name === "wood")
+            && this.prices.every(price => getResourceMax(price.name) >= price.val);
+    }
+    get craftRatio() {
+        return getCraftRatio(this.name);
+    }
+    craftAll() {
+        craftAll(this.name);
+    }
+    craftMultiple(amount) {
+        craftMultiple(this.data, amount);
+    }
+}
+recipeMap = arrayToObject(game.workshop.crafts.map(data => new Recipe(data)), "name");
 //getCraft(craft).prices doesn't account for starchart discount on ships
 getCraftPrices = craft => { return game.workshop.getCraftPrice(game.workshop.getCraft(craft)) }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
@@ -931,11 +968,8 @@ setAutoCrafting = level => {
     }
 }
 canCraft = resInternalName => {
-    var craftData = game.workshop.getCraft(resInternalName);
-    return craftData && craftData.unlocked 
-        //construction required for first craft, though it is possible to cheat and click the buttons before they're shown 
-        && ((game.bld.get("workshop").val && game.science.get("construction").researched) || resInternalName === "wood")
-        && getCraftPrices(resInternalName).every(price => getResourceMax(price.name) >= price.val);
+    var recipe = recipeMap[resInternalName];
+    return recipe && recipe.canCraft;
 }
 getAdditionalNeeded = (prices, reserved) => 
     prices
@@ -948,15 +982,14 @@ craftAdditionalNeeded = (prices, reserved) =>
         .forEach(price => makeCraft(price.name, price.val, reserved));
 getCraftRatio = res => game.getResCraftRatio({ name: res }) + 1;
 makeCraft = (craft, amountNeeded, reserved) => {
-    var craftRatio = getCraftRatio(craft);
-    var prices = getCraftPrices(craft);
-    var timesToCraft = Math.ceil(amountNeeded / craftRatio);
-    var totalPrices = multiplyPrices(prices, timesToCraft);
+    var recipe = recipeMap[craft];
+    var timesToCraft = Math.ceil(amountNeeded / recipe.craftRatio);
+    var totalPrices = multiplyPrices(recipe.prices, timesToCraft);
     craftAdditionalNeeded(totalPrices, reserved);
     if (canAfford(totalPrices, reserved)) {
-        craftMultiple(game.workshop.getCraft(craft), timesToCraft);
-    } else if (prices.every(price => !reserved.get(price.name).current)) {
-        craftAll(craft);
+        recipe.craftMultiple(timesToCraft);
+    } else if (recipe.prices.every(price => !reserved.get(price.name).current)) {
+        recipe.craftAll();
     }
 }
 getTotalCraftPrices = (res) => {
@@ -2481,4 +2514,5 @@ add extra info to help
 allow buying stuff with cost between safe storage and actual storage
 --when all resources are close to full, allow them to become completely full
 can't get religion bonus while on religion tab
+selling buildings isn't noticed
 */
