@@ -581,6 +581,7 @@ mainLoop = () => {
     if (isResourceFull("gold")) state.queue.filter(bld => bld.constructor.name === "Trade" && bld.isEnabled()).forEach(bld => promote(bld.name));
     state.queue = buyPrioritiesQueue(state.queue);
     if (state.autoConverters) manageConverters();
+    loadUnicornRecipes();
     doAutoCraft();
     additionalActions.forEach(action => action());
     if (state.masterPlanMode) queueNewTechs();
@@ -883,7 +884,10 @@ buyItemMultiple = (button, amount) => {
 }
 sacrificeMultiple = (button, amount) => button.controller.sacrifice(button.model, amount)
 refineMultiple = (button, amount) => button.controller._refine(button.model, amount)
-unicornRecipes = [
+recipeMap = arrayToObject(game.workshop.crafts.map(data => new Recipe(data)), "name");
+loadUnicornRecipes = () => {
+    if (!recipeMap["tears"] && game.bld.get("ziggurat").val) {
+        var unicornRecipes = arrayToObject([
     new UnicornRecipe("tears", game.religionTab.sacrificeBtn, 
         () => game.bld.get("ziggurat").val, sacrificeMultiple),
     new UnicornRecipe("timeCrystal", game.religionTab.sacrificeAlicornsBtn, 
@@ -892,8 +896,11 @@ unicornRecipes = [
         () => 1, buyItemMultiple),
     new UnicornRecipe("relic", game.religionTab.refineTCBtn,
         () => 1 + game.getEffect("relicRefineRatio") * game.religion.getZU("blackPyramid").val, refineMultiple),
-]
-recipeMap = arrayToObject(game.workshop.crafts.map(data => new Recipe(data)).concat(unicornRecipes), "name");
+        ], "name");
+        Object.assign(recipeMap, unicornRecipes);
+    }
+}
+loadUnicornRecipes();
 getCraftPrices = craft => { return recipeMap[craft].prices }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
 craftTableElem = $('.craftTable');
