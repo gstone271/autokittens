@@ -699,6 +699,7 @@ resourceNameCache = arrayToObject(game.resPool.resources, "title");
 getResourceTitle = resInternalName => resourceTitleCache[resInternalName].title;
 getResourceInternalName = resTitle => resourceNameCache[resTitle].name;
 fixPriceTitle = price => ({ val: price.val, name: getResourceTitle(price.name) });
+getPrice = (prices, res) => (prices.filter(price => price.name === res)[0] || {val: 0}).val
 //TODO calculate if resource production is zero (getEffectiveProduction -- make sure all events are ok)
 getTotalDemand = res => {
     //this could be optimized a lot...
@@ -1314,8 +1315,8 @@ getClickableKitten = condition => {
     }).find(candidate => candidate.kitten)
 }
 withLeader = (leaderType, op) => {
-    if (!game.science.get("civil").researched || game.challenges.currentChallenge === "anarchy") {
-        op();
+    if (!game.science.get("civil").researched || game.challenges.currentChallenge === "anarchy" || !leaderType) {
+        return op();
     } else if (state.api >= 1) {
         var oldLeader = game.village.leader;
         var newLeader = game.village.sim.kittens.find(kitten => kitten.trait.title === leaderType);
@@ -1325,7 +1326,7 @@ withLeader = (leaderType, op) => {
             console.error("Unable to find leader type " + leaderType + ". Are you low on kittens?");
         }
         try {
-            op();
+            return op();
         } finally {
             if (oldLeader && newLeader) apiSetLeader(oldLeader);
         }
@@ -1337,7 +1338,7 @@ withLeader = (leaderType, op) => {
                 clickSetLeader(newLeader.kitten, newLeader.job);
             } else console.error("Unable to find leader type " + leaderType + ". Make sure to promote a kitten of that type so they appear on the first page.");
             try {
-                op();
+                return op();
             } finally {
                 if (oldLeader && newLeader) clickSetLeader(oldLeader.kitten, oldLeader.job);
             }
@@ -1459,63 +1460,105 @@ buyButton = (name) => {
     }
 }
 tabBuyButton = (tab, name) => {
-    var bought;
-    withTab(tab, () => bought = buyButton(name));
-    return bought;
+    return withTab(tab, () => buyButton(name));
+}
+Queueable = class {
+    //TODO the naming conventions should be refactored to match Recipe
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        this.name = name;
+        this.tab = tab;
+        this.panel = panel;
+        this.maxPriority = maxPriority;
+        this.masterPlan = masterPlan;
+    }
+    buy() {
+        var bought = withLeader(this.buyingLeader, tabBuyButton(this.tab, this.name));
+        if (bought) {
+            state.populationIncrease += housingMap[this.name] || 0;
+            if (!this.noLog && this.getPrices().some(price => price.name === "gold")) {
+                //log how many trades before buying a gold-cost building, so that in master plan mode, we can plan to buy at least that many trades first
+                logTrades();
+            }
+        }
+        return bought;
+    }
+    get buyingLeader() {
+        return null;
+    }
+    getPrices() {
+        throw new Error("Needs to be overridden");
+    }
+    isUnlocked() {
+        return true;
+    }
+    isEnabled() {
+        return this.isUnlocked();
+    }
+}
+DataQueable = class extends Queueable {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+        this.data = this.getData();
+    }
+    get internalName() {
+        return this.data.name;
+    }
+    getData() {
+        throw new Error("Needs to be overridden");
+    }
+    getPrices() {
+        return this.data.prices;
+    }
+    isUnlocked() {
+        return this.data.unlocked && !this.data.researched;
+    }
+    isEnabled() {
+        return super.isEnabled()
+            && !state.disabledConverters[this.internalName]
+            && (!["Barn", "Warehouse", "Harbour"].includes(this.name) || isStorageLimited(state.smartStorage));
+    }
+}
+DataListQueueable = dataList => class extends DataQueable {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+    }
+    getData() {
+        return dataList.find(data => data.label === this.name || data.stages && data.stages.some(stage => stage.label === this.name));
+    }
 }
 
 getBuildingLabel = internalName => {
     var data = game.bld.get(internalName);
     return data.label || data.stages[data.stage].label;
 }
-internalBuildingNames = flattenArr(game.bld.buildingsData.map(data => { if (data.stages) return (data.stages.map(stage => { return { name: data.name, label: stage.label }; })); return data; }))
-getPrice = (prices, res) => (prices.filter(price => price.name === res)[0] || {val: 0}).val
-function Building(name, tab, panel) {
-    this.name = name;
-    this.tab = tab;
-    this.panel = panel;
-    this.internalName = internalBuildingNames.filter(bld => bld.label === name)[0].name;
-}
-Building.prototype.buy = function() {
-    var bought = tabBuyButton(this.tab, this.name);
-    if (bought) {
-        state.populationIncrease += housingMap[this.name] || 0;
-        if (this.getPrices().some(price => price.name === "gold")) {
-            //log how many trades before buying a gold-cost building, so that in master plan mode, we can plan to buy at least that many trades first
-            logTrades();
+Building = class extends DataListQueueable(game.bld.buildingsData) {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+    }
+    getPrices() { 
+        var prices = game.bld.getPrices(this.internalName);
+        if (housingMap[this.name] && !(game.science.get("agriculture").researched && state.autoFarmer)) {
+            prices = prices.concat({name: "catnip", val: getAdditionalCatnipNeeded(true, housingMap[this.name])});
         }
+        return prices;
     }
-    return bought;
-}
-Building.prototype.getRealPrices = function() { 
-    return game.bld.getPrices(this.internalName);
-}
-Building.prototype.getPrices = function() { 
-    var prices = this.getRealPrices();
-    if (housingMap[this.name] && !(game.science.get("agriculture").researched && state.autoFarmer)) {
-        prices = prices.concat({name: "catnip", val: getAdditionalCatnipNeeded(true, housingMap[this.name])});
-    }
-    return prices;
-}
-Building.prototype.isUnlocked = function() {
-    return game.bld.get(this.internalName).unlocked;
-}
-Building.prototype.isEnabled = function() {
-    return this.isUnlocked()
-        && !state.disabledConverters[this.internalName]
-        && (!["Barn", "Warehouse", "Harbour"].includes(this.name) || isStorageLimited(state.smartStorage));
 }
 
-function Craft(name, tab, panel) {
-    this.name = name;
-    this.tab = tab;
-    this.panel = panel;
-    this.resName = getCraftInternalName(name);
+Craft = class extends Queueable {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+        this.resName = getCraftInternalName(name);
+    }
+    buy() { 
+        return craftOne(this.resName)
+    }
+    getPrices() { 
+        return getCraftPrices(this.resName)
+    }
+    isEnabled() { 
+        return canCraft(this.resName)
+    }
 }
-Craft.prototype.buy = function() { return craftOne(this.resName); }
-Craft.prototype.getPrices = function() { return getCraftPrices(this.resName); }
-Craft.prototype.isEnabled = function() { return canCraft(this.resName); }
-Craft.prototype.isUnlocked = Craft.prototype.isEnabled
 
 tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains("Send caravan")').click()
 getTradeButtons = race => $('div.panelContainer:contains("' + race + '") div.btnContent').children(":visible")
@@ -1530,7 +1573,6 @@ getTradeValue = (race, bestCase) => {
     }[tradeData.attitude]
     var ships = game.resPool.get("ship").value;
     var energyRatio = tradeData.name === "leviathans" ? 1 + 0.02 * tradeData.energy : 1;
-    var chance = bestCase ? 1 : (sell.name === "titanium" ? Math.min(1, .15 + ships * .0035) : sell.chance / 100);
     return tradeData.sells.map(sell => ({
         name: sell.name, 
         val: (sell.name === "titanium" ? 1.5 * (1 + ships / 50) : sell.value)
@@ -1736,26 +1778,6 @@ Religion.prototype.buy = function() {
         if (this.panel === "Order of the Sun") {
             //note how much faith we had before buying an upgrade
             logFaith();
-        } else {
-            /* var prices = this.getRealPrices();
-            var maxClicks = 25;
-            var tearsNeeded = prices.filter(price => price.name === "tears").map(price => price.val - getResourceOwned("tears"))[0] || 0;
-            if (state.api >= 1) {
-                if (tearsNeeded > 0) {
-                    game.religionTab.sacrificeBtn.controller.sacrifice(game.religionTab.sacrificeBtn.model, Math.ceil(tearsNeeded / game.bld.get("ziggurat").val))
-                    if (state.disableTimeskip) {
-                        //we need the button to be activated, but shouldn't use the API to speed up time
-                        game.render();
-                    }
-                }
-            } else {
-                while (maxClicks > 0 && tearsNeeded > 0) {
-                    buyButton("Sacrifice Unicorns");
-                    maxClicks--;
-                    tearsNeeded -= game.bld.get("ziggurat").val;
-                    //we will probably need to wait 1 tick after making tears
-                }
-            }*/
         }
         bought = buyButton(this.name);
     });
@@ -1908,14 +1930,14 @@ openTab = name => {
 getTabButtonByName = name => $('a.tab:contains("' + name + '")');
 getTabButtonByNumber = tabNumber => $('a.tab:nth-of-type(' + tabNumber + ')');
 withTab = (tab, op) => {
-    if (tab === getActiveTab()) {
-        op();
+    if (tab === getActiveTab() || !tab) {
+        return op();
     } else {
         var oldTab = $('a.tab.activeTab');
         var oldScroll = $("#midColumn").scrollTop();
         if (openTab(tab)) {
             try {
-                op();
+                return op();
             } finally {
                 oldTab[0].click();
                 $("#midColumn").scrollTop(oldScroll);
