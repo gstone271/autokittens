@@ -888,14 +888,14 @@ recipeMap = arrayToObject(game.workshop.crafts.map(data => new Recipe(data)), "n
 loadUnicornRecipes = () => {
     if (!recipeMap["tears"] && game.bld.get("ziggurat").val) {
         var unicornRecipes = arrayToObject([
-    new UnicornRecipe("tears", game.religionTab.sacrificeBtn, 
-        () => game.bld.get("ziggurat").val, sacrificeMultiple),
-    new UnicornRecipe("timeCrystal", game.religionTab.sacrificeAlicornsBtn, 
-        () => 1 + game.getEffect("tcRefineRatio"), sacrificeMultiple),
-    new UnicornRecipe("sorrow", game.religionTab.refineBtn, 
-        () => 1, buyItemMultiple),
-    new UnicornRecipe("relic", game.religionTab.refineTCBtn,
-        () => 1 + game.getEffect("relicRefineRatio") * game.religion.getZU("blackPyramid").val, refineMultiple),
+            new UnicornRecipe("tears", game.religionTab.sacrificeBtn, 
+                () => game.bld.get("ziggurat").val, sacrificeMultiple),
+            new UnicornRecipe("timeCrystal", game.religionTab.sacrificeAlicornsBtn, 
+                () => 1 + game.getEffect("tcRefineRatio"), sacrificeMultiple),
+            new UnicornRecipe("sorrow", game.religionTab.refineBtn, 
+                () => 1, buyItemMultiple),
+            new UnicornRecipe("relic", game.religionTab.refineTCBtn,
+                () => 1 + game.getEffect("relicRefineRatio") * game.religion.getZU("blackPyramid").val, refineMultiple),
         ], "name");
         Object.assign(recipeMap, unicornRecipes);
     }
@@ -1038,15 +1038,22 @@ canCraft = resInternalName => {
     var recipe = recipeMap[resInternalName];
     return recipe && recipe.canCraft;
 }
+shouldDelayCrafting = res => recipeMap[res] && !recipeMap[res].shouldCraftAll;
 getAdditionalNeeded = (prices, reserved) => 
     prices
         .map(price => ({ name: price.name, val: (price.val + reserved.get(price.name).current - getResourceOwned(price.name))}))
         .filter(price => price.val > 0);
-craftAdditionalNeeded = (prices, reserved) =>
-    getAdditionalNeeded(prices, reserved)
-        .filter(price => canCraft(price.name))
+craftAdditionalNeeded = (prices, reserved) => {
+    var needed = getAdditionalNeeded(prices, reserved);
+    var tryCraft = prices => prices.filter(price => canCraft(price.name))
         .filter(price => price.val < Infinity)
         .forEach(price => makeCraft(price.name, price.val, reserved));
+    tryCraft(needed.filter(price => !shouldDelayCrafting(price.name)));
+    var nowNeeded = getAdditionalNeeded(prices, reserved);
+    if (nowNeeded.every(price => shouldDelayCrafting(price.name))) {
+        tryCraft(nowNeeded);
+    }
+}
 getCraftRatio = res => game.getResCraftRatio({ name: res }) + 1;
 makeCraft = (craft, amountNeeded, reserved) => {
     var recipe = recipeMap[craft];
