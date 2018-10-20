@@ -802,6 +802,7 @@ Recipe = class {
         //assumes that changes in game state are automatically reflected in data object
         //if this changes, we'll need to instead save the name and make the data a getter property
         this.data = data;
+        this.shouldCraftAll = data.prices.some(price => getResourceMax(price.name) < Infinity);
     }
     get name() {
         return this.data.name;
@@ -815,6 +816,7 @@ Recipe = class {
         return getResourceLongTitle(this.name);
     }
     get prices() {
+        //data.prices doesn't account for starchart discount on ships
         return game.workshop.getCraftPrice(this.data);
     }
     get canCraft() {
@@ -827,15 +829,72 @@ Recipe = class {
         return getCraftRatio(this.name);
     }
     craftAll() {
-        craftAll(this.name);
+        if (this.shouldCraftAll) {
+            craftAll(this.name);
+        }
     }
     craftMultiple(amount) {
         craftMultiple(this.data, amount);
     }
 }
-recipeMap = arrayToObject(game.workshop.crafts.map(data => new Recipe(data)), "name");
-//getCraft(craft).prices doesn't account for starchart discount on ships
-getCraftPrices = craft => { return game.workshop.getCraftPrice(game.workshop.getCraft(craft)) }
+UnicornRecipe = class extends Recipe {
+    constructor(name, button, getRatio, apiCraftMultiple) {
+        super({name, label: getResourceTitle(name), prices: button.model.prices});
+        this.button = button;
+        this.getRatio = getRatio;
+        this.apiCraftMultiple = apiCraftMultiple;
+    }
+    get longTitle() {
+        return this.button.model.name;
+    }
+    get prices() {
+        return this.data.prices;
+    }
+    get canCraft() {
+        return game.bld.get("ziggurat").val && game.science.get("theology").researched;
+    }
+    get craftRatio() {
+        return this.getRatio();
+    }
+    craftAll() {
+        //note: all 4 current unicorn recipes have shouldCraftAll==false
+        if (this.shouldCraftAll) {
+            this.craftMultiple(getAffordableAmount(this.prices))
+        }
+    }
+    craftMultiple(amount) {
+        if (amount > 0) {
+            if (state.api >= 1) {
+                this.apiCraftMultiple(this.button, amount)
+            } else {
+                withTab("Religion", () => {
+                    for (var i = 0; i < amount; i++) {
+                        buyButton(this.longTitle);
+                    }
+                });
+            }
+        }
+    }
+}
+buyItemMultiple = (button, amount) => {
+    for (var i = 0; i < amount; i++) {
+        button.controller.buyItem(button.model, null, () => {});
+    }
+}
+sacrificeMultiple = (button, amount) => button.controller.sacrifice(button.model, amount)
+refineMultiple = (button, amount) => button.controller._refine(button.model, amount)
+unicornRecipes = [
+    new UnicornRecipe("tears", game.religionTab.sacrificeBtn, 
+        () => game.bld.get("ziggurat").val, sacrificeMultiple),
+    new UnicornRecipe("timeCrystal", game.religionTab.sacrificeAlicornsBtn, 
+        () => 1 + game.getEffect("tcRefineRatio"), sacrificeMultiple),
+    new UnicornRecipe("sorrow", game.religionTab.refineBtn, 
+        () => 1, buyItemMultiple),
+    new UnicornRecipe("relic", game.religionTab.refineTCBtn,
+        () => 1 + game.getEffect("relicRefineRatio") * game.religion.getZU("blackPyramid").val, refineMultiple),
+]
+recipeMap = arrayToObject(game.workshop.crafts.map(data => new Recipe(data)).concat(unicornRecipes), "name");
+getCraftPrices = craft => { return recipeMap[craft].prices }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
 craftTableElem = $('.craftTable');
 getCraftTableElem = () => {
@@ -844,6 +903,7 @@ getCraftTableElem = () => {
     }
     return craftTableElem;
 }
+getAffordableAmount = prices => Math.min(...prices.map(price => Math.floor(getResourceOwned(price.name) / price.val)))
 findCraftAllButton = (name) => getCraftTableElem().children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("all")')[0]
 findCraftButtons = (name) => getCraftTableElem().children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("+")');
 craftFirstTime = name => {
@@ -879,7 +939,7 @@ findCraftButtonValues = (craft, craftRatio) => {
         return [{click: () => craftFirstTime(craft), times: 1, amount: craftRatio}]
     } else {
         var craftAllButton = findCraftAllButton(craft);
-        var craftAllTimes = Math.min(...getCraftPrices(craft).map(price => Math.floor(getResourceOwned(price.name) / price.val)));
+        var craftAllTimes = getAffordableAmount(getCraftPrices(craft));
         return craftButtonRatios.filter(ratio => craftAllTimes >= ratio.min).map((ratio, idx) => {
             var craftTimes = Math.max(ratio.min, Math.floor(craftAllTimes * ratio.ratio))
             var craftAmount = craftTimes * craftRatio
@@ -1658,7 +1718,7 @@ Religion.prototype.buy = function() {
             //note how much faith we had before buying an upgrade
             logFaith();
         } else {
-            var prices = this.getRealPrices();
+            /* var prices = this.getRealPrices();
             var maxClicks = 25;
             var tearsNeeded = prices.filter(price => price.name === "tears").map(price => price.val - getResourceOwned("tears"))[0] || 0;
             if (state.api >= 1) {
@@ -1667,7 +1727,7 @@ Religion.prototype.buy = function() {
                     if (state.disableTimeskip) {
                         //we need the button to be activated, but shouldn't use the API to speed up time
                         game.render();
-                }
+                    }
                 }
             } else {
                 while (maxClicks > 0 && tearsNeeded > 0) {
@@ -1676,7 +1736,7 @@ Religion.prototype.buy = function() {
                     tearsNeeded -= game.bld.get("ziggurat").val;
                     //we will probably need to wait 1 tick after making tears
                 }
-            }
+            }*/
         }
         bought = buyButton(this.name);
     });
@@ -1696,7 +1756,7 @@ Religion.prototype.getRealPrices = function() {
     return multiplyPrices(data.prices, this.priceMultiplier * Math.pow(data.priceRatio, data.val));
 }
 Religion.prototype.getPrices = function() { 
-    return this.getRealPrices().map(priceTearsToUnicorns);
+    return this.getRealPrices();//.map(priceTearsToUnicorns);
 }
 Religion.prototype.isEnabled = function() { 
     var data = this.getData();
