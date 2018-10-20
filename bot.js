@@ -1379,6 +1379,8 @@ var priorityBuilds = [
     "calciner",
     "accelerator"
 ]
+//too valuable to be spent by a naive master plan
+var specialResources = ["relic", "timeCrystal", "void"]
 var isUseful = bld => {
     var specialCases = {
         mineralHoes: () => getJobCounts().find(job => job.name === "farmer").val,
@@ -1396,7 +1398,7 @@ var isUseful = bld => {
         workshop: () => game.science.get("writing").researched,
     }
     if (specialCases[bld.name]) return specialCases[bld.name]();
-    return !uselessBuilds.includes(bld.name) && !dangerousBuilds.includes(bld.name);
+    return !uselessBuilds.includes(bld.name) && !dangerousBuilds.includes(bld.name) && !bld.prices.some(price => specialResources.includes(price.name));
 }
 //luckily we're only concerned with the first copy of a building, so we don't need to worry about price ratios
 var notTooExpensive = bld => priorityBuilds.includes(bld.name) || getMaxProductionTicksNeeded(bld.prices) <= maxProductionCostToEnable;
