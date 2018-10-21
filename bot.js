@@ -2464,7 +2464,7 @@ displayStarchartPayoffs = () => {
         var button = findButton(name);
         if (button.length) {
             var panel = getPanelTitle(button);
-            var bld = new Science(name, "Space", panel);
+            var bld = new Space(name, "Space", panel);
             var starchartPrice = getPrice(bld.getPrices(), "starchart")
             var starchartProduction = bld.getData().effects.starchartPerTickBaseSpace * getResourceProductionRatio("starchart");
             var starchartPayoff = starchartPrice / starchartProduction;
@@ -2482,7 +2482,7 @@ displayUnobtainiumPayoffs = () => {
         var button = findButton(name);
         if (button.length) {
             var panel = getPanelTitle(button);
-            var bld = new Science(name, "Space", panel);
+            var bld = new Space(name, "Space", panel);
             var unobtainiumPrice = getPrice(bld.getPrices(), "unobtainium") + getIngredientsNeeded({name: "eludium", val: getPrice(bld.getPrices(), "eludium")})[0].val
             var spaceProductionBonus = bld.getData().effects.spaceRatio;
             //spaceRatio calculation from calcResourcePerTick
