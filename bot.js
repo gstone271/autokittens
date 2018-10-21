@@ -1710,6 +1710,8 @@ Ziggurats = DataListQueueable(game.religion.zigguratUpgrades);
 
 Cryptotheology = DataListQueueable(game.religion.transcendenceUpgrades);
 
+Chronoforge = DataListQueueable(game.time.chronoforgeUpgrades);
+
 Trade = class extends DataListQueueable(game.diplomacy.races, "Merchant") {
     constructor(name, tab, panel, maxPriority, masterPlan) {
         //overwrite name with panel
@@ -1923,6 +1925,7 @@ enable = (name, tab, panel, maxPriority, masterPlan) => {
     else if (panel === "Order of the Sun") type = OrderOfTheSun;
     else if (panel === "Ziggurats") type = Ziggurats;
     else if (panel === "Cryptotheology") type = Cryptotheology;
+    else if (panel === "Chronoforge") type = Chronoforge;
     else console.error(tab + " tab not supported yet!");
     var created = new type(name, tab, panel, maxPriority, masterPlan);
     state.queue.push(created);
@@ -2073,8 +2076,7 @@ game.tick = () => {
  * Interface
 **************/
 ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit",
-    "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Buy bcoin", "Sell bcoin",
-    "Temporal Battery", "Chrono Furnace", "Temporal Accelerator", "Time Impedance", "Resource Retrieva"
+    "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Buy bcoin", "Sell bcoin"
 ]
 //we could add support for void space and chronoforge, but meh
 ignoredPanels = ["Metaphysics", "Challenges", "Void Space"]
