@@ -888,6 +888,8 @@ refineMultiple = (button, amount) => button.controller._refine(button.model, amo
 recipeMap = arrayToObject(game.workshop.crafts.map(data => new Recipe(data)), "name");
 loadUnicornRecipes = () => {
     if (!recipeMap["tears"] && game.bld.get("ziggurat").val) {
+        withTab("Religion", () => {
+            //need to open the religion tab once for the game to load these buttons
         var unicornRecipes = arrayToObject([
             new UnicornRecipe("tears", game.religionTab.sacrificeBtn, 
                 () => game.bld.get("ziggurat").val, sacrificeMultiple),
@@ -899,9 +901,9 @@ loadUnicornRecipes = () => {
                 () => 1 + game.getEffect("relicRefineRatio") * game.religion.getZU("blackPyramid").val, refineMultiple),
         ], "name");
         Object.assign(recipeMap, unicornRecipes);
+        });
     }
 }
-loadUnicornRecipes();
 getCraftPrices = craft => { return recipeMap[craft].prices }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
 craftTableElem = $('.craftTable');
@@ -2523,6 +2525,7 @@ updateUi = () => {
 /************** 
  * Initialize
 **************/
+loadUnicornRecipes();
 if (window.state) {
     loadDefaults();
     //if we've updated class behavior, get the new behavior
