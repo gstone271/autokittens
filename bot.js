@@ -1580,7 +1580,7 @@ Queueable = class {
         this.masterPlan = masterPlan;
     }
     buy(reserved) {
-        var bought = withLeader(this.buyingLeader, tabBuyButton(this.tab, this.name));
+        var bought = withLeader(this.buyingLeader, () => tabBuyButton(this.tab, this.name));
         if (bought) {
             state.populationIncrease += housingMap[this.name] || 0;
             if (!this.noLog && this.getPrices().some(price => price.name === "gold")) {
