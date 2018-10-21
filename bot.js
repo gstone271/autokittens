@@ -1788,59 +1788,68 @@ Trade = class extends DataListQueueable(game.diplomacy.races, "Merchant") {
     }
 };
 
-function PraiseSun(name, tab, panel) {
-    this.name = name;
-    this.tab = tab;
-    this.panel = panel;
-    this.buy = () => {
+PraiseSun = class extends Queueable {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+        this.silent = true;
+        this.noLog = true;
+    }
+    buy() {
         if (state.api >= 1) {
             game.religion.praise();
         } else {
             $('#fastPraiseContainer > a')[0].click();
         }
     }
-    this.getPrices = () => ([{ name: "faith", val: Math.min(getResourceOwned("faith"), .9 * getResourceMax("faith")) }]);
-    this.isEnabled = () => true;
-    this.silent = true;
-    this.noLog = true;
+    getPrices() {
+        return [{ name: "faith", val: Math.min(getResourceOwned("faith"), .9 * getResourceMax("faith")) }];
+    }
 }
-function Transcend(name, tab, panel) {
-    this.name = name;
-    this.tab = tab;
-    this.panel = panel;
-    this.buy = () => withTab("Religion", () => { 
-        var faithResetOnly = this.name !== "Transcend";
-        var realConfirm = window.confirm;
-        try {
-            window.confirm = () => true;
-            if (!faithResetOnly) findButton(this.name).click();
-            $('a:contains("[Faith Reset]")')[0].click();
-            $('#fastPraiseContainer > a').click();
-        } finally {
-            window.confirm = realConfirm;
-        }
-    }),
-    this.getPrices = () => ([{ name: "faith", val: .95 * getResourceMax("faith") }]);
-    this.isEnabled = () => true;
-    this.once = true;
+Transcend = class extends Queueable {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+        this.once = true;
+    }
+    buy() {
+        withTab("Religion", () => { 
+            var faithResetOnly = this.name !== "Transcend";
+            var realConfirm = window.confirm;
+            try {
+                window.confirm = () => true;
+                if (!faithResetOnly) findButton(this.name).click();
+                $('a:contains("[Faith Reset]")')[0].click();
+                $('#fastPraiseContainer > a').click();
+            } finally {
+                window.confirm = realConfirm;
+            }
+        });
+    }
+    getPrices() {
+        return [{ name: "faith", val: .95 * getResourceMax("faith") }];
+    }
 }
-function HoldFestival(name, tab, panel) {
-    this.name = name;
-    this.tab = tab;
-    this.panel = panel;
-    this.buy = () => tabBuyButton(this.tab, this.name);
-    this.getPrices = () => ([{ name: "manpower", val: 1500 }, { name: "culture", val: 5000 }, { name: "parchment", val: 2500 }]);
-    this.isEnabled = () => game.calendar.festivalDays === 0;
-    this.quiet = true;
+HoldFestival = class extends Queueable {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+        this.quiet = true;
+        this.noLog = true;
+    }
+    getPrices() {
+        return [{ name: "manpower", val: 1500 }, { name: "culture", val: 5000 }, { name: "parchment", val: 2500 }];
+    }
+    isEnabled() {
+        return game.calendar.festivalDays === 0;
+    }
 }
-function SendExplorers(name, tab, panel) {
-    this.name = name;
-    this.tab = tab;
-    this.panel = panel;
-    this.buy = () => tabBuyButton(this.tab, this.name);
-    this.getPrices = () => ([{ name: "manpower", val: 1000 }]);
-    this.isEnabled = () => true; //TODO detect when new races are available
-    this.once = true;
+SendExplorers = class extends Queueable {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+        this.once = true;
+    }
+    getPrices() {
+        return [{ name: "manpower", val: 1000 }];
+    }
+    //TODO detect when new races are available
 }
 
 /************** 
