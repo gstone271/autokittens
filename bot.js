@@ -1851,6 +1851,16 @@ SendExplorers = class extends Queueable {
     }
     //TODO detect when new races are available
 }
+FeedElders = class extends Queueable {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+        this.once = true;
+    }
+    getPrices() {
+        return [{ name: "necrocorn", val: 1 }];
+    }
+    //TODO detect when new races are available
+}
 
 /************** 
  * Queue Management
@@ -2052,7 +2062,7 @@ game.tick = () => {
 /************** 
  * Interface
 **************/
-ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit", "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Feed elders", "Buy bcoin", "Sell bcoin"]
+ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit", "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Buy bcoin", "Sell bcoin"]
 //we could add support for void space and chronoforge, but meh
 ignoredPanels = ["Metaphysics", "Cryptotheology", "Challenges", "Void Space", "Chronoforge"]
 stateButtons = {
@@ -2067,6 +2077,7 @@ specialBuys = {
     //allow refine catnip from Bonfire
     "Refine Catnip": Craft,
     "Send explorers": SendExplorers,
+    "Feed elders": FeedElders,
 }
 getManagedItem = manageButton => trimButtonText($(manageButton).parent().find("span").first().text());
 getPanelTitle = elem => getOwnText($(elem).parents('.panelContainer').children('.title')).trim();
