@@ -890,17 +890,17 @@ loadUnicornRecipes = () => {
     if (!recipeMap["tears"] && game.bld.get("ziggurat").val) {
         withTab("Religion", () => {
             //need to open the religion tab once for the game to load these buttons
-        var unicornRecipes = arrayToObject([
-            new UnicornRecipe("tears", game.religionTab.sacrificeBtn, 
-                () => game.bld.get("ziggurat").val, sacrificeMultiple),
-            new UnicornRecipe("timeCrystal", game.religionTab.sacrificeAlicornsBtn, 
-                () => 1 + game.getEffect("tcRefineRatio"), sacrificeMultiple),
-            new UnicornRecipe("sorrow", game.religionTab.refineBtn, 
-                () => 1, buyItemMultiple),
-            new UnicornRecipe("relic", game.religionTab.refineTCBtn,
-                () => 1 + game.getEffect("relicRefineRatio") * game.religion.getZU("blackPyramid").val, refineMultiple),
-        ], "name");
-        Object.assign(recipeMap, unicornRecipes);
+            var unicornRecipes = arrayToObject([
+                new UnicornRecipe("tears", game.religionTab.sacrificeBtn, 
+                    () => game.bld.get("ziggurat").val, sacrificeMultiple),
+                new UnicornRecipe("timeCrystal", game.religionTab.sacrificeAlicornsBtn, 
+                    () => 1 + game.getEffect("tcRefineRatio"), sacrificeMultiple),
+                new UnicornRecipe("sorrow", game.religionTab.refineBtn, 
+                    () => 1, buyItemMultiple),
+                new UnicornRecipe("relic", game.religionTab.refineTCBtn,
+                    () => 1 + game.getEffect("relicRefineRatio") * game.religion.getZU("blackPyramid").val, refineMultiple),
+            ], "name");
+            Object.assign(recipeMap, unicornRecipes);
         });
     }
 }
@@ -1422,6 +1422,12 @@ var notTooExpensive = bld => priorityBuilds.includes(bld.name) || getMaxProducti
 //todo base this on the max production cost of the cheapest queued building sharing a resource price with it?
 var maxProductionCostToEnable = game.rate * 60 * 15; //15 minutes
 //TODO only add each thing once (if human intervenes)
+scienceData = {
+    Bonfire: game.bld.buildingsData,
+    Science: Object.values(game.science.metaCache),
+    Workshop: game.workshop.upgrades,
+    Space: Object.values(game.space.metaCache),
+}
 var queueNewTechs = () => {
     ["Workshop", "Science"].forEach(tab => {
         getUnresearched(scienceData[tab]).filter(isUseful).filter(notTooExpensive).forEach(bld => {
@@ -1485,7 +1491,8 @@ Queueable = class {
         return bought;
     }
     get buyingLeader() {
-        return null;
+        //todo account for leader (scientist, philosopher) effects on prices
+        return undefined;
     }
     getPrices() {
         throw new Error("Needs to be overridden");
@@ -1509,7 +1516,7 @@ DataQueable = class extends Queueable {
         throw new Error("Needs to be overridden");
     }
     getPrices() {
-        return this.data.prices;
+        return multiplyPrices(this.data.prices, Math.pow(this.data.priceRatio || 1, this.data.val || 0));
     }
     isUnlocked() {
         return this.data.unlocked && !this.data.researched;
@@ -1520,12 +1527,15 @@ DataQueable = class extends Queueable {
             && (!["Barn", "Warehouse", "Harbour"].includes(this.name) || isStorageLimited(state.smartStorage));
     }
 }
-DataListQueueable = dataList => class extends DataQueable {
+DataListQueueable = (dataList, leader) => class extends DataQueable {
     constructor(name, tab, panel, maxPriority, masterPlan) {
         super(name, tab, panel, maxPriority, masterPlan);
     }
     getData() {
         return dataList.find(data => data.label === this.name || data.stages && data.stages.some(stage => stage.label === this.name));
+    }
+    get buyingLeader() {
+        return leader;
     }
 }
 
@@ -1562,6 +1572,66 @@ Craft = class extends Queueable {
     }
 }
 
+Science = DataListQueueable(Object.values(game.science.metaCache), "Scientist")
+
+WorkshopUpgrade = DataListQueueable(game.workshop.upgrades, "Scientist");
+
+Space = class extends DataListQueueable(Object.values(game.space.metaCache)) {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+    }
+    getPrices() { 
+        return classes.ui.space.PlanetBuildingBtnController.prototype.getPrices.call(game.space, {metadata: this.data});
+    }
+}
+
+religionData = {
+    "Order of the Sun": game.religion.religionUpgrades,
+    "Ziggurats": game.religion.zigguratUpgrades,
+}   
+function Religion(name, tab, panel) {
+    this.name = name;
+    this.tab = tab;
+    this.panel = panel;
+    this.once = this.getData().noStackable;
+    this.priceMultiplier = panel === "Order of the Sun" ? 0.9 : 1;
+}
+Religion.prototype.getData = function() {
+    return religionData[this.panel].filter(upgrade => upgrade.label === this.name)[0];
+}
+Religion.prototype.buy = function() {
+    var bought;
+    var doBuy = () => withTab("Religion", () => {
+        if (this.panel === "Order of the Sun") {
+            //note how much faith we had before buying an upgrade
+            logFaith();
+        }
+        bought = buyButton(this.name);
+    });
+    if (this.panel === "Order of the Sun") {
+        withLeader("Philosopher", doBuy);
+    } else {
+        doBuy();
+    }
+    if (this.getPrices().some(price => price.name === "gold")) {
+        //log how many trades before buying a gold-cost building, so that in master plan mode, we can plan to buy at least that many trades first
+        logTrades();
+    }
+    return bought;
+}
+Religion.prototype.getRealPrices = function() { 
+    var data = this.getData();
+    return multiplyPrices(data.prices, this.priceMultiplier * Math.pow(data.priceRatio, data.val));
+}
+Religion.prototype.getPrices = function() { 
+    return this.getRealPrices();
+}
+Religion.prototype.isEnabled = function() { 
+    var data = this.getData();
+    var enoughFaith = this.panel !== "Order of the Sun" || game.religion.faith >= data.faith;
+    return enoughFaith && (data.val === 0 || !data.noStackable);
+}
+
 tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains("Send caravan")').click()
 getTradeButtons = race => $('div.panelContainer:contains("' + race + '") div.btnContent').children(":visible")
 getTradeData = race => game.diplomacy.get(race.toLowerCase());
@@ -1587,6 +1657,20 @@ getTradeValue = (race, bestCase) => {
     }))
 }
 seasonNames = ["spring", "summer", "autumn", "winter"];
+makeRoomForTrades = (race) => {
+    //TODO for sharks, also craft away the beams
+    var loopsToNextTrade = Math.max(1, state.autoCraftLevel);
+    var tradesToMake = Math.ceil((getResourceOwned("gold") - getSafeStorage("gold", loopsToNextTrade)) / 15)
+    var storageNeeded = multiplyPrices(getTradeValue(race, true), tradesToMake);
+    storageNeeded.forEach(price => {
+        var craft = game.workshop.crafts.find(craft => craft.prices.some(craftPrice => craftPrice.name === price.name));
+        if (craft && canCraft(craft.name)) {
+            var excess = getResourceOwned(price.name) + price.val - getSafeStorage(price.name)
+            var timesToCraft = Math.max(0, Math.ceil(excess / craft.prices.find(craftPrice => craftPrice.name === price.name).val))
+            craftMultiple(craft, timesToCraft);
+        }
+    })
+}
 function Trade(name, tab, panel) {
     this.name = panel;
     this.tab = tab;
@@ -1599,18 +1683,7 @@ Trade.prototype.buy = function(reserved) {
     var quantityTraded = 0;
     if (state.api >= 1 || state.tradeTimer >= tradeTimerDuration || getResourceOwned("manpower") * 1.2 > getResourceMax("manpower") || this.overrideNeeds()) {
         if (this.overrideNeeds()) {
-            //TODO for sharks, also craft away the beams
-            var loopsToNextTrade = Math.max(1, state.autoCraftLevel);
-            var tradesToMake = Math.ceil((getResourceOwned("gold") - getSafeStorage("gold", loopsToNextTrade)) / 15)
-            var storageNeeded = multiplyPrices(getTradeValue(this.panel, true), tradesToMake);
-            storageNeeded.forEach(price => {
-                var craft = game.workshop.crafts.find(craft => craft.prices.some(craftPrice => craftPrice.name === price.name));
-                if (craft && canCraft(craft.name)) {
-                    var excess = getResourceOwned(price.name) + price.val - getSafeStorage(price.name)
-                    var timesToCraft = Math.max(0, Math.ceil(excess / craft.prices.find(craftPrice => craftPrice.name === price.name).val))
-                    craftMultiple(craft, timesToCraft);
-                }
-            })
+            makeRoomForTrades(this.panel);
         }
         withLeader("Merchant", () => {
             var prices = this.getPrices();
@@ -1728,85 +1801,6 @@ clearTradeLogs = (expectedTradeMessages) => {
     return tradeMessages;
 }
 
-scienceData = {
-    Bonfire: game.bld.buildingsData,
-    Science: Object.values(game.science.metaCache),
-    Workshop: game.workshop.upgrades,
-    Space: Object.values(game.space.metaCache),
-}
-function Science(name, tab, panel) {
-    this.name = name;
-    this.tab = tab;
-    this.panel = panel;
-    this.once = tab !== "Space" || this.getData().noStackable;
-}
-Science.prototype.buy = function() {
-    var bought;
-    withLeader("Scientist", () => bought = tabBuyButton(this.tab, this.name));
-    if (bought) {
-        state.populationIncrease += housingMap[this.name] || 0;
-    }
-    return bought;
-} //don't actually need scientist for Space
-Science.prototype.getData = function() { return scienceData[this.tab].filter(data => data.label === this.name)[0]; }
-Science.prototype.getPrices = function() { 
-    var data = this.getData(); 
-    var prices = this.tab === "Space" ? classes.ui.space.PlanetBuildingBtnController.prototype.getPrices.call(game.space, {metadata: data}) : data.prices;
-    return prices; 
-}
-Science.prototype.isEnabled = function() { var data = this.getData(); return data.unlocked && !data.researched; }
-Science.prototype.isUnlocked = Science.prototype.isEnabled
-
-religionData = {
-    "Order of the Sun": game.religion.religionUpgrades,
-    "Ziggurats": game.religion.zigguratUpgrades,
-}
-//TODO just add this to crafting for more accuracy
-getUnicornsNeeded = tears => 2500 * Math.ceil((tears) / game.bld.get("ziggurat").val);
-priceTearsToUnicorns = price => (price.name === "tears" ? { name: "unicorns", val: getUnicornsNeeded(price.val) } : price)
-function Religion(name, tab, panel) {
-    this.name = name;
-    this.tab = tab;
-    this.panel = panel;
-    this.once = this.getData().noStackable;
-    this.priceMultiplier = panel === "Order of the Sun" ? 0.9 : 1;
-}
-Religion.prototype.getData = function() {
-    return religionData[this.panel].filter(upgrade => upgrade.label === this.name)[0];
-}
-Religion.prototype.buy = function() {
-    var bought;
-    var doBuy = () => withTab("Religion", () => {
-        if (this.panel === "Order of the Sun") {
-            //note how much faith we had before buying an upgrade
-            logFaith();
-        }
-        bought = buyButton(this.name);
-    });
-    if (this.panel === "Order of the Sun") {
-        withLeader("Philosopher", doBuy);
-    } else {
-        doBuy();
-    }
-    if (this.getPrices().some(price => price.name === "gold")) {
-        //log how many trades before buying a gold-cost building, so that in master plan mode, we can plan to buy at least that many trades first
-        logTrades();
-    }
-    return bought;
-}
-Religion.prototype.getRealPrices = function() { 
-    var data = this.getData();
-    return multiplyPrices(data.prices, this.priceMultiplier * Math.pow(data.priceRatio, data.val));
-}
-Religion.prototype.getPrices = function() { 
-    return this.getRealPrices();//.map(priceTearsToUnicorns);
-}
-Religion.prototype.isEnabled = function() { 
-    var data = this.getData();
-    var enoughFaith = this.panel !== "Order of the Sun" || game.religion.faith >= data.faith;
-    return enoughFaith && (data.val === 0 || !data.noStackable);
-}
-
 function PraiseSun(name, tab, panel) {
     this.name = name;
     this.tab = tab;
@@ -1905,7 +1899,9 @@ enable = (name, tab, panel, maxPriority, masterPlan) => {
     if (specialBuys[name]) type = specialBuys[name];
     else if (tab === "Bonfire") type = Building;
     else if (panel === "Crafting") type = Craft;
-    else if (scienceData[tab]) type = Science;
+    else if (tab === "Science") type = Science;
+    else if (tab === "Workshop") type = WorkshopUpgrade;
+    else if (tab === "Space") type = Space;
     else if (tab === "Trade") type = Trade;
     else if (religionData[panel]) type = Religion;
     else console.error(tab + " tab not supported yet!");
