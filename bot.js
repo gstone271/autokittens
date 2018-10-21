@@ -1708,6 +1708,8 @@ OrderOfTheSun = class extends DataListQueueable(game.religion.religionUpgrades, 
 
 Ziggurats = DataListQueueable(game.religion.zigguratUpgrades);
 
+Cryptotheology = DataListQueueable(game.religion.transcendenceUpgrades);
+
 Trade = class extends DataListQueueable(game.diplomacy.races, "Merchant") {
     constructor(name, tab, panel, maxPriority, masterPlan) {
         //overwrite name with panel
@@ -1911,6 +1913,7 @@ enable = (name, tab, panel, maxPriority, masterPlan) => {
     else if (tab === "Trade") type = Trade;
     else if (panel === "Order of the Sun") type = OrderOfTheSun;
     else if (panel === "Ziggurats") type = Ziggurats;
+    else if (panel === "Cryptotheology") type = Cryptotheology;
     else console.error(tab + " tab not supported yet!");
     var created = new type(name, tab, panel);
     if (maxPriority) created.maxPriority = true;
@@ -2064,7 +2067,7 @@ game.tick = () => {
 **************/
 ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit", "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Buy bcoin", "Sell bcoin"]
 //we could add support for void space and chronoforge, but meh
-ignoredPanels = ["Metaphysics", "Cryptotheology", "Challenges", "Void Space", "Chronoforge"]
+ignoredPanels = ["Metaphysics", "Challenges", "Void Space", "Chronoforge"]
 stateButtons = {
     "Send hunters": "autoHunt",
     "Steel": "autoSteel",
