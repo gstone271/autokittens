@@ -1348,6 +1348,106 @@ withLeader = (leaderType, op) => {
     }
 }
 
+
+/************** 
+ * Trading
+**************/
+var tradeTimerDuration = 10;
+tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains("Send caravan")').click()
+getTradeButtons = race => $('div.panelContainer:contains("' + race + '") div.btnContent').children(":visible")
+getTradeData = race => game.diplomacy.get(race.toLowerCase());
+getTradeValue = (race, bestCase) => {
+    var tradeData = getTradeData(race);
+    var standingRatio = bestCase ? 200 : game.getEffect("standingRatio") + (game.prestige.getPerk("diplomacy").researched ? 10 : 0);
+    var attitudeMultiplier = {
+        hostile: Math.min(1, tradeData.standing + standingRatio / 100),
+        neutral: 1,
+        friendly: 1 + .25 * Math.min(1, tradeData.standing + standingRatio / 200)
+    }[tradeData.attitude]
+    var ships = game.resPool.get("ship").value;
+    var energyRatio = tradeData.name === "leviathans" ? 1 + 0.02 * tradeData.energy : 1;
+    return tradeData.sells.map(sell => ({
+        name: sell.name, 
+        val: (sell.name === "titanium" ? 1.5 * (1 + ships / 50) : sell.value)
+            * (1 + game.diplomacy.getTradeRatio())
+            * (bestCase ? (1 + sell.delta/2) : 1)
+            * attitudeMultiplier
+            * energyRatio
+            * bestCase ? 1 : (sell.name === "titanium" ? Math.min(1, .15 + ships * .0035) : sell.chance / 100)
+            * sell.seasons[seasonNames[game.calendar.season]]
+    }))
+}
+seasonNames = ["spring", "summer", "autumn", "winter"];
+makeRoomForTrades = (race) => {
+    //TODO for sharks, also craft away the beams
+    var loopsToNextTrade = Math.max(1, state.autoCraftLevel);
+    var tradesToMake = Math.ceil((getResourceOwned("gold") - getSafeStorage("gold", loopsToNextTrade)) / 15)
+    var storageNeeded = multiplyPrices(getTradeValue(race, true), tradesToMake);
+    storageNeeded.forEach(price => {
+        var craft = game.workshop.crafts.find(craft => craft.prices.some(craftPrice => craftPrice.name === price.name));
+        if (craft && canCraft(craft.name)) {
+            var excess = getResourceOwned(price.name) + price.val - getSafeStorage(price.name)
+            var timesToCraft = Math.max(0, Math.ceil(excess / craft.prices.find(craftPrice => craftPrice.name === price.name).val))
+            craftMultiple(craft, timesToCraft);
+        }
+    })
+}
+gainTradeResources = yieldResTotal => Object.fromEntries(Object.entries(yieldResTotal).map(entry => [entry[0], game.resPool.addResEvent(...entry)]))
+updateTradeMessages = (yieldResTotal, quantityTraded) => {
+    var tradeSeason = game.calendar.year + game.calendar.season / 4;
+    if (tradeSeason !== state.lastTradeSeason) {
+        //make new logs each season
+        state.tradeResourceTotal = {};
+        state.tradeMessages = 0;
+        state.lastTradeSeason = tradeSeason;
+        state.lastTradeQuantity = 0;
+    }
+    var actualTradeMessages = clearTradeLogs(state.tradeMessages);
+    if (actualTradeMessages !== state.tradeMessages || state.tradeSeason) {
+        //did not successfully clear logs; something else appeared
+        state.tradeResourceTotal = {};
+        state.lastTradeQuantity = 0;
+    }
+    Object.entries(yieldResTotal).forEach(entry => state.tradeResourceTotal[entry[0]] = (state.tradeResourceTotal[entry[0]] || 0) + entry[1])
+    state.lastTradeQuantity += quantityTraded;
+    state.tradeMessages = msgTrades(state.tradeResourceTotal, state.lastTradeQuantity);
+}
+//from diplomacy.gainTradeRes
+msgTrades = (yieldResTotal, amtTrade) => {
+    //add this return value
+    var totalMessages = 1;
+    for (var res in yieldResTotal){
+        //just need to rip this one line out
+        //var amt = this.game.resPool.addResEvent(res, yieldResTotal[res]);
+        var amt = yieldResTotal[res];
+        if (amt > 0){
+            if (res == "blueprint"){
+                game.msg($I("trade.msg.resources", [game.getDisplayValueExt(amt), res]) + "!", "notice", "trade", true);
+            } else if (res == "titanium"){
+                game.msg($I("trade.msg.resources", [game.getDisplayValueExt(amt), res]) + "!", "notice", "trade", true);
+            } else {
+                var resPool = game.resPool.get(res);
+                var name = resPool.title || res;
+                game.msg($I("trade.msg.resources", [game.getDisplayValueExt(amt), name]), null, "trade", true);
+            }
+            totalMessages++;
+        }
+    }
+    game.msg($I("trade.msg.trade.caravan", [amtTrade]), null, "trade");
+    return totalMessages;
+}
+clearTradeLogs = (expectedTradeMessages) => {
+    var tradeMessages = 0;
+    for (var i = game.console.messages.length - 2; i >= 0; i--) {
+        if (game.console.messages[i].tag === "trade") tradeMessages++; else break;
+    }
+    if (tradeMessages === expectedTradeMessages || expectedTradeMessages === undefined) {
+        game.console.messages.splice(game.console.messages.length - 1 - tradeMessages, tradeMessages);
+        game.ui.renderConsoleLog();
+    }
+    return tradeMessages;
+}
+
 /************** 
  * Master Plan
 **************/
@@ -1479,7 +1579,7 @@ Queueable = class {
         this.maxPriority = maxPriority;
         this.masterPlan = masterPlan;
     }
-    buy() {
+    buy(reserved) {
         var bought = withLeader(this.buyingLeader, tabBuyButton(this.tab, this.name));
         if (bought) {
             state.populationIncrease += housingMap[this.name] || 0;
@@ -1539,7 +1639,9 @@ DataListQueueable = (dataList, leader) => class extends DataQueable {
         super(name, tab, panel, maxPriority, masterPlan);
     }
     getData() {
-        return dataList.find(data => data.label === this.name || data.stages && data.stages.some(stage => stage.label === this.name));
+        return dataList.find(data => data.label === this.name
+            || data.title === this.name
+            || data.stages && data.stages.some(stage => stage.label === this.name));
     }
     get buyingLeader() {
         return leader;
@@ -1606,174 +1708,85 @@ OrderOfTheSun = class extends DataListQueueable(game.religion.religionUpgrades, 
 
 Ziggurats = DataListQueueable(game.religion.zigguratUpgrades);
 
-tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains("Send caravan")').click()
-getTradeButtons = race => $('div.panelContainer:contains("' + race + '") div.btnContent').children(":visible")
-getTradeData = race => game.diplomacy.get(race.toLowerCase());
-getTradeValue = (race, bestCase) => {
-    var tradeData = getTradeData(race);
-    var standingRatio = bestCase ? 200 : game.getEffect("standingRatio") + (game.prestige.getPerk("diplomacy").researched ? 10 : 0);
-    var attitudeMultiplier = {
-        hostile: Math.min(1, tradeData.standing + standingRatio / 100),
-        neutral: 1,
-        friendly: 1 + .25 * Math.min(1, tradeData.standing + standingRatio / 200)
-    }[tradeData.attitude]
-    var ships = game.resPool.get("ship").value;
-    var energyRatio = tradeData.name === "leviathans" ? 1 + 0.02 * tradeData.energy : 1;
-    return tradeData.sells.map(sell => ({
-        name: sell.name, 
-        val: (sell.name === "titanium" ? 1.5 * (1 + ships / 50) : sell.value)
-            * (1 + game.diplomacy.getTradeRatio())
-            * (bestCase ? (1 + sell.delta/2) : 1)
-            * attitudeMultiplier
-            * energyRatio
-            * bestCase ? 1 : (sell.name === "titanium" ? Math.min(1, .15 + ships * .0035) : sell.chance / 100)
-            * sell.seasons[seasonNames[game.calendar.season]]
-    }))
-}
-seasonNames = ["spring", "summer", "autumn", "winter"];
-makeRoomForTrades = (race) => {
-    //TODO for sharks, also craft away the beams
-    var loopsToNextTrade = Math.max(1, state.autoCraftLevel);
-    var tradesToMake = Math.ceil((getResourceOwned("gold") - getSafeStorage("gold", loopsToNextTrade)) / 15)
-    var storageNeeded = multiplyPrices(getTradeValue(race, true), tradesToMake);
-    storageNeeded.forEach(price => {
-        var craft = game.workshop.crafts.find(craft => craft.prices.some(craftPrice => craftPrice.name === price.name));
-        if (craft && canCraft(craft.name)) {
-            var excess = getResourceOwned(price.name) + price.val - getSafeStorage(price.name)
-            var timesToCraft = Math.max(0, Math.ceil(excess / craft.prices.find(craftPrice => craftPrice.name === price.name).val))
-            craftMultiple(craft, timesToCraft);
-        }
-    })
-}
-function Trade(name, tab, panel) {
-    this.name = panel;
-    this.tab = tab;
-    this.panel = panel;
-    this.quiet = true;
-    this.noLog = true;
-}
-var tradeTimerDuration = 10;
-Trade.prototype.buy = function(reserved) {
-    var quantityTraded = 0;
-    if (state.api >= 1 || state.tradeTimer >= tradeTimerDuration || getResourceOwned("manpower") * 1.2 > getResourceMax("manpower") || this.overrideNeeds()) {
-        if (this.overrideNeeds()) {
-            makeRoomForTrades(this.panel);
-        }
-        withLeader("Merchant", () => {
-            var prices = this.getPrices();
-            if (state.api >= 1) {
-                var yieldResTotal = null;
-                while (canAfford(prices, reserved) && this.needProduct(1, yieldResTotal) && quantityTraded < 1000) {
-                    prices.forEach(price => game.resPool.addResEvent(price.name, -price.val));
-                    yieldResTotal = game.diplomacy.tradeInternal(game.diplomacy.races.find(race => race.title === this.panel), true, yieldResTotal);
-                    quantityTraded++;
-                }
-                if (yieldResTotal) {
-                    yieldResTotal = gainTradeResources(yieldResTotal);
-                    var tradeSeason = game.calendar.year + game.calendar.season / 4;
-                    if (tradeSeason !== state.lastTradeSeason) {
-                        //make new logs each season
-                        state.tradeResourceTotal = {};
-                        state.tradeMessages = 0;
-                        state.lastTradeSeason = tradeSeason;
-                        state.lastTradeQuantity = 0;
-                    }
-                    var actualTradeMessages = clearTradeLogs(state.tradeMessages);
-                    if (actualTradeMessages !== state.tradeMessages || state.tradeSeason) {
-                        //did not successfully clear logs; something else appeared
-                        state.tradeResourceTotal = {};
-                        state.lastTradeQuantity = 0;
-                    }
-                    Object.entries(yieldResTotal).forEach(entry => state.tradeResourceTotal[entry[0]] = (state.tradeResourceTotal[entry[0]] || 0) + entry[1])
-                    state.lastTradeQuantity += quantityTraded;
-                    state.tradeMessages = msgTrades(state.tradeResourceTotal, state.lastTradeQuantity);
-                }
-            } else {
-                withTab("Trade", () => {
-                    if (!canAfford(prices, reserved)) console.error(reserved);
-                    var maxClicks = 10;
-                    while (maxClicks > 0 && canAfford(prices, reserved) && this.needProduct(1)) {
-                        var allQuantity = Math.floor(Math.min(...prices.map(price => getResourceOwned(price.name) / price.val)));
-                        buttons = getTradeButtons(this.panel).toArray().map((elem) => {
-                            text = $(elem).text();
-                            return {
-                                button: elem,
-                                quantity: text === "Send caravan" ? 1 : text === "all" ? allQuantity : text.replace("x", "") * 1
-                            }
-                        });
-                        affordableButtons = buttons.filter((button) => canAfford(multiplyPrices(prices, button.quantity), reserved) && this.needProduct(button.quantity)); //always nonempty
-                        targetButton = maxBy(affordableButtons, button => button.quantity);
-                        targetButton.button.click();
-                        quantityTraded += targetButton.quantity;
-                        maxClicks--;
-                    }
-                })
+Trade = class extends DataListQueueable(game.diplomacy.races, "Merchant") {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        //overwrite name with panel
+        super(panel, tab, panel, maxPriority, masterPlan);
+        this.quiet = true;
+        this.noLog = true;
+    }
+    buy(reserved) {
+        var quantityTraded = 0;
+        if (state.api >= 1 || state.tradeTimer >= tradeTimerDuration || getResourceOwned("manpower") * 1.2 > getResourceMax("manpower") || this.overrideNeeds()) {
+            if (this.overrideNeeds()) {
+                makeRoomForTrades(this.panel);
             }
-            state.tradeTimer = 0;
-        })
-    }
-    state.totalTrades += quantityTraded;
-    return quantityTraded;
-}
-Trade.prototype.getPrices = function() { return [{name: "manpower", val: 50}, {name: "gold", val: 15}].concat(getTradeData(this.panel).buys); }
-Trade.prototype.needProduct = function(quantity, resourcesSoFar) {
-    if (!resourcesSoFar) resourcesSoFar = {};
-    return getTradeValue(this.panel, true).every(sell => 
-        getResourceOwned(sell.name) * (this.overrideNeeds() ? 1 : 1.1)
-                + sell.val * quantity + (resourcesSoFar[sell.name] || 0)
-            < getResourceMax(sell.name)
-        || sell.name === "sorrow");
-}
-Trade.prototype.bestSeason = function() {
-    return getTradeData(this.panel).sells[0].seasons[seasonNames[game.calendar.season]] >= Math.max(...Object.values(getTradeData(this.panel).sells[0].seasons))
-}
-Trade.prototype.isEnabled = function() { 
-    return (this.needProduct(1) || this.overrideNeeds())
-        && (this.bestSeason() || this.ignoreSeason())
-        && (this.name !== "Leviathans" || game.diplomacy.get("leviathans").duration);
-}
-Trade.prototype.overrideNeeds = function() {
-    return isResourceFull("gold") && state.ignoreNeeds[this.panel] || state.ignoreNeeds[this.panel] >= 2;
-}
-Trade.prototype.ignoreSeason = function() {
-    return isResourceFull("gold") && state.ignoreSeason[this.panel] || state.ignoreSeason[this.panel] >= 2;
-}
-gainTradeResources = yieldResTotal => Object.fromEntries(Object.entries(yieldResTotal).map(entry => [entry[0], game.resPool.addResEvent(...entry)]))
-//from diplomacy.gainTradeRes
-msgTrades = (yieldResTotal, amtTrade) => {
-    //add this return value
-    var totalMessages = 1;
-    for (var res in yieldResTotal){
-        //just need to rip this one line out
-        //var amt = this.game.resPool.addResEvent(res, yieldResTotal[res]);
-        var amt = yieldResTotal[res];
-        if (amt > 0){
-            if (res == "blueprint"){
-                game.msg($I("trade.msg.resources", [game.getDisplayValueExt(amt), res]) + "!", "notice", "trade", true);
-            } else if (res == "titanium"){
-                game.msg($I("trade.msg.resources", [game.getDisplayValueExt(amt), res]) + "!", "notice", "trade", true);
-            } else {
-                var resPool = game.resPool.get(res);
-                var name = resPool.title || res;
-                game.msg($I("trade.msg.resources", [game.getDisplayValueExt(amt), name]), null, "trade", true);
-            }
-            totalMessages++;
+            withLeader("Merchant", () => {
+                var prices = this.getPrices();
+                if (state.api >= 1) {
+                    var yieldResTotal = null;
+                    while (canAfford(prices, reserved) && this.needProduct(1, yieldResTotal) && quantityTraded < 100000) {
+                        prices.forEach(price => game.resPool.addResEvent(price.name, -price.val));
+                        yieldResTotal = game.diplomacy.tradeInternal(game.diplomacy.races.find(race => race.title === this.panel), true, yieldResTotal);
+                        quantityTraded++;
+                    }
+                    if (yieldResTotal) {
+                        yieldResTotal = gainTradeResources(yieldResTotal);
+                        updateTradeMessages(yieldResTotal, quantityTraded);
+                    }
+                } else {
+                    withTab("Trade", () => {
+                        if (!canAfford(prices, reserved)) console.error(reserved);
+                        var maxClicks = 10;
+                        while (maxClicks > 0 && canAfford(prices, reserved) && this.needProduct(1)) {
+                            var allQuantity = Math.floor(Math.min(...prices.map(price => getResourceOwned(price.name) / price.val)));
+                            buttons = getTradeButtons(this.panel).toArray().map((elem) => {
+                                text = $(elem).text();
+                                return {
+                                    button: elem,
+                                    quantity: text === "Send caravan" ? 1 : text === "all" ? allQuantity : text.replace("x", "") * 1
+                                }
+                            });
+                            affordableButtons = buttons.filter((button) => canAfford(multiplyPrices(prices, button.quantity), reserved) && this.needProduct(button.quantity)); //always nonempty
+                            targetButton = maxBy(affordableButtons, button => button.quantity);
+                            targetButton.button.click();
+                            quantityTraded += targetButton.quantity;
+                            maxClicks--;
+                        }
+                    })
+                }
+                state.tradeTimer = 0;
+            })
         }
+        state.totalTrades += quantityTraded;
+        return quantityTraded;
     }
-    game.msg($I("trade.msg.trade.caravan", [amtTrade]), null, "trade");
-    return totalMessages;
-}
-clearTradeLogs = (expectedTradeMessages) => {
-    var tradeMessages = 0;
-    for (var i = game.console.messages.length - 2; i >= 0; i--) {
-        if (game.console.messages[i].tag === "trade") tradeMessages++; else break;
+    isEnabled() {
+        return (this.needProduct(1) || this.overrideNeeds())
+            && (this.bestSeason() || this.ignoreSeason())
+            && (this.name !== "Leviathans" || game.diplomacy.get("leviathans").duration);
     }
-    if (tradeMessages === expectedTradeMessages || expectedTradeMessages === undefined) {
-        game.console.messages.splice(game.console.messages.length - 1 - tradeMessages, tradeMessages);
-        game.ui.renderConsoleLog();
+    getPrices() { 
+        return [{name: "manpower", val: 50}, {name: "gold", val: 15}].concat(this.data.buys);
     }
-    return tradeMessages;
-}
+    needProduct(quantity, resourcesSoFar) {
+        if (!resourcesSoFar) resourcesSoFar = {};
+        return getTradeValue(this.panel, true).every(sell => 
+            getResourceOwned(sell.name) * (this.overrideNeeds() ? 1 : 1.1)
+                    + sell.val * quantity + (resourcesSoFar[sell.name] || 0)
+                < getResourceMax(sell.name)
+            || sell.name === "sorrow");
+    }
+    bestSeason() {
+        return this.data.sells[0].seasons[seasonNames[game.calendar.season]] >= Math.max(...Object.values(this.data.sells[0].seasons))
+    }
+    overrideNeeds() {
+        return isResourceFull("gold") && state.ignoreNeeds[this.panel] || state.ignoreNeeds[this.panel] >= 2;
+    }
+    ignoreSeason() {
+        return isResourceFull("gold") && state.ignoreSeason[this.panel] || state.ignoreSeason[this.panel] >= 2;
+    }
+};
 
 function PraiseSun(name, tab, panel) {
     this.name = name;
