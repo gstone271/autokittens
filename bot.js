@@ -1628,7 +1628,8 @@ DataQueable = class extends Queueable {
         return super.isEnabled()
             && !state.disabledConverters[this.internalName]
             && (!["Barn", "Warehouse", "Harbour"].includes(this.name) || isStorageLimited(state.smartStorage))
-            && (!this.data.val || !this.data.noStackable);
+            && (!this.data.val || !this.data.noStackable)
+            && (!this.data.limitBuild || this.data.val < this.data.limitBuild);
     }
     get once() {
         return this.data.noStackable;
@@ -1711,6 +1712,8 @@ Ziggurats = DataListQueueable(game.religion.zigguratUpgrades);
 Cryptotheology = DataListQueueable(game.religion.transcendenceUpgrades);
 
 Chronoforge = DataListQueueable(game.time.chronoforgeUpgrades);
+
+VoidSpace = DataListQueueable(game.time.voidspaceUpgrades);
 
 Trade = class extends DataListQueueable(game.diplomacy.races, "Merchant") {
     constructor(name, tab, panel, maxPriority, masterPlan) {
@@ -1926,6 +1929,7 @@ enable = (name, tab, panel, maxPriority, masterPlan) => {
     else if (panel === "Ziggurats") type = Ziggurats;
     else if (panel === "Cryptotheology") type = Cryptotheology;
     else if (panel === "Chronoforge") type = Chronoforge;
+    else if (panel === "Void Space") type = VoidSpace;
     else console.error(tab + " tab not supported yet!");
     var created = new type(name, tab, panel, maxPriority, masterPlan);
     state.queue.push(created);
@@ -2079,7 +2083,7 @@ ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "R
     "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Buy bcoin", "Sell bcoin"
 ]
 //we could add support for void space and chronoforge, but meh
-ignoredPanels = ["Metaphysics", "Challenges", "Void Space"]
+ignoredPanels = ["Metaphysics", "Challenges"]
 stateButtons = {
     "Send hunters": "autoHunt",
     "Steel": "autoSteel",
