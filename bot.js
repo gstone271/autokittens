@@ -1856,12 +1856,21 @@ SendExplorers = class extends Queueable {
 FeedElders = class extends Queueable {
     constructor(name, tab, panel, maxPriority, masterPlan) {
         super(name, tab, panel, maxPriority, masterPlan);
-        this.once = true;
     }
     getPrices() {
         return [{ name: "necrocorn", val: 1 }];
     }
-    //TODO detect when new races are available
+}
+CombustTC = class extends Queueable {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+    }
+    getPrices() {
+        return [{ name: "timeCrystal", val: 1 }];
+    }
+    isEnabled() {
+        return game.time.heat * 2 < game.getEffect("heatMax") && game.calendar.season === 0 && game.calendar.day < 50;
+    }
 }
 
 /************** 
@@ -1915,9 +1924,7 @@ enable = (name, tab, panel, maxPriority, masterPlan) => {
     else if (panel === "Ziggurats") type = Ziggurats;
     else if (panel === "Cryptotheology") type = Cryptotheology;
     else console.error(tab + " tab not supported yet!");
-    var created = new type(name, tab, panel);
-    if (maxPriority) created.maxPriority = true;
-    if (masterPlan) created.masterPlan = true;
+    var created = new type(name, tab, panel, maxPriority, masterPlan);
     state.queue.push(created);
 }
 
@@ -2065,9 +2072,12 @@ game.tick = () => {
 /************** 
  * Interface
 **************/
-ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit", "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Buy bcoin", "Sell bcoin"]
+ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit",
+    "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Buy bcoin", "Sell bcoin",
+    "Temporal Battery", "Chrono Furnace", "Temporal Accelerator", "Time Impedance", "Resource Retrieva"
+]
 //we could add support for void space and chronoforge, but meh
-ignoredPanels = ["Metaphysics", "Challenges", "Void Space", "Chronoforge"]
+ignoredPanels = ["Metaphysics", "Challenges", "Void Space"]
 stateButtons = {
     "Send hunters": "autoHunt",
     "Steel": "autoSteel",
@@ -2081,6 +2091,7 @@ specialBuys = {
     "Refine Catnip": Craft,
     "Send explorers": SendExplorers,
     "Feed elders": FeedElders,
+    "Combust TC": CombustTC,
 }
 getManagedItem = manageButton => trimButtonText($(manageButton).parent().find("span").first().text());
 getPanelTitle = elem => getOwnText($(elem).parents('.panelContainer').children('.title')).trim();
