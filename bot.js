@@ -1487,6 +1487,9 @@ Queueable = class {
                 //log how many trades before buying a gold-cost building, so that in master plan mode, we can plan to buy at least that many trades first
                 logTrades();
             }
+            if (!this.noLog && this.getPrices().some(price => price.name === "faith")) {
+                logFaith();
+            }
         }
         return bought;
     }
@@ -1524,7 +1527,11 @@ DataQueable = class extends Queueable {
     isEnabled() {
         return super.isEnabled()
             && !state.disabledConverters[this.internalName]
-            && (!["Barn", "Warehouse", "Harbour"].includes(this.name) || isStorageLimited(state.smartStorage));
+            && (!["Barn", "Warehouse", "Harbour"].includes(this.name) || isStorageLimited(state.smartStorage))
+            && (!this.data.val || !this.data.noStackable);
+    }
+    get once() {
+        return this.data.noStackable;
     }
 }
 DataListQueueable = (dataList, leader) => class extends DataQueable {
@@ -1585,52 +1592,19 @@ Space = class extends DataListQueueable(Object.values(game.space.metaCache)) {
     }
 }
 
-religionData = {
-    "Order of the Sun": game.religion.religionUpgrades,
-    "Ziggurats": game.religion.zigguratUpgrades,
-}   
-function Religion(name, tab, panel) {
-    this.name = name;
-    this.tab = tab;
-    this.panel = panel;
-    this.once = this.getData().noStackable;
-    this.priceMultiplier = panel === "Order of the Sun" ? 0.9 : 1;
-}
-Religion.prototype.getData = function() {
-    return religionData[this.panel].filter(upgrade => upgrade.label === this.name)[0];
-}
-Religion.prototype.buy = function() {
-    var bought;
-    var doBuy = () => withTab("Religion", () => {
-        if (this.panel === "Order of the Sun") {
-            //note how much faith we had before buying an upgrade
-            logFaith();
-        }
-        bought = buyButton(this.name);
-    });
-    if (this.panel === "Order of the Sun") {
-        withLeader("Philosopher", doBuy);
-    } else {
-        doBuy();
+OrderOfTheSun = class extends DataListQueueable(game.religion.religionUpgrades, "Philosopher") {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
     }
-    if (this.getPrices().some(price => price.name === "gold")) {
-        //log how many trades before buying a gold-cost building, so that in master plan mode, we can plan to buy at least that many trades first
-        logTrades();
+    isEnabled() {
+        return super.isEnabled() && game.religion.faith >= this.data.faith;
     }
-    return bought;
-}
-Religion.prototype.getRealPrices = function() { 
-    var data = this.getData();
-    return multiplyPrices(data.prices, this.priceMultiplier * Math.pow(data.priceRatio, data.val));
-}
-Religion.prototype.getPrices = function() { 
-    return this.getRealPrices();
-}
-Religion.prototype.isEnabled = function() { 
-    var data = this.getData();
-    var enoughFaith = this.panel !== "Order of the Sun" || game.religion.faith >= data.faith;
-    return enoughFaith && (data.val === 0 || !data.noStackable);
-}
+    getPrices() { 
+        return multiplyPrices(super.getPrices(), 0.9);
+    }
+};
+
+Ziggurats = DataListQueueable(game.religion.zigguratUpgrades);
 
 tradeWith = race => $('div.panelContainer:contains("' + race + '") span:contains("Send caravan")').click()
 getTradeButtons = race => $('div.panelContainer:contains("' + race + '") div.btnContent').children(":visible")
@@ -1903,7 +1877,8 @@ enable = (name, tab, panel, maxPriority, masterPlan) => {
     else if (tab === "Workshop") type = WorkshopUpgrade;
     else if (tab === "Space") type = Space;
     else if (tab === "Trade") type = Trade;
-    else if (religionData[panel]) type = Religion;
+    else if (panel === "Order of the Sun") type = OrderOfTheSun;
+    else if (panel === "Ziggurats") type = Ziggurats;
     else console.error(tab + " tab not supported yet!");
     var created = new type(name, tab, panel);
     if (maxPriority) created.maxPriority = true;
