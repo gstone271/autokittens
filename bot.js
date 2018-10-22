@@ -1699,8 +1699,8 @@ OrderOfTheSun = class extends DataListQueueable(game.religion.religionUpgrades, 
     constructor(name, tab, panel, maxPriority, masterPlan) {
         super(name, tab, panel, maxPriority, masterPlan);
     }
-    isEnabled() {
-        return super.isEnabled() && game.religion.faith >= this.data.faith;
+    isUnlocked() {
+        return game.religion.faith >= this.data.faith;
     }
     getPrices() { 
         return multiplyPrices(super.getPrices(), 0.9);
@@ -1923,7 +1923,7 @@ enable = (name, tab, panel, maxPriority, masterPlan) => {
     else if (panel === "Crafting") type = Craft;
     else if (tab === "Science") type = Science;
     else if (tab === "Workshop") type = WorkshopUpgrade;
-    else if (tab === "Space") type = Space;
+    else if (tab === "Space") type = Space; 
     else if (tab === "Trade") type = Trade;
     else if (panel === "Order of the Sun") type = OrderOfTheSun;
     else if (panel === "Ziggurats") type = Ziggurats;
