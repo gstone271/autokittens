@@ -1865,6 +1865,9 @@ FeedElders = class extends Queueable {
     getPrices() {
         return [{ name: "necrocorn", val: 1 }];
     }
+    isEnabled() {
+        return game.diplomacy.get("leviathans").energy < game.religion.getZU("marker").val * 5 + 5;
+    }
 }
 CombustTC = class extends Queueable {
     constructor(name, tab, panel, maxPriority, masterPlan) {
