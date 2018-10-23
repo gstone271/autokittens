@@ -2100,7 +2100,9 @@ specialBuys = {
     "Combust TC": CombustTC,
 }
 getManagedItem = manageButton => trimButtonText($(manageButton).parent().find("span").first().text());
-getPanelTitle = elem => getOwnText($(elem).parents('.panelContainer').children('.title')).trim();
+getPanelTitle = elem => getOwnText(($(elem).hasClass('panelContainer') ? $(elem) : $(elem).parents('.panelContainer')).children('.title')).trim();
+getPanels = () => $("#gameContainerId div.panelContainer");
+getPanel = title => getPanels().toArray().map(div => $(div)).find(elem => getPanelTitle(elem) == title);
 updateButton = (elem, tab) => {
     var item = getManagedItem(elem);
     var panel = getPanelTitle(elem);
@@ -2268,10 +2270,20 @@ createSettingsMenu = () => {
 updateSettingsMenu = () => {
     settingsMenu.forEach(item => $('#' + item.name).html(item.getHtml()));
 }
-var rightOfButtonStyle = ' style="position: absolute; left: 270px; top: 7px; width: 270px; text-align: left"'
+var rightOfButtonStyle = 'position: absolute; left: 270px; top: 7px; width: 270px; text-align: left'
+infoDiv = (id, style, add) => {
+    var info = $("#" + id + "Info");
+    if (!info.length) { info = $('<div id="' + id + 'Info" style="' + style + '">'); add(info); }
+    return info;
+}
+infoTop = (name) => {
+    return infoDiv(name, "float: left; margin-top: -15px; margin-right: 15px;", info => $("#gameContainerId > .tabInner").prepend(info));
+}
+infoRightOfButton = (name) => {
+    return infoDiv(name, rightOfButtonStyle, info => findButton(name).prepend(info));
+}
 displayJobQueue = () => {
-    var jobInfo = $("#jobInfo")
-    if (!jobInfo.length) { jobInfo = $('<div id="jobInfo" style="float: right;">'); $("#gameContainerId > div.tabInner > div:nth-child(1) > div.container > table").after(jobInfo); }
+    var jobInfo = infoDiv("job", "float: right;", info => getPanel("Jobs").children("div.container").children("table").after(info));
     jobInfo.html("Job Queue: " + state.jobQueue.map(job => "<br />" + getJobLongName(job)).join(''))
 }
 displayTradeValues = () => {
@@ -2283,8 +2295,6 @@ displayTradeValues = () => {
         var production = kittenProduction ? kittenProduction : getCraftingResourcePerTick(resource, new Reservations({}), true);
         if (production > 0) {
             if (resource === "catnip" && getFarmerEffectiveness() < 1) production /= getFarmerEffectiveness();
-            var tradeInfo = elem.children(".tradeInfo");
-            if (!tradeInfo.length) { tradeInfo = $("<span class=\"tradeInfo\">"); elem.append(tradeInfo); }
             var raceName = getPanelTitle(elem);
             var raceData = getTradeData(raceName);
             var ticks = 0;
@@ -2296,6 +2306,8 @@ displayTradeValues = () => {
                 amount = getPrice(getTradeValue(raceName), resource);
             }
             ticks += amount / production;
+            var tradeInfo = elem.children(".tradeInfo");
+            if (!tradeInfo.length) { tradeInfo = $("<span class=\"tradeInfo\">"); elem.append(tradeInfo); }
             tradeInfo.text(" (" + game.getDisplayValueExt(ticks) + (kittenProduction ? " cat*t)" : " t)"))
         }
     })
@@ -2303,26 +2315,22 @@ displayTradeValues = () => {
 displayGoldValue = () => {
     var kittenGoldProduction = getResourcePerTickPerKitten("gold");
     if (kittenGoldProduction) {
-        var goldInfo = $("#goldInfo")
-        if (!goldInfo.length) { goldInfo = $('<div id="goldInfo" style="float: left; margin-top: -15px">'); $("#gameContainerId > .tabInner").prepend(goldInfo); }
-        goldInfo.text("15 Gold: " + game.getDisplayValueExt(15 / kittenGoldProduction) + " cat*t")
+        infoTop("gold").text("15 Gold: " + game.getDisplayValueExt(15 / kittenGoldProduction) + " cat*t")
     }
 }
 displayBlueprintValue = () => {
     if (canCraft("blueprint")) {
-        var blueprintInfo = $("#blueprintInfo")
-        if (!blueprintInfo.length) { blueprintInfo = $('<div id="blueprintInfo" style="float: left; margin-top: -15px; margin-right: 15px;">'); $("#gameContainerId > .tabInner").prepend(blueprintInfo); }
         var totalPrices = getTotalCraftPrices("blueprint");
         var scienceCost = getPrice(totalPrices, "science") / 10;
         var fursCost = getPrice(totalPrices, "furs") / 10;
         var scienceKittensTicks = scienceCost / getResourcePerTickPerKitten("science");
         var fursKittenTicks = fursCost / getFursPerHunt() * 100 / getResourcePerTickPerKitten("manpower");
         var totalKittenTicks = scienceKittensTicks + fursKittenTicks;
-        blueprintInfo.text("Blueprints: " + game.getDisplayValueExt(totalKittenTicks) + " cat*t/trade")
+        infoTop("blueprint").text("Blueprints: " + game.getDisplayValueExt(totalKittenTicks) + " cat*t/trade")
     }
 }
 displayTradeAgressionSettings = () => {
-    $("#gameContainerId div.panelContainer > .title").toArray().forEach(div => {
+    getPanels().toArray().forEach(div => {
         var elem = $(div);
         var raceName = getPanelTitle(elem);
         ["ignoreNeeds", "ignoreSeason"].forEach(buttonType => {
@@ -2339,7 +2347,7 @@ displayTradeAgressionSettings = () => {
                 button.css("margin-bottom", "0");
                 button.css("margin-left", "10px");
                 button.css("display", "inline-block");
-                elem.append(button);
+                elem.children(".title").append(button);
                 updateButton();
             }
         })
@@ -2347,8 +2355,7 @@ displayTradeAgressionSettings = () => {
 }
 displayParagonInfo = () => {
     if (game.village.sim.getKittens() > 70) {
-        var paragonInfo = $("#paragonInfo");
-        if (!paragonInfo.length) { paragonInfo = $('<div id="paragonInfo" style="float: right">'); $("#gameContainerId > div > div.panelContainer:nth-child(2) > div.toggle").after(paragonInfo); }
+        var paragonInfo = infoDiv("paragon", "float: right;", info => getPanel("Reset").children("div.toggle").after(info));
         paragonInfo.html("Best resets (local maxima of paragon/y): <br />"
             + getBestResetPoint(state.history, true).slice(0, 5)
                 .map(point => 
@@ -2361,8 +2368,7 @@ displayParagonInfo = () => {
 }
 displayPreviousHistoryInfo = () => {
     if (state.previousHistories.length > 0) {
-        var pastParagonInfo = $("#pastParagonInfo");
-        if (!pastParagonInfo.length) { pastParagonInfo = $('<div id="pastParagonInfo">'); $("#gameContainerId > div.tabInner").append(pastParagonInfo); }
+        var pastParagonInfo = infoDiv("pastParagon", "", info => $("#gameContainerId > div.tabInner").append(info));
         pastParagonInfo.html("Past resets: <br />"
             + state.previousHistories
                 .map(history => history.find(event => event.type === "Reset"))
@@ -2416,8 +2422,6 @@ binarySearch = (lessThan, min, max, guess, maxIterations, precision) => {
 displayFaithResetPayoff = () => {
     //TODO double check this
     if (game.religion.faith >= game.religion.getRU("apocripha").faith && getEffectiveResourcePerTick("faith") > 0) {
-        var apocryphaInfo = $("#apocryphaInfo");
-        if (!apocryphaInfo.length) { apocryphaInfo = $('<div id="apocryphaInfo"' + rightOfButtonStyle + '>'); findButton("Apocrypha").prepend(apocryphaInfo); }
         var timeToMaxFaith = Math.ceil(getResourceMax("faith") / getEffectiveResourcePerTick("faith"))
         var getFaithBonus = faithRatio => game.religion.getTriValueReligion(faithRatio);
         var bonusRatioGained = game.religion.getApocryphaResetBonus(1.01);
@@ -2439,40 +2443,34 @@ displayFaithResetPayoff = () => {
         var getDisplay = estimate => estimate.max - estimate.min < 5 ? 
             ticksToDisplaySeconds(estimate.max) 
             : ticksToDisplaySeconds(estimate.min) + " - " + ticksToDisplaySeconds(estimate.max)
-        apocryphaInfo.html(" (" + getDisplay(faithPayoffEstimate) + " faith payback)"
+        infoRightOfButton("Apocrypha").html(" (" + getDisplay(faithPayoffEstimate) + " faith payback)"
             + "<br /> (" + getDisplay(productionPayoffEstimate) + " production payback)")
     }
 }
 displayApocryphaNeededToTranscend = () => {
     if (game.religion.faith >= game.religion.getRU("transcendence").faith) {
-        var transcendenceInfo = $("#transcendenceInfo");
-        if (!transcendenceInfo.length) { transcendenceInfo = $('<div id="transcendenceInfo"' + rightOfButtonStyle + '>'); findButton("Transcendence").prepend(transcendenceInfo); }
         var tclevel = game.religion.getTranscendenceLevel();
         var apocryphaNeeded = game.religion.getTranscendenceRatio(tclevel+1) - game.religion.getTranscendenceRatio(tclevel);
         var percentageOwned = game.religion.faithRatio / apocryphaNeeded * 100;
-        transcendenceInfo.text(" (" + game.getDisplayValueExt(percentageOwned) + "% of apocrypha needed)");
+        infoRightOfButton("Transcendence").text(" (" + game.getDisplayValueExt(percentageOwned) + "% of apocrypha needed)");
     }
 }
 displayAutoResetSettings = () => {
     if (game.religion.getRU("apocripha").val) {
-        $("#gameContainerId div.panelContainer > .title").toArray().forEach(div => {
-            var elem = $(div);
-            if (getPanelTitle(elem) !== "Order of the Sun") return;
-            var autoResetButton = $("#autoResetButton");
-            if (!autoResetButton.length) {
-                var updateButton = () => $("#autoResetButton").html(buttonData.getHtml());
-                var buttonData = {
-                    name: "autoResetButton",
-                    leftClick: () => { state.autoReset = Math.min(1000, state.autoReset + 100); updateButton(); },
-                    rightClick: () => { state.autoReset = Math.max(100, state.autoReset - 100); updateButton(); },
-                    getHtml: () => "Auto Reset: " + (state.autoReset === 1000 ? "never" : state.autoReset + "%")
-                }
-                autoResetButton = createSettingsButton(buttonData);
-                autoResetButton.css("float", "right");
-                elem.append(autoResetButton);
-                updateButton();
+        var autoResetButton = $("#autoResetButton");
+        if (!autoResetButton.length) {
+            var updateButton = () => $("#autoResetButton").html(buttonData.getHtml());
+            var buttonData = {
+                name: "autoResetButton",
+                leftClick: () => { state.autoReset = Math.min(1000, state.autoReset + 100); updateButton(); },
+                rightClick: () => { state.autoReset = Math.max(100, state.autoReset - 100); updateButton(); },
+                getHtml: () => "Auto Reset: " + (state.autoReset === 1000 ? "never" : state.autoReset + "%")
             }
-        })
+            autoResetButton = createSettingsButton(buttonData);
+            autoResetButton.css("float", "right");
+            getPanel("Order of the Sun").children(".title").append(autoResetButton);
+            updateButton();
+        }
     }
 }
 var starchartBuildings = ["Satellite", "Research Vessel", "Space Beacon"]
@@ -2485,11 +2483,8 @@ displayStarchartPayoffs = () => {
             var starchartPrice = getPrice(bld.getPrices(), "starchart")
             var starchartProduction = bld.getData().effects.starchartPerTickBaseSpace * getResourceProductionRatio("starchart");
             var starchartPayoff = starchartPrice / starchartProduction;
-            
-            var starchartInfo = button.children(".starchartInfo");
-            if (!starchartInfo.length) { starchartInfo = $('<div class="starchartInfo"' + rightOfButtonStyle + '>'); button.append(starchartInfo); }
 
-            starchartInfo.text("Starchart payoff: " + ticksToDisplaySeconds(starchartPayoff))
+            infoRightOfButton(name).text("Starchart payoff: " + ticksToDisplaySeconds(starchartPayoff))
         }
     })
 }
@@ -2507,11 +2502,8 @@ displayUnobtainiumPayoffs = () => {
             //assumes all unobtainium is produced from PerTickSpace sources, like Lunar Outpost
             var unobtainiumProduction = spaceProductionBonus * game.getEffect("unobtainiumPerTickSpace");
             var unobtainiumPayoff = unobtainiumPrice / unobtainiumProduction;
-            
-            var unobtainiumInfo = button.children(".unobtainiumInfo");
-            if (!unobtainiumInfo.length) { unobtainiumInfo = $('<div class="unobtainiumInfo"' + rightOfButtonStyle + '>'); button.append(unobtainiumInfo); }
 
-            unobtainiumInfo.text("Unobtainium payoff: " + ticksToDisplaySeconds(unobtainiumPayoff))
+            infoRightOfButton(name).text("Unobtainium payoff: " + ticksToDisplaySeconds(unobtainiumPayoff))
         }
     })
 }
