@@ -257,6 +257,7 @@ loadDefaults = () => {
         masterPlanMode: 0,
         smartStorage: 0,
         autoReset: 1000, //should never be 0
+        restrictedRecipes: { timeCrystal: 2, sorrow: 2, relic: 2 },
     }
     Object.entries(falseyDefaults).forEach(entry => state[entry[0]] = state[entry[0]] || entry[1]);
     if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
@@ -827,6 +828,10 @@ Recipe = class {
             && ((game.bld.get("workshop").val && game.science.get("construction").researched) || this.name === "wood")
             && this.prices.every(price => getResourceMax(price.name) >= price.val);
     }
+    get mayCraft() {
+        return this.canCraft && (!state.restrictedRecipes[this.name]
+            || state.restrictedRecipes[this.name] == 1 && this.prices.every(price => !canCraft(price.name) || getResourceOwned(price.name) >= getResourceOwned(this.name)))
+    }
     get craftRatio() {
         return getCraftRatio(this.name);
     }
@@ -990,7 +995,7 @@ preferSteelCrafting = () => {
 preferSteelCrafting();
 doAutoCraft = () => {
     autoCrafts.forEach(craft => {
-        if (canCraft(craft.name)) {
+        if (mayCraft(craft.name)) {
             var getAmountToCraft = price => {
                 var safeCrafts = (getResourceOwned(price.name) - getEnoughResource(price.name)) / price.val
                 return getResourceMax(price.name) === Infinity ? Math.floor(safeCrafts) : Math.ceil(safeCrafts);
@@ -1041,6 +1046,10 @@ canCraft = resInternalName => {
     var recipe = recipeMap[resInternalName];
     return recipe && recipe.canCraft;
 }
+mayCraft = resInternalName => {
+    var recipe = recipeMap[resInternalName];
+    return recipe && recipe.mayCraft;
+}
 shouldDelayCrafting = res => recipeMap[res] && !recipeMap[res].shouldCraftAll;
 getAdditionalNeeded = (prices, reserved) => 
     prices
@@ -1060,13 +1069,16 @@ craftAdditionalNeeded = (prices, reserved) => {
 getCraftRatio = res => game.getResCraftRatio({ name: res }) + 1;
 makeCraft = (craft, amountNeeded, reserved) => {
     var recipe = recipeMap[craft];
-    var timesToCraft = Math.ceil(amountNeeded / recipe.craftRatio);
-    var totalPrices = multiplyPrices(recipe.prices, timesToCraft);
-    craftAdditionalNeeded(totalPrices, reserved);
-    if (canAfford(totalPrices, reserved)) {
-        recipe.craftMultiple(timesToCraft);
-    } else if (recipe.prices.every(price => !reserved.get(price.name).current)) {
-        recipe.craftAll();
+    if (recipe.mayCraft) {
+        //TODO instead implement this as a reservation
+        var timesToCraft = Math.ceil(amountNeeded / recipe.craftRatio);
+        var totalPrices = multiplyPrices(recipe.prices, timesToCraft);
+        craftAdditionalNeeded(totalPrices, reserved);
+        if (canAfford(totalPrices, reserved)) {
+            recipe.craftMultiple(timesToCraft);
+        } else if (recipe.prices.every(price => !reserved.get(price.name).current)) {
+            recipe.craftAll();
+        }
     }
 }
 getTotalCraftPrices = (res) => {
@@ -1385,7 +1397,7 @@ makeRoomForTrades = (race) => {
     var storageNeeded = multiplyPrices(getTradeValue(race, true), tradesToMake);
     storageNeeded.forEach(price => {
         var craft = game.workshop.crafts.find(craft => craft.prices.some(craftPrice => craftPrice.name === price.name));
-        if (craft && canCraft(craft.name)) {
+        if (craft && mayCraft(craft.name)) {
             var excess = getResourceOwned(price.name) + price.val - getSafeStorage(price.name)
             var timesToCraft = Math.max(0, Math.ceil(excess / craft.prices.find(craftPrice => craftPrice.name === price.name).val))
             craftMultiple(craft, timesToCraft);
@@ -2510,9 +2522,42 @@ displayUnobtainiumPayoffs = () => {
         }
     })
 }
+displayCraftSettings = () => {
+    var settingsTable = infoDiv("craftSettings", "", info => {
+        info.append("<div>Allowed crafts:</div>");
+        tr = $("<tr>");
+        td = $("<td style='height: 100%'>");
+        tr.append(td);
+        td.append(info);
+        getPanel("Crafting").find(".container > table > td").first().attr("rowspan", 2)
+        //the game's table is malformed; using the actual jquery method throws in a tbody; use vanillajs instead
+        getPanel("Crafting").find(".container > table")[0].appendChild(tr[0]);
+    });
+    Object.values(recipeMap).forEach(recipe => {
+        if (recipe.prices.some(price => canCraft(price.name)) && recipe.prices.some(price => !canCraft(price.name)) || recipe.constructor.name == "UnicornRecipe") {
+            var id = recipe.name + "AllowedButton"
+            var allowedButton = $("#" + id);
+            if (!allowedButton.length) {
+                var updateButton = () => $("#" + id).html(buttonData.getHtml());
+                var buttonData = {
+                    name: id,
+                    rightClick: () => { state.restrictedRecipes[recipe.name] = Math.min(2, (state.restrictedRecipes[recipe.name] || 0) + 1); updateButton(); },
+                    leftClick: () => { state.restrictedRecipes[recipe.name] = Math.max(0, (state.restrictedRecipes[recipe.name] || 0) - 1); updateButton(); },
+                    getHtml: () => recipe.longTitle + ": " + ["yes", "slow", "never"][state.restrictedRecipes[recipe.name] || 0]
+                }
+                allowedButton = createSettingsButton(buttonData);
+                settingsTable.append(allowedButton);
+                updateButton();
+            }
+        }
+    })
+}
 specialUis = {
     Village: () => {
         displayJobQueue();
+    },
+    Workshop: () => {
+        displayCraftSettings();
     },
     Trade: () => {
         displayTradeValues();
@@ -2634,6 +2679,7 @@ populationIncrease has problems, ever since the kittensAssigned added
 deal with building upgrades (or maybe just don't; might be optimal)
 mode to not craft compendiums
 add extra info to help
+add extra settings to help
 allow buying stuff with cost between safe storage and actual storage
 --when all resources are close to full, allow them to become completely full
 can't get religion bonus while on religion tab
