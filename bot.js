@@ -1373,7 +1373,7 @@ getTradeValue = (race, bestCase) => {
             * (bestCase ? (1 + sell.delta/2) : 1)
             * attitudeMultiplier
             * energyRatio
-            * bestCase ? 1 : (sell.name === "titanium" ? Math.min(1, .15 + ships * .0035) : sell.chance / 100)
+            * (bestCase ? 1 : (sell.name === "titanium" ? Math.min(1, .15 + ships * .0035) : sell.chance / 100))
             * sell.seasons[seasonNames[game.calendar.season]]
     }))
 }
