@@ -1591,8 +1591,8 @@ Queueable = class {
         this.maxPriority = maxPriority;
         this.masterPlan = masterPlan;
     }
-    toJSON() {
-        var props = ["name", "tab", "panel", "maxPriority", "masterPlan"];
+    toJSON(minimal) {
+        var props = ["name", "tab", "panel"].concat(minimal ? [] : ["maxPriority", "masterPlan"]);
         var result = {};
         props.forEach(prop => result[prop] = this[prop])
         return result;
