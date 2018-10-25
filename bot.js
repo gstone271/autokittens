@@ -1591,6 +1591,12 @@ Queueable = class {
         this.maxPriority = maxPriority;
         this.masterPlan = masterPlan;
     }
+    toJSON() {
+        var props = ["name", "tab", "panel", "maxPriority", "masterPlan"];
+        var result = {};
+        props.forEach(prop => result[prop] = this[prop])
+        return result;
+    }
     buy(reserved) {
         var bought = withLeader(this.buyingLeader, () => tabBuyButton(this.tab, this.name));
         if (bought) {
