@@ -488,18 +488,21 @@ getResourcesToReserve = (effectivePrices, ticksNeeded, reserved) => {
     return {newReserved: newReserved, limitingResources: Object.keys(limitingResources)};
 }
 findPriorities = (queue, reserved) => {
-    if (queue.length == 0) return [];
-    var found = queue[0];
-    var prices = found.getPrices();
-    if (!found.isEnabled() || !haveEnoughStorage(prices, reserved)) return findPriorities(queue.slice(1), reserved);
-    var unavailableResources = prices.map(price => price.name).filter(res => reserved.get(res).current > getResourceOwned(res));
-    var viable = unavailableResources.length ? false : true;
-    var effectivePrices = getEffectivePrices(prices, reserved);
-    var realTicksNeeded = getTicksNeeded(effectivePrices, prices, reserved);
-    var ticksNeeded = bufferTicksNeeded(realTicksNeeded);
-    var toReserve = getResourcesToReserve(effectivePrices, ticksNeeded, reserved);
-    return [{bld: found, reserved, viable, unavailable: unavailableResources, limiting: toReserve.limitingResources, ticksNeeded: realTicksNeeded}]
-        .concat(findPriorities(queue.slice(1), toReserve.newReserved));
+    var priorities = [];
+    queue.forEach(found => {
+        var prices = found.getPrices();
+        if (found.isEnabled() && haveEnoughStorage(prices, reserved)) {
+            var unavailableResources = prices.map(price => price.name).filter(res => reserved.get(res).current > getResourceOwned(res));
+            var viable = unavailableResources.length ? false : true;
+            var effectivePrices = getEffectivePrices(prices, reserved);
+            var realTicksNeeded = getTicksNeeded(effectivePrices, prices, reserved);
+            var ticksNeeded = bufferTicksNeeded(realTicksNeeded);
+            var toReserve = getResourcesToReserve(effectivePrices, ticksNeeded, reserved);
+            priorities.push({bld: found, reserved, viable, unavailable: unavailableResources, limiting: toReserve.limitingResources, ticksNeeded: realTicksNeeded});
+            reserved = toReserve.newReserved;
+        }
+    });
+    return priorities;
 }
 subtractUnreserved = (reserved, bought) => {
     var newReserved = reserved.clone();
