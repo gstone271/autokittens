@@ -2297,6 +2297,7 @@ updateSettingsMenu = () => {
 }
 var rightOfButtonStyle = 'position: absolute; left: 270px; top: 7px; width: 270px; text-align: left'
 infoDiv = (id, style, add) => {
+    id = id.replace(" ", "");
     var info = $("#" + id + "Info");
     if (!info.length) { info = $('<div id="' + id + 'Info" style="' + style + '">'); add(info); }
     return info;
