@@ -2095,7 +2095,7 @@ game.tick = () => {
  * Interface
 **************/
 ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit",
-    "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Buy bcoin", "Sell bcoin"
+    "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Buy bcoin", "Sell bcoin", "Fix Cryochamber"
 ]
 //we could add support for void space and chronoforge, but meh
 ignoredPanels = ["Metaphysics", "Challenges"]
