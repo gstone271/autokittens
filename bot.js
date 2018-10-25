@@ -1890,6 +1890,7 @@ FeedElders = class extends Queueable {
 CombustTC = class extends Queueable {
     constructor(name, tab, panel, maxPriority, masterPlan) {
         super(name, tab, panel, maxPriority, masterPlan);
+        this.noLog = true;
     }
     getPrices() {
         return [{ name: "timeCrystal", val: 1 }];
