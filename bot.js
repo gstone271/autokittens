@@ -831,6 +831,9 @@ Recipe = class {
             && ((game.bld.get("workshop").val && game.science.get("construction").researched) || this.name === "wood")
             && this.prices.every(price => getResourceMax(price.name) >= price.val);
     }
+    get allowRestriction() {
+        return this.prices.some(price => canCraft(price.name)) && this.prices.some(price => !canCraft(price.name));
+    }
     get mayCraft() {
         return this.canCraft && (!state.restrictedRecipes[this.name]
             || state.restrictedRecipes[this.name] == 1 && this.prices.every(price => getResourceMax(price.name) < Infinity || getResourceOwned(price.name) >= getResourceOwned(this.name)))
@@ -862,6 +865,9 @@ UnicornRecipe = class extends Recipe {
     }
     get canCraft() {
         return game.bld.get("ziggurat").val && game.science.get("theology").researched;
+    }
+    get allowRestriction() {
+        return true;
     }
     get craftRatio() {
         return this.getRatio();
@@ -2544,22 +2550,20 @@ displayCraftSettings = () => {
         //the game's table is malformed; using the actual jquery method throws in a tbody; use vanillajs instead
         getPanel("Crafting").find(".container > table")[0].appendChild(tr[0]);
     });
-    Object.values(recipeMap).forEach(recipe => {
-        if (recipe.prices.some(price => canCraft(price.name)) && recipe.prices.some(price => !canCraft(price.name)) || recipe.constructor.name == "UnicornRecipe") {
-            var id = recipe.name + "AllowedButton"
-            var allowedButton = $("#" + id);
-            if (!allowedButton.length) {
-                var updateButton = () => $("#" + id).html(buttonData.getHtml());
-                var buttonData = {
-                    name: id,
-                    rightClick: () => { state.restrictedRecipes[recipe.name] = Math.min(2, (state.restrictedRecipes[recipe.name] || 0) + 1); updateButton(); },
-                    leftClick: () => { state.restrictedRecipes[recipe.name] = Math.max(0, (state.restrictedRecipes[recipe.name] || 0) - 1); updateButton(); },
-                    getHtml: () => recipe.longTitle + ": " + ["yes", "slow", "never"][state.restrictedRecipes[recipe.name] || 0]
-                }
-                allowedButton = createSettingsButton(buttonData);
-                settingsTable.append(allowedButton);
-                updateButton();
+    Object.values(recipeMap).filter(recipe => recipe.allowRestriction).forEach(recipe => {
+        var id = recipe.name + "AllowedButton"
+        var allowedButton = $("#" + id);
+        if (!allowedButton.length) {
+            var updateButton = () => $("#" + id).html(buttonData.getHtml());
+            var buttonData = {
+                name: id,
+                rightClick: () => { state.restrictedRecipes[recipe.name] = Math.min(2, (state.restrictedRecipes[recipe.name] || 0) + 1); updateButton(); },
+                leftClick: () => { state.restrictedRecipes[recipe.name] = Math.max(0, (state.restrictedRecipes[recipe.name] || 0) - 1); updateButton(); },
+                getHtml: () => recipe.longTitle + ": " + ["yes", "slow", "never"][state.restrictedRecipes[recipe.name] || 0]
             }
+            allowedButton = createSettingsButton(buttonData);
+            settingsTable.append(allowedButton);
+            updateButton();
         }
     })
 }
