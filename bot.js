@@ -833,7 +833,7 @@ Recipe = class {
     }
     get mayCraft() {
         return this.canCraft && (!state.restrictedRecipes[this.name]
-            || state.restrictedRecipes[this.name] == 1 && this.prices.every(price => !canCraft(price.name) || getResourceOwned(price.name) >= getResourceOwned(this.name)))
+            || state.restrictedRecipes[this.name] == 1 && this.prices.every(price => getResourceMax(price.name) < Infinity || getResourceOwned(price.name) >= getResourceOwned(this.name)))
     }
     get craftRatio() {
         return getCraftRatio(this.name);
