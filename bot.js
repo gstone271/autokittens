@@ -50,6 +50,8 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     <li>Steel (in Workshop): Always make as much steel as possible (to prevent wasting coal, even if your queue needs more iron than coal)</li>
     <li>Transcend: Wait for faith to be full, then click Transcend once, then click Faith Reset, then Praise the Sun.</li>
     <li>Jobs: In the Jobs panel, left click a job to add it to the job queue; right click to remove. Whenever the bot buys housing, it will assign the new kitten to next job in the queue, then send that job to the end of the queue. The bot will not assign new kittens when you buy housing manually.</li>
+    <li>Combust TC: Combusts a time crystal whenever your chronoheat is under half of max, but only during the first 50 days of the year.</li>
+    <li>Buy bcoin: Sells bcoin whenever the market is about to crash or the elders are about to leave, and buys bcoin otherwise.</li>
 </ul></p>
 <p>Leaders: It is recommended that you make an Artisan your leader. For all tasks except crafting, if you already have a leader, the bot will automatically switch to a leader of the appropriate type. If API is set to none, a leader of the appropriate type must appear on the first page of kittens (you may need to promote one).</p>
 <p>Trade: Sending trade caravans is queued like buildings. <ul>
@@ -58,6 +60,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
     <li>The bot will not make trades for resources that you have a lot of already, unless you enable ignoreNeeds.</li>
     <li>It will only trade during optimal seasons, unless you enable ignoreSeasons.</li>
 </ul>Next to tradeable resources, the bot will display the amount of time it would take one no-skill kitten to produce that much resource (in cats*ticks), or if kittens can't produce it, the amount of time it would take all your production to produce it (in ticks).</p>
+<p>Allowed Crafts: In the crafting panel, you can restrict the crafting of any recipe which costs both crafted and noncrafted resources, or any unicorn conversion. In "slow" mode, the bot will only craft the recipe if you own more of the components than the result.</p>
 <p>Auto Faith Reset: In the Order of the Sun panel, you can set Auto Reset to a percentage. When your base faith bonus (before Black Obelisk and Atheism bonuses) reaches this percentage, Simba will automatically store maximum faith, then reset praised faith (with apocrypha), then praise the sun.</p>
 <p>Compatibility: Simba requires a modern browser (with HTML5 and ES6) and is currently only compatible with the English version of the game.</p>
 <hr />
