@@ -32,7 +32,7 @@ $('#helpDiv').prepend($(`<div id="botHelp">
         <li>aggressive: Only buy storage if you don't have enough to buy a queued upgrade or normal building (aqueduct, log house, library, mine, smelter, or workshop). Recommended in the early game.</li>
         <li>conservative: Only buy storage if you don't have enough to buy any of your queued normal buildings. Recommended in the mid and late game.</li>
     </ul></li>
-    <li>Auto Craft: Automatically craft resouces that are near their max storage capacity. The bot won't attempt to buy buildings whose cost is so near your storage capacity that a needed resouce would be auto crafted.<ul>
+    <li>Auto Craft: Automatically craft resouces that are near their max storage capacity. The bot won't reserve resources for buildings whose cost is so near your storage capacity that a needed resouce would be auto crafted, but may buy them anyway if it can.<ul>
         <li>off: Don't auto craft.</li>
         <li>normal: Craft resources that would be full by the time the bot plans to run again.</li>
         <li>safe: As normal, but assume twice as much time will pass before the bot runs. Useful at high game speeds, high bot speeds, or if the game is laggy. Consider using this mode if you see "Warning: [resource] full" messages in the console.</li>
