@@ -2280,15 +2280,18 @@ settingsMenu = [
         getHtml: () => "Auto SETI: " + (state.autoSeti ? "on" : "off")
     },
 ];
-var eventHandler = action => event => {
+var eventHandler = (action, update) => event => {
     event.preventDefault();
     if (action) action();
-    updateSettingsMenu();
+    update();
 };
-createSettingsButton = data => {
+createSettingsButton = (data, isIndependent) => {
     var button = $('<div id="' + data.name + '" style="margin-bottom: 5px">');
-    button.click(eventHandler(data.leftClick));
-    button.contextmenu(eventHandler(data.rightClick));
+    var updateButton = () => button.html(data.getHtml());
+    var update = isIndependent ? updateButton : updateSettingsMenu;
+    button.click(eventHandler(data.leftClick, update));
+    button.contextmenu(eventHandler(data.rightClick, update));
+    updateButton();
     return button;
 }
 createSettingsMenu = () => {
@@ -2296,7 +2299,6 @@ createSettingsMenu = () => {
     var botSettings = $('<div id="botSettings" style="position: absolute; top: 50px; right: 10px; z-index: 1">');
     settingsMenu.map(createSettingsButton).forEach(button => botSettings.append(button));
     $('#gamePageContainer').append(botSettings);
-    updateSettingsMenu();
 }
 updateSettingsMenu = () => {
     settingsMenu.forEach(item => $('#' + item.name).html(item.getHtml()));
@@ -2368,19 +2370,17 @@ displayTradeAgressionSettings = () => {
         ["ignoreNeeds", "ignoreSeason"].forEach(buttonType => {
             var button = $("#" + buttonType + raceName);
             if (!button.length) {
-                var updateButton = () => $("#" + buttonType + raceName).html(buttonData.getHtml());
                 var buttonData = {
                     name: buttonType + raceName,
                     leftClick: () => { state[buttonType][raceName] = Math.min(2, (state[buttonType][raceName] || 0) + 1); updateButton(); },
                     rightClick: () => { state[buttonType][raceName] = Math.max(0, (state[buttonType][raceName] || 0) - 1); updateButton(); },
                     getHtml: () => buttonType + ": " + ["never", "max gold", "always"][(state[buttonType][raceName] || 0)]
                 }
-                button = createSettingsButton(buttonData);
+                button = createSettingsButton(buttonData, true);
                 button.css("margin-bottom", "0");
                 button.css("margin-left", "10px");
                 button.css("display", "inline-block");
                 elem.children(".title").append(button);
-                updateButton();
             }
         })
     })
@@ -2491,17 +2491,15 @@ displayAutoResetSettings = () => {
     if (game.religion.getRU("apocripha").val) {
         var autoResetButton = $("#autoResetButton");
         if (!autoResetButton.length) {
-            var updateButton = () => $("#autoResetButton").html(buttonData.getHtml());
             var buttonData = {
                 name: "autoResetButton",
                 leftClick: () => { state.autoReset = Math.min(1000, state.autoReset + 100); updateButton(); },
                 rightClick: () => { state.autoReset = Math.max(100, state.autoReset - 100); updateButton(); },
                 getHtml: () => "Auto Reset: " + (state.autoReset === 1000 ? "never" : state.autoReset + "%")
             }
-            autoResetButton = createSettingsButton(buttonData);
+            autoResetButton = createSettingsButton(buttonData, true);
             autoResetButton.css("float", "right");
             getPanel("Order of the Sun").children(".title").append(autoResetButton);
-            updateButton();
         }
     }
 }
@@ -2554,16 +2552,14 @@ displayCraftSettings = () => {
         var id = recipe.name + "AllowedButton"
         var allowedButton = $("#" + id);
         if (!allowedButton.length) {
-            var updateButton = () => $("#" + id).html(buttonData.getHtml());
             var buttonData = {
                 name: id,
                 rightClick: () => { state.restrictedRecipes[recipe.name] = Math.min(2, (state.restrictedRecipes[recipe.name] || 0) + 1); updateButton(); },
                 leftClick: () => { state.restrictedRecipes[recipe.name] = Math.max(0, (state.restrictedRecipes[recipe.name] || 0) - 1); updateButton(); },
                 getHtml: () => recipe.longTitle + ": " + ["yes", "slow", "never"][state.restrictedRecipes[recipe.name] || 0]
             }
-            allowedButton = createSettingsButton(buttonData);
+            allowedButton = createSettingsButton(buttonData, true);
             settingsTable.append(allowedButton);
-            updateButton();
         }
     })
 }
