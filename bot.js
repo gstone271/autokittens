@@ -746,7 +746,10 @@ getSafeStorage = (res, autoCraftLevel, additionalProduction) => {
     var max = getResourceMax(res);
     return max === Infinity ? max : max - autoCraftLevel * state.ticksPerLoop * (getEffectiveResourcePerTick(res, state.ticksPerLoop) + additionalProduction);
 }
-haveEnoughStorage = (prices, reserved) => prices.every(price => getSafeStorage(price.name) >= price.val + (reserved ? reserved.get(price.name).current : 0))
+haveEnoughStorage = (prices, reserved) => {
+    return prices.every(price => getSafeStorage(price.name) >= price.val + (reserved ? reserved.get(price.name).current : 0))
+        || canAfford(prices, reserved)
+}
 isResourceFull = (res, additionalProduction) => getResourceOwned(res) >= getSafeStorage(res, Math.max(state.autoCraftLevel, 1), additionalProduction);
 
 getCraftingResourcePerTick = (res, reserved, forSteel) => {
