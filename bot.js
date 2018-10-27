@@ -1707,7 +1707,7 @@ DataQueable = class extends Queueable {
             && (!this.data.limitBuild || this.data.val < this.data.limitBuild);
     }
     get once() {
-        return this.data.noStackable;
+        return this.data.noStackable || this.data.researched !== undefined;
     }
 }
 DataListQueueable = (dataList, leader) => class extends DataQueable {
