@@ -235,6 +235,7 @@ loadDefaults = () => {
         jobQueue: [],
         populationIncrease: 0,
         tradeTimer: 0,
+        blackcoinTimer: 0,
         speed: 1,
         desiredTicksPerLoop: 8,
         queue: [],
@@ -604,6 +605,21 @@ additionalActions = [
         }
     },
     () => {
+        if (state.autoBcoin && game.diplomacy.get("leviathans").duration && game.science.get("blackchain").researched) {
+            var maxDailyCryptoAdjust = 0.01 / 400
+            //add 1 for paranoia--don't want to miss a market crash (due to lag or rounding error)
+            var daysToNextLoop = Math.ceil(state.ticksPerLoop * (state.autoCraftLevel || 1) / 5) + 1;
+            var daysToMarketCrash = Math.log(game.calendar.cryptoPriceMax / game.calendar.cryptoPrice) / Math.log1p(maxDailyCryptoAdjust)
+            if (daysToNextLoop >= game.diplomacy.get("leviathans").duration || daysToNextLoop >= daysToMarketCrash) {
+                sellBcoin();
+            } else {
+                buyBcoin();
+            }
+        }
+    },
+    () => state.blackcoinTimer++,
+    () => state.tradeTimer++,
+    () => {
         if (state.populationIncrease > 0 && game.village.isFreeKittens() && game.village.sim.getKittens() > state.kittensAssigned) {
             var job = state.jobQueue.find(job => isJobEnabled(job))
             if (job) {
@@ -621,7 +637,6 @@ additionalActions = [
 
         }
     },
-    () => state.tradeTimer++,
     () => {
         if (state.autoReset < 1000 && state.autoReset < getBaseFaithProductionBonus(game.religion.faith)) {
             if (!findQueue("Transcend") && !findQueue("Faith Reset")) {
@@ -1468,6 +1483,33 @@ clearTradeLogs = (expectedTradeMessages) => {
     }
     return tradeMessages;
 }
+sellBcoin = () => {
+    if (game.resPool.get("blackcoin").value) {
+        if (state.api) {
+            //As diplomacy.sellEcoin, but don't send a message
+            var amt = game.resPool.get("blackcoin").value * game.calendar.cryptoPrice;
+            game.resPool.get("relic").value += amt;
+            game.resPool.get("blackcoin").value = 0;
+        } else {
+            tabBuyButton("Trade", "Sell bcoin");
+        }
+    }
+}
+buyBcoin = () => {
+    if (game.resPool.get("relic").value) {
+        if (state.api) {
+            //As diplomacy.buyEcoin, but don't send a message
+            var amt = game.resPool.get("relic").value / game.calendar.cryptoPrice;
+            game.resPool.get("blackcoin").value += amt;
+            game.resPool.get("relic").value = 0;
+        } else {
+            if (state.blackcoinTimer >= tradeTimerDuration) {
+                tabBuyButton("Trade", "Buy bcoin");
+                state.blackcoinTimer = 0;
+            }
+        }
+    }
+}
 
 /************** 
  * Master Plan
@@ -2111,13 +2153,14 @@ game.tick = () => {
  * Interface
 **************/
 ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit",
-    "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Buy bcoin", "Sell bcoin", "Fix Cryochamber"
+    "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Sell bcoin", "Fix Cryochamber"
 ]
 //we could add support for void space and chronoforge, but meh
 ignoredPanels = ["Metaphysics", "Challenges"]
 stateButtons = {
     "Send hunters": "autoHunt",
     "Steel": "autoSteel",
+    "Buy bcoin": "autoBcoin"
 }
 specialBuys = {
     "Hold Festival": HoldFestival,
@@ -2163,7 +2206,7 @@ buttonClick = (elem, leftClick) => {
     var item = getManagedItem(elem);
     var tab = getActiveTab();
     var panel = getPanelTitle(elem);
-    if (tab === "Trade" && !specialBuys[item]) item = panel;
+    if (tab === "Trade" && !specialBuys[item] && !stateButtons[item]) item = panel;
     //Bonfire page refine button has a lowercase c
     if (item === "Refine catnip") item = "Refine Catnip";
     if (stateButtons[item] && tab !== "Science") {
