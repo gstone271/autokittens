@@ -257,7 +257,7 @@ loadDefaults = () => {
         ignoreSeason: {},
         masterPlanMode: 0,
         smartStorage: 0,
-        autoReset: 1000, //should never be 0
+        autoResetThreshold: 1, //should never be 0
         restrictedRecipes: { timeCrystal: 2, sorrow: 2, relic: 2 },
     }
     Object.entries(falseyDefaults).forEach(entry => state[entry[0]] = state[entry[0]] || entry[1]);
@@ -638,7 +638,7 @@ additionalActions = [
         }
     },
     () => {
-        if (state.autoReset < 1000 && state.autoReset < getBaseFaithProductionBonus(game.religion.faith)) {
+        if (state.autoReset && getResetThreshold(state.autoResetThreshold) < getBaseFaithProductionBonus(game.religion.faith)) {
             if (!findQueue("Transcend") && !findQueue("Faith Reset")) {
                 enable("Faith Reset", "Religion", "Order of the Sun");
             }
@@ -2415,8 +2415,8 @@ displayTradeAgressionSettings = () => {
             if (!button.length) {
                 var buttonData = {
                     name: buttonType + raceName,
-                    leftClick: () => { state[buttonType][raceName] = Math.min(2, (state[buttonType][raceName] || 0) + 1); updateButton(); },
-                    rightClick: () => { state[buttonType][raceName] = Math.max(0, (state[buttonType][raceName] || 0) - 1); updateButton(); },
+                    leftClick: () => { state[buttonType][raceName] = Math.min(2, (state[buttonType][raceName] || 0) + 1); },
+                    rightClick: () => { state[buttonType][raceName] = Math.max(0, (state[buttonType][raceName] || 0) - 1); },
                     getHtml: () => buttonType + ": " + ["never", "max gold", "always"][(state[buttonType][raceName] || 0)]
                 }
                 button = createSettingsButton(buttonData, true);
@@ -2530,19 +2530,29 @@ displayApocryphaNeededToTranscend = () => {
         infoRightOfButton("Transcendence").text(" (" + game.getDisplayValueExt(percentageOwned) + "% of apocrypha needed)");
     }
 }
+getResetThreshold = setting => {
+    return (Math.min(setting, 9) + 1 - Math.pow(.5, Math.max(setting - 9, 0))) * 100; 
+}
 displayAutoResetSettings = () => {
     if (game.religion.getRU("apocripha").val) {
-        var autoResetButton = $("#autoResetButton");
-        if (!autoResetButton.length) {
-            var buttonData = {
-                name: "autoResetButton",
-                leftClick: () => { state.autoReset = Math.min(1000, state.autoReset + 100); updateButton(); },
-                rightClick: () => { state.autoReset = Math.max(100, state.autoReset - 100); updateButton(); },
-                getHtml: () => "Auto Reset: " + (state.autoReset === 1000 ? "never" : state.autoReset + "%")
+        var autoResetOnButton = $("#autoResetOn");
+        if (!autoResetOnButton.length) {
+            var onButtonData = {
+                name: "autoResetOn",
+                leftClick: () => { state.autoReset = true; },
+                rightClick: () => { state.autoReset = false; },
+                getHtml: () => "Auto Reset: " + (state.autoReset ? "on" : "off"),
             }
-            autoResetButton = createSettingsButton(buttonData, true);
-            autoResetButton.css("float", "right");
-            getPanel("Order of the Sun").children(".title").append(autoResetButton);
+            var thresholdButtonData = {
+                name: "autoResetThreshold",
+                leftClick: () => { state.autoResetThreshold++; },
+                rightClick: () => { state.autoResetThreshold = Math.max(1, state.autoResetThreshold - 1); },
+                getHtml: () => "Threshold: " + game.getDisplayValueExt(getResetThreshold(state.autoResetThreshold)) + "%",
+            }
+            autoResetOnButton = createSettingsButton(onButtonData, true);
+            var autoResetThresholdButton = createSettingsButton(thresholdButtonData, true);
+            var resetSettings = $('<div style="float: right">').append(autoResetOnButton).append(autoResetThresholdButton);
+            getPanel("Order of the Sun").children(".title").append(resetSettings);
         }
     }
 }
@@ -2597,8 +2607,8 @@ displayCraftSettings = () => {
         if (!allowedButton.length) {
             var buttonData = {
                 name: id,
-                rightClick: () => { state.restrictedRecipes[recipe.name] = Math.min(2, (state.restrictedRecipes[recipe.name] || 0) + 1); updateButton(); },
-                leftClick: () => { state.restrictedRecipes[recipe.name] = Math.max(0, (state.restrictedRecipes[recipe.name] || 0) - 1); updateButton(); },
+                rightClick: () => { state.restrictedRecipes[recipe.name] = Math.min(2, (state.restrictedRecipes[recipe.name] || 0) + 1); },
+                leftClick: () => { state.restrictedRecipes[recipe.name] = Math.max(0, (state.restrictedRecipes[recipe.name] || 0) - 1); },
                 getHtml: () => recipe.longTitle + ": " + ["yes", "slow", "never"][state.restrictedRecipes[recipe.name] || 0]
             }
             allowedButton = createSettingsButton(buttonData, true);
