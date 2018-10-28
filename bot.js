@@ -1502,18 +1502,16 @@ sellBcoin = () => {
     }
 }
 buyBcoin = () => {
-    if (game.resPool.get("relic").value) {
+    if (game.resPool.get("relic").value && state.blackcoinTimer >= tradeTimerDuration) {
         if (state.api) {
             //As diplomacy.buyEcoin, but don't send a message
             var amt = game.resPool.get("relic").value / game.calendar.cryptoPrice;
             game.resPool.get("blackcoin").value += amt;
             game.resPool.get("relic").value = 0;
         } else {
-            if (state.blackcoinTimer >= tradeTimerDuration) {
-                tabBuyButton("Trade", "Buy bcoin");
-                state.blackcoinTimer = 0;
-            }
+            tabBuyButton("Trade", "Buy bcoin");
         }
+        state.blackcoinTimer = 0;
     }
 }
 
