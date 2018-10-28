@@ -1171,7 +1171,7 @@ ticksPerSeason = () => 100 / game.calendar.dayPerTick;
 ticksLeftInSeason = () => (100 - game.calendar.day) / game.calendar.dayPerTick;
 getExpectedCatnipBeforeWinter = () => {
     if (game.calendar.season === 3) return 0;
-    return game.getResourcePerTick("catnip", true) * ticksLeftInSeason()
+    return getTrueResourcePerTick("catnip") * ticksLeftInSeason()
         + (2 - game.calendar.season) * getSeasonalCatnipProduction(1) * ticksPerSeason();
 }
 getWinterCatnipStockNeeded = (isCold, additionalConsumption, ignorePopulationIncrease) => {
