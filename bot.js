@@ -1918,7 +1918,7 @@ HoldFestival = class extends Queueable {
         return [{ name: "manpower", val: 1500 }, { name: "culture", val: 5000 }, { name: "parchment", val: 2500 }];
     }
     isEnabled() {
-        return game.calendar.festivalDays === 0;
+        return game.calendar.festivalDays <= 10 * game.prestige.getPerk("carnivals").researched;
     }
 }
 SendExplorers = class extends Queueable {
