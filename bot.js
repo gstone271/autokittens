@@ -1520,7 +1520,7 @@ sellBcoin = () => {
     }
 }
 buyBcoin = () => {
-    if (game.resPool.get("relic").value && state.blackcoinTimer >= tradeTimerDuration) {
+    if (game.resPool.get("relic").value && state.blackcoinTimer >= 50 / state.ticksPerLoop) {
         if (state.api) {
             //As diplomacy.buyEcoin, but don't send a message
             var amt = game.resPool.get("relic").value / game.calendar.cryptoPrice;
