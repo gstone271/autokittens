@@ -778,6 +778,7 @@ getEffectiveResourcePerTick = (res, bestCaseTicks) => {
     var resourcePerTick = game.getResourcePerTick(res, true);
     var bestCaseDays = Math.ceil(bestCaseTicks * game.calendar.dayPerTick);
     var effectiveDaysPerTick = bestCaseTicks ? bestCaseDays / bestCaseTicks : game.calendar.dayPerTick;
+    resourcePerTick += game.getEffect(res + "PerDay") * effectiveDaysPerTick;
     var meteorRatio = game.prestige.getPerk("chronomancy").researched ? 1.1 : 1
     var starRatio = meteorRatio * (game.prestige.getPerk("astromancy").researched ? 2 : 1)
     if (res === "science" || res === "starchart" && game.science.get("astronomy").researched) {
