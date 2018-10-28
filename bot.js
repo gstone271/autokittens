@@ -811,21 +811,28 @@ getEffectiveResourcePerTick = (res, bestCaseTicks) => {
         var valuePerEvent = (250 + 1500 / 2) * (1 + game.getEffect("ivoryMeteorRatio"));
         resourcePerTick += eventsPerTick * valuePerEvent;
     }
-    //don't bother with ivory hunts or unicorn rifts; it doesn't matter
-    if (res === "furs" && state.autoHunt) {
+    //don't bother with unicorn rifts; it doesn't matter
+    if ((res === "furs" || res === "ivory") && state.autoHunt) {
         var effectiveCatpowerPerTick = Math.max(0, 
             getEffectiveResourcePerTick("manpower", bestCaseTicks)
                 - getEffectiveResourcePerTick("gold", bestCaseTicks) * 50 / 15
         )
-        resourcePerTick += getFursPerHunt() * effectiveCatpowerPerTick / 100;
+        resourcePerTick += (res === "furs" ? getFursPerHunt() : getIvoryPerHunt()) * effectiveCatpowerPerTick / 100;
     }
     //don't bother with the other possible events; they don't have capacities
     return resourcePerTick;
 }
-var getFursPerHunt = () => {
+var getHuntRatio = () => {
     var managerBonus = .05 * (1 + game.prestige.getBurnedParagonRatio())
     var huntRatio = game.getEffect("hunterRatio") + managerBonus;
-    var maxResult = 80 + 65 * huntRatio;
+    return huntRatio;
+}
+var getFursPerHunt = () => {
+    var maxResult = 80 + 65 * getHuntRatio();
+    return maxResult / 2;
+}
+var getIvoryPerHunt = () => {
+    var maxResult = 50 + 40 * getHuntRatio();
     return maxResult / 2;
 }
 
