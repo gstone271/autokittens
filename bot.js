@@ -804,7 +804,14 @@ getEffectiveResourcePerTick = (res, bestCaseTicks) => {
         }
         resourcePerTick += eventsPerTick * valuePerEvent;
     }
-    //don't bother with ivory and unicorns income; it doesn't matter
+    var unicornRatio = game.prestige.getPerk("unicornmancy").researched ? 1.1 : 1;
+    if (res === "ivory") {
+        var ivoryMeteorChance = bestCaseTicks ? 1 : Math.min(1, game.getEffect("ivoryMeteorChance") / 10000 * unicornRatio);
+        var eventsPerTick = ivoryMeteorChance * effectiveDaysPerTick;
+        var valuePerEvent = (250 + 1500 / 2) * (1 + game.getEffect("ivoryMeteorRatio"));
+        resourcePerTick += eventsPerTick * valuePerEvent;
+    }
+    //don't bother with ivory hunts or unicorn rifts; it doesn't matter
     if (res === "furs" && state.autoHunt) {
         var effectiveCatpowerPerTick = Math.max(0, 
             getEffectiveResourcePerTick("manpower", bestCaseTicks)
