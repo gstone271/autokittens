@@ -123,7 +123,7 @@ addLog = item => {
     item.day = roundedDay + 100 * game.calendar.season;
     state.history.push(item);
 }
-logBuy = (bld, numBought) => addLog({ name: bld.name, type: "Buy", buy: bld, num: numBought});
+logBuy = (bld, numBought) => addLog({ name: bld.name, type: "Buy", buy: bld.savedProps(true), num: numBought});
 logKitten = (numKittens, job) => addLog({ name: numKittens + " Kittens", type: "Kitten", kittens: numKittens, job: job});
 logFaith = () => {
     var totalFaith = game.religion.faith;
@@ -1664,7 +1664,10 @@ Queueable = class {
         this.maxPriority = maxPriority;
         this.masterPlan = masterPlan;
     }
-    toJSON(minimal) {
+    toJSON() {
+        return this.savedProps(false);
+    }
+    savedProps(minimal) {
         var props = ["name", "tab", "panel"].concat(minimal ? [] : ["maxPriority", "masterPlan"]);
         var result = {};
         props.forEach(prop => result[prop] = this[prop])
