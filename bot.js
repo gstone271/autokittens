@@ -819,6 +819,9 @@ getEffectiveResourcePerTick = (res, bestCaseTicks) => {
         )
         resourcePerTick += (res === "furs" ? getFursPerHunt() : getIvoryPerHunt()) * effectiveCatpowerPerTick / 100;
     }
+    if (res === "antimatter") {
+        resourcePerTick += game.getEffect("antimatterProduction") / 400 * game.calendar.dayPerTick;
+    }
     //don't bother with the other possible events; they don't have capacities
     return resourcePerTick;
 }
