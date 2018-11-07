@@ -14,6 +14,8 @@ Features include:
   - Space
   - Order of the Sun
   - Ziggurats
+  - Cryptotheology
+  - Time
   - Trade
   - Festivals, Praise the sun!
 - Auto Craft
@@ -27,3 +29,4 @@ Features include:
 - Prevent starvation
 - Increase game speed
 - Disable useless converters
+- Auto Blackcoin
