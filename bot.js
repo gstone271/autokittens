@@ -313,21 +313,21 @@ game._wipe = () => {
 /************** 
  * Queue Logic
 **************/
-Reservations = function(initialReserved) {
-    this.reserved = Object.fromEntries(Object.entries(initialReserved).map(entry => [entry[0], Object.assign({}, entry[1])]));
-}
-Object.assign(Reservations.prototype, {
+Reservations = class {
+    constructor(initialReserved) {
+        this.reserved = Object.fromEntries(Object.entries(initialReserved).map(entry => [entry[0], Object.assign({}, entry[1])]));
+    }
     //reserve current now, plus once you own current, reserve production every tick, until you have total
-    get: function(res) { if (!this.reserved[res]) { this.reserved[res] = { current: 0, production: 0, total: 0 }; } return this.reserved[res]; },
-    add: function(res, current, production, total) {
+    get(res) { if (!this.reserved[res]) { this.reserved[res] = { current: 0, production: 0, total: 0 }; } return this.reserved[res]; }
+    add(res, current, production, total) {
         if ([current, production, total].some(isNaN)) throw new Error("Reserving NaN!")
         var reservation = this.get(res);
         reservation.current += current;
         reservation.production += production;
         reservation.total += total;
-    },
-    addCurrent: function(res, val) { this.add(res, val, 0, val) },
-    addOverTime: function(res, val, ticks, productionAvailable) {
+    }
+    addCurrent(res, val) { this.add(res, val, 0, val) }
+    addOverTime(res, val, ticks, productionAvailable) {
         //todo maybe it would be correct to just not include this, and if production is negative, reserve a negative amount of production if appropriate
         if (productionAvailable < 0) productionAvailable = 0;
         var maxOverTime = ticks * productionAvailable;
@@ -344,9 +344,9 @@ Object.assign(Reservations.prototype, {
             currentNeeded = val - maxOverTime;
         }
         this.add(res, currentNeeded, productionNeeded, val);
-    },
-    clone: function() { return new Reservations(this.reserved) },
-});
+    }
+    clone() { return new Reservations(this.reserved) }
+};
 getTimeToChange = reservations => {
     return Math.ceil(Math.min(...Object.entries(reservations.reserved).map(entry => {
         var resource = entry[0];
