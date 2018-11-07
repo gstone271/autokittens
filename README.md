@@ -13,7 +13,7 @@ Features include:
   - Workshop
   - Space
   - Order of the Sun
-  - Ziggurats (Tears only)
+  - Ziggurats
   - Trade
   - Festivals, Praise the sun!
 - Auto Craft
