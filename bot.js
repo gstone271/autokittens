@@ -355,19 +355,6 @@ getTimeToChange = reservations => {
         return (reservation.total - reservation.current) / reservation.production;
     })))
 }
-//get what the reservations will be the next time a partial reservation is fulfilled, and how many ticks until this happens
-//simulate production of resources by decreasing reservation. assumes that you have enough storage space for both the reservation and whatever you want to buy
-getNextFutureReservations = reservations => {
-    var timeToChange = getTimeToChange(reservations);
-    if (timeToChange === Infinity) {
-        return { ticks: Infinity, reserved: reservations };
-    } else if (timeToChange <= 0) {
-        console.error(reservations);
-        throw new Error("Miscalculated time to change: " + timeToChange);
-    } else {
-        return { ticks: timeToChange, reserved: getFutureReservations(reservations, timeToChange) }
-    }
-}
 getFutureReservations = (reservations, ticksPassed) => {
     return new Reservations(Object.fromEntries(Object.entries(reservations.reserved).map(entry => {
         var resource = entry[0];
@@ -379,8 +366,6 @@ getFutureReservations = (reservations, ticksPassed) => {
         return [resource, { current: current, production: total > current ? reservation.production : 0, total: total }]
     })))
 }
-var getIngredientsNeeded = price => 
-    (canCraft(price.name) ? multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)) ) : [])
 //get the sum of the prices and the prices to craft any missing resources
 getEffectivePrices = (prices, reserved) => {
     var totalPricesMap = {};
@@ -538,29 +523,6 @@ tryBuy = (priorities) => {
 }
 updateQueue = (queue, bought) => {
     return queue.filter(bld => !bought.includes(bld)).concat(bought.filter(bld => !bld.once));
-}
-setVerbosity = level => {
-    if (level >= 0 && level <= 1) {
-        state.verboseQueue = level;
-        updateUpNext(botDebug.priorities);
-    }
-}
-moreVerbose = () => setVerbosity(state.verboseQueue + 1);
-lessVerbose = () => setVerbosity(state.verboseQueue - 1);
-updateUpNext = priorities => {
-    var filter;
-    var getHtml;
-    if (state.verboseQueue) {
-        filter = plan => true;
-        getHtml = plan => "<span" + (plan.viable ? "" : ' style="color: #999999"') + ">"
-             + plan.bld.name
-             + " (" + ticksToDisplaySeconds(plan.ticksNeeded) + ")"
-             + " (" + Array.from(new Set(plan.limiting.concat(plan.unavailable))).map(getResourceTitle).join(", ") + ")</span>"
-    } else {
-        filter = plan => plan.viable;
-        getHtml = plan => plan.bld.name;
-    }
-    $("#botInfo").html("Up next: <br />" + priorities.filter(filter).map(getHtml).join("<br />"));
 }
 buyPrioritiesQueue = (queue) => {
     var maxPriority = queue.filter(bld => bld.maxPriority);
@@ -811,7 +773,6 @@ getEffectiveResourcePerTick = (res, bestCaseTicks) => {
         var valuePerEvent = (250 + 1500 / 2) * (1 + game.getEffect("ivoryMeteorRatio"));
         resourcePerTick += eventsPerTick * valuePerEvent;
     }
-    //don't bother with unicorn rifts; it doesn't matter
     if ((res === "furs" || res === "ivory") && state.autoHunt) {
         var effectiveCatpowerPerTick = Math.max(0, 
             getEffectiveResourcePerTick("manpower", bestCaseTicks)
@@ -822,7 +783,7 @@ getEffectiveResourcePerTick = (res, bestCaseTicks) => {
     if (res === "antimatter") {
         resourcePerTick += game.getEffect("antimatterProduction") / 400 * game.calendar.dayPerTick;
     }
-    //don't bother with the other possible events; they don't have capacities
+    //don't bother with unicorn rifts and other events for now
     return resourcePerTick;
 }
 var getHuntRatio = () => {
@@ -959,6 +920,8 @@ loadUnicornRecipes = () => {
 }
 getCraftPrices = craft => { return recipeMap[craft].prices }
 multiplyPrices = (prices, quantity) => prices.map(price => ({ name: price.name, val: price.val * quantity }))
+getIngredientsNeeded = price => 
+    (canCraft(price.name) ? multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name))) : [])
 craftTableElem = $('.craftTable');
 getCraftTableElem = () => {
     if (!craftTableElem.length) {
@@ -1616,7 +1579,6 @@ scienceData = {
 var queueNewTechs = () => {
     ["Workshop", "Science"].forEach(tab => {
         getUnresearched(scienceData[tab]).filter(isUseful).filter(notTooExpensive).forEach(bld => {
-            //todo require that it's enabled???
             if (!findQueue(bld.label))
                 enable(bld.label, tab, undefined, false, true);
         })
@@ -2257,6 +2219,29 @@ updateManagementButtons = () => {
     var tabCache = getActiveTab();
     $("p.botManage").each((idx, elem) => updateButton(elem, tabCache));
 }
+setVerbosity = level => {
+    if (level >= 0 && level <= 1) {
+        state.verboseQueue = level;
+        updateUpNext(botDebug.priorities);
+    }
+}
+moreVerbose = () => setVerbosity(state.verboseQueue + 1);
+lessVerbose = () => setVerbosity(state.verboseQueue - 1);
+updateUpNext = priorities => {
+    var filter;
+    var getHtml;
+    if (state.verboseQueue) {
+        filter = plan => true;
+        getHtml = plan => "<span" + (plan.viable ? "" : ' style="color: #999999"') + ">"
+             + plan.bld.name
+             + " (" + ticksToDisplaySeconds(plan.ticksNeeded) + ")"
+             + " (" + Array.from(new Set(plan.limiting.concat(plan.unavailable))).map(getResourceTitle).join(", ") + ")</span>"
+    } else {
+        filter = plan => plan.viable;
+        getHtml = plan => plan.bld.name;
+    }
+    $("#botInfo").html("Up next: <br />" + priorities.filter(filter).map(getHtml).join("<br />"));
+}
 ticksToDisplaySeconds = ticks => ticks === Infinity ? "???" : game.toDisplaySeconds(ticks / game.rate)
 settingsMenu = [
     {
@@ -2754,10 +2739,6 @@ early game needs:
 --try harder to get rid of ivory??
 --don't spam First time crafting foobar if it's reduced to 0 (eg. negative production)
 organize code (but it has to be one file :/)
-reservations seems still not correct (crafting too early)
---eg blueprint need, with enough compendiums, still reserves
---kittens can still starve in cold winter??? doesn't seem to be reserving properly
-----might have been a race condition with the first day of winter
 log human actions?
 don't craft away Chronosphere resources
 check for updates
@@ -2766,9 +2747,6 @@ fix once for buildings--check at time of buy
 populationIncrease has problems, ever since the kittensAssigned added
 --fix when two kittens arrive in one loop
 deal with building upgrades (or maybe just don't; might be optimal)
-mode to not craft compendiums
-add extra info to help
-add extra settings to help
 allow buying stuff with cost between safe storage and actual storage
 --when all resources are close to full, allow them to become completely full
 can't get religion bonus while on religion tab
