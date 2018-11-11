@@ -547,7 +547,6 @@ mainLoop = () => {
         preventStarvation();
     }
     if (state.autoSteel) craftAll("steel")
-    //todo make trades try harder to do more
     if (isResourceFull("gold")) state.queue.filter(bld => bld.constructor.name === "Trade" && bld.isEnabled()).forEach(bld => promote(bld.name));
     state.queue = buyPrioritiesQueue(state.queue);
     if (state.autoConverters) manageConverters();
@@ -1081,7 +1080,7 @@ getCraftRatio = res => game.getResCraftRatio({ name: res }) + 1;
 makeCraft = (craft, amountNeeded, reserved) => {
     var recipe = recipeMap[craft];
     if (recipe.mayCraft) {
-        //TODO instead implement this as a reservation
+        //TODO instead implement mayCraft as a reservation
         var timesToCraft = Math.ceil(amountNeeded / recipe.craftRatio);
         var totalPrices = multiplyPrices(recipe.prices, timesToCraft);
         craftAdditionalNeeded(totalPrices, reserved);
@@ -2760,7 +2759,6 @@ early game needs:
 ----unassign scholars when useless (reassign?)
 ----wood/geologist efficiency (for trade)
 ----job ratio, change ratio with upgrades?
---promote leader
 --try harder to get rid of ivory??
 --don't spam First time crafting foobar if it's reduced to 0 (eg. negative production)
 organize code (but it has to be one file :/)
@@ -2768,7 +2766,6 @@ log human actions?
 don't craft away Chronosphere resources
 check for updates
 payoff time for buildings
-fix once for buildings--check at time of buy
 populationIncrease has problems, ever since the kittensAssigned added
 --fix when two kittens arrive in one loop
 deal with building upgrades (or maybe just don't; might be optimal)
