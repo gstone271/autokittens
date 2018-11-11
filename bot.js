@@ -1301,27 +1301,23 @@ clickSetLeader = (newLeader, job) => {
 }
 assignFirstLeader = () => {
     if (!state.leaderAssigned && game.science.get("civil").researched) {
-        if (game.village.leader) {
-            //TODO does the game just automake a leader when you get civil???
-            state.leaderAssigned = true;
-        } else {
-            var isArtisan = kitten => kitten.trait.name === "engineer";
-            var targetLeader;
-            if (state.api >= 1) {
-                targetLeader = game.village.sim.kittens.find(isArtisan);
-                if (targetLeader) {
-                    apiSetLeader(targetLeader);
-                }
-            } else {
-                var clickable = getClickableKitten(isArtisan);
-                if (clickable) {
-                    targetLeader = clickable.kitten;
-                    withTab("Village", () => clickSetLeader(targetLeader, clickable.job));
-                }
-            }
+        var isArtisan = kitten => kitten.trait.name === "engineer";
+        var targetLeader;
+        if (state.api >= 1) {
+            targetLeader = game.village.sim.kittens.find(isArtisan);
             if (targetLeader) {
-                log("Assigned first leader to Artisan (job: " + getJobLongName(targetLeader.job) + ")")
+                apiSetLeader(targetLeader);
             }
+        } else {
+            var clickable = getClickableKitten(isArtisan);
+            if (clickable) {
+                targetLeader = clickable.kitten;
+                withTab("Village", () => clickSetLeader(targetLeader, clickable.job));
+            }
+        }
+        if (targetLeader) {
+            log("Assigned first leader to Artisan (job: " + getJobLongName(targetLeader.job) + ")");
+            state.leaderAssigned = true;
         }
     }
 }
