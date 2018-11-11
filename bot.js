@@ -1887,6 +1887,34 @@ Transcend = class extends Queueable {
         return [{ name: "faith", val: .95 * getResourceMax("faith") }];
     }
 }
+PromoteLeader = class extends Queueable {
+    constructor(name, tab, panel, maxPriority, masterPlan) {
+        super(name, tab, panel, maxPriority, masterPlan);
+        this.quiet = true;
+    }
+    buy() {
+        if (state.api >= 1) {
+            game.village.sim.promote(game.village.leader);
+        } else {
+            withTab("Village", () => {
+                $('a:contains("Promote (")')[0].click();
+            });
+        }
+        log("Promoted leader to rank " + this.getLeaderRank());
+        
+    }
+    getLeaderRank() {
+        return game.village.leader.rank;
+    }
+    getPrices() {
+        return [{ name: "gold", val: 25 * (this.getLeaderRank() + 1) }];
+    }
+    isEnabled() {
+        var rank = this.getLeaderRank();
+        var expNeeded = 500 * Math.pow(1.75, rank);
+        return rank < 10 && game.village.leader.exp >= expNeeded;
+    }
+}
 HoldFestival = class extends Queueable {
     constructor(name, tab, panel, maxPriority, masterPlan) {
         super(name, tab, panel, maxPriority, masterPlan);
@@ -2135,7 +2163,7 @@ game.tick = () => {
 /************** 
  * Interface
 **************/
-ignoredButtons = ["Gather catnip", "Manage Jobs", "Promote kittens", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit",
+ignoredButtons = ["Gather catnip", "Manage Jobs", "Clear", "Reset", "Tempus Stasit", "Tempus Fugit",
     "Sacrifice Unicorns", "Sacrifice Alicorns", "Refine Tears", "Refine Time Crystals", "Sell bcoin", "Fix Cryochamber"
 ]
 //we could add support for void space and chronoforge, but meh
@@ -2146,6 +2174,7 @@ stateButtons = {
     "Buy bcoin": "autoBcoin"
 }
 specialBuys = {
+    "Promote kittens": PromoteLeader,
     "Hold Festival": HoldFestival,
     "Faith Reset": Transcend,
     "Transcend": Transcend,
