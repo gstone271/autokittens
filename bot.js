@@ -524,12 +524,22 @@ tryBuy = (priorities) => {
 updateQueue = (queue, bought) => {
     return queue.filter(bld => !bought.includes(bld)).concat(bought.filter(bld => !bld.once));
 }
-buyPrioritiesQueue = (queue) => {
-    var maxPriority = queue.filter(bld => bld.maxPriority);
-    queue = maxPriority.concat(queue.filter(bld => !bld.maxPriority));
+promoteHighPriorities = queue => {
+    if (isResourceFull("gold")) {
+        queue = promoteMulti(queue, bld => bld.constructor.name === "Trade" && bld.isEnabled());
+    }
+    queue = promoteMulti(queue, bld => bld.maxPriority);
+    return queue;
+}
+getInitialReservations = () => {
     var reserved = new Reservations({});
     reserved.addCurrent("catnip", getWinterCatnipStockNeeded(canHaveColdSeason()));
     reserved.addCurrent("furs", getFursStockNeeded());
+    return reserved;
+}
+buyPrioritiesQueue = (queue) => {
+    queue = promoteHighPriorities(queue);
+    var reserved = getInitialReservations();
     var priorities = findPriorities(queue, reserved);
     botDebug.priorities = priorities;
     updateUpNext(priorities);
@@ -547,7 +557,6 @@ mainLoop = () => {
         preventStarvation();
     }
     if (state.autoSteel) craftAll("steel")
-    if (isResourceFull("gold")) state.queue.filter(bld => bld.constructor.name === "Trade" && bld.isEnabled()).forEach(bld => promote(bld.name));
     state.queue = buyPrioritiesQueue(state.queue);
     if (state.autoConverters) manageConverters();
     loadUnicornRecipes();
@@ -555,9 +564,14 @@ mainLoop = () => {
     additionalActions.forEach(action => action());
     if (state.masterPlanMode) queueNewTechs();
     updateUi();
+    countTicks();
+}
+countTicks = () => {
     var ticksPassed = game.ticks - state.ticks;
     if (ticksPassed !== state.ticksPerLoop) console.log(ticksPassed + " ticks passed (expected " + state.ticksPerLoop + ")")
     state.ticks = game.ticks;
+    state.blackcoinTimer++;
+    state.tradeTimer++;
 }
 additionalActions = [
     () => {
@@ -581,8 +595,6 @@ additionalActions = [
             }
         }
     },
-    () => state.blackcoinTimer++,
-    () => state.tradeTimer++,
     () => {
         if (state.populationIncrease > 0 && game.village.isFreeKittens() && game.village.sim.getKittens() > state.kittensAssigned) {
             var job = state.jobQueue.find(job => isJobEnabled(job))
@@ -1991,6 +2003,11 @@ getPriority = name => {
 }
 promote = name => { var item = findQueue(name); disable(name); if (item) state.queue.unshift(item); }
 demote = name => { var item = findQueue(name); disable(name); if (item) state.queue.push(item); }
+promoteMulti = (queue, fun) => {
+    var toPromote = queue.filter(fun);
+    var rest = queue.filter(bld => !fun(bld));
+    return toPromote.concat(rest);
+}
 increasePriority = (name, tab, panel) => {
     var existing = findQueue(name);
     if (existing) {
