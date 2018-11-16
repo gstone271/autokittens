@@ -551,20 +551,54 @@ buyPrioritiesQueue = (queue) => {
  * Main Loop
 **************/
 mainLoop = () => {
-    assignFirstLeader();
-    if (state.autoFarmer) {
-        gatherIntialCatnip();
-        preventStarvation();
-    }
-    if (state.autoSteel) craftAll("steel")
+    doChores();
+    manageJobs();
     state.queue = buyPrioritiesQueue(state.queue);
     if (state.autoConverters) manageConverters();
     loadUnicornRecipes();
     doAutoCraft();
-    additionalActions.forEach(action => action());
     if (state.masterPlanMode) queueNewTechs();
     updateUi();
     countTicks();
+}
+doChores = () => {
+    if (state.autoFarmer) gatherIntialCatnip();
+    if (state.autoSteel) craftAll("steel");
+    if (state.autoSeti) $('#observeBtn').click();
+    if (state.autoHunt && (isResourceFull("manpower") || getTotalDemand("manpower") === 0) && getResourceOwned("manpower") >= 100) { 
+        withLeader("Manager", () => $('a:contains("Send hunters")')[0].click());
+    }
+    if (state.autoBcoin) autoTradeBcoin();
+    if (state.autoReset && getResetThreshold(state.autoResetThreshold) < getBaseFaithProductionBonus(game.religion.faith)) {
+        if (!findQueue("Transcend") && !findQueue("Faith Reset")) {
+            enable("Faith Reset", "Religion", "Order of the Sun");
+        }
+    } else {
+        disable("Faith Reset");
+    }
+}
+manageJobs = () => {
+    //assigning first leader is one of the only things the bot will do with no way to disable it; maybe add an option?
+    assignFirstLeader();
+    if (state.autoFarmer) {
+        preventStarvation();
+    }
+    if (state.populationIncrease > 0 && game.village.isFreeKittens() && game.village.sim.getKittens() > state.kittensAssigned) {
+        var job = state.jobQueue.find(job => isJobEnabled(job))
+        if (job) {
+            state.jobQueue = removeOne(state.jobQueue, job);
+            state.jobQueue.push(job);
+        } else {
+            //job that's always enabled
+            job = "woodcutter";
+        }
+        //it's actually possible to cheat and click on a button that hasn't been revealed yet
+        withTab("Village", () => {
+            getJobButton(job).click();
+            log("Assigned new kitten to " + job);
+        });
+        recountKittens(job);
+    }
 }
 countTicks = () => {
     var ticksPassed = game.ticks - state.ticks;
@@ -573,56 +607,6 @@ countTicks = () => {
     state.blackcoinTimer++;
     state.tradeTimer++;
 }
-additionalActions = [
-    () => {
-        if (state.autoSeti) $('#observeBtn').click()
-    },
-    () => { 
-        if (state.autoHunt && (isResourceFull("manpower") || getTotalDemand("manpower") === 0) && getResourceOwned("manpower") >= 100) { 
-            withLeader("Manager", () => $('a:contains("Send hunters")')[0].click())
-        }
-    },
-    () => {
-        if (state.autoBcoin && game.diplomacy.get("leviathans").duration && game.science.get("blackchain").researched) {
-            var maxDailyCryptoAdjust = 0.01 / 400
-            //add 1 for paranoia--don't want to miss a market crash (due to lag or rounding error)
-            var daysToNextLoop = Math.ceil(state.ticksPerLoop * (state.autoCraftLevel || 1) / 5) + 1;
-            var daysToMarketCrash = Math.log(game.calendar.cryptoPriceMax / game.calendar.cryptoPrice) / Math.log1p(maxDailyCryptoAdjust)
-            if (daysToNextLoop >= game.diplomacy.get("leviathans").duration || daysToNextLoop >= daysToMarketCrash) {
-                sellBcoin();
-            } else {
-                buyBcoin();
-            }
-        }
-    },
-    () => {
-        if (state.populationIncrease > 0 && game.village.isFreeKittens() && game.village.sim.getKittens() > state.kittensAssigned) {
-            var job = state.jobQueue.find(job => isJobEnabled(job))
-            if (job) {
-                state.jobQueue = removeOne(state.jobQueue, job);
-                state.jobQueue.push(job);
-            } else {
-                job = "woodcutter";
-            }
-            //it's actually possible to cheat and click on a button that hasn't been revealed yet
-            withTab("Village", () => {
-                getJobButton(job).click();
-                log("Assigned new kitten to " + job);
-            });
-            recountKittens(job);
-
-        }
-    },
-    () => {
-        if (state.autoReset && getResetThreshold(state.autoResetThreshold) < getBaseFaithProductionBonus(game.religion.faith)) {
-            if (!findQueue("Transcend") && !findQueue("Faith Reset")) {
-                enable("Faith Reset", "Religion", "Order of the Sun");
-            }
-        } else {
-            disable("Faith Reset");
-        }
-    }
-]
 
 /************** 
  * Conversion
@@ -1500,6 +1484,19 @@ buyBcoin = () => {
             tabBuyButton("Trade", "Buy bcoin");
         }
         state.blackcoinTimer = 0;
+    }
+}
+autoTradeBcoin = () => {
+    if (game.diplomacy.get("leviathans").duration && game.science.get("blackchain").researched) {
+        var maxDailyCryptoAdjust = 0.01 / 400
+        //add 1 for paranoia--don't want to miss a market crash (due to lag or rounding error)
+        var daysToNextLoop = Math.ceil(state.ticksPerLoop * (state.autoCraftLevel || 1) / 5) + 1;
+        var daysToMarketCrash = Math.log(game.calendar.cryptoPriceMax / game.calendar.cryptoPrice) / Math.log1p(maxDailyCryptoAdjust)
+        if (daysToNextLoop >= game.diplomacy.get("leviathans").duration || daysToNextLoop >= daysToMarketCrash) {
+            sellBcoin();
+        } else {
+            buyBcoin();
+        }
     }
 }
 
