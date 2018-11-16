@@ -215,21 +215,11 @@ reloadQueue = queue => {
 }
 load = () => {
     var data = localStorage.getItem("simba.state");
-    var removeOldSave = false;
-    if (!data) {
-      data = localStorage.getItem("autokittens.state");
-      if (data) {
-        removeOldSave = true;
-      }
-    }
     if (data) {
         loadString(data);
     }
     loadDefaults();
     initialize();
-    if (removeOldSave) {
-      localStorage.removeItem("autokittens.state");
-    }
 }
 loadDefaults = () => {
     if (!window.state) state = {};
