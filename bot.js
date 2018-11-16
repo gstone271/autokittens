@@ -1,5 +1,5 @@
 //Paste the contents of this file directly into the developer console
-$("#botHelp").remove()
+$("#botHelp").remove();
 $('#helpDiv').prepend($(`<div id="botHelp">
 <h2>Simba by Griffin Stone</h2>
 <p>This program adds queueing buttons to the left of tasks you can automate, settings in the upper right, and queue information in the lower right.</p>
@@ -65,10 +65,10 @@ $('#helpDiv').prepend($(`<div id="botHelp">
 <p>Compatibility: Simba requires a modern browser (with HTML5 and ES6) and is currently only compatible with the English version of the game.</p>
 <hr />
 <h3>Kittens Game Official "Help"</h3>
-</div>`))
+</div>`));
 $('#helpDiv').css({"margin-top": "0", top: "10%", overflow: "auto", "max-height": "75%"});
-$("#botInfo").remove()
-$('#gamePageContainer').append($('<div id="botInfo" style="position: absolute; bottom: 50px; right: 10px;">'))
+$("#botInfo").remove();
+$('#gamePageContainer').append($('<div id="botInfo" style="position: absolute; bottom: 50px; right: 10px;">'));
 updateBotInfoWidth = () => $("#botInfo").css("max-width", Math.max(225, $("#game").width() - $("#rightColumn")[0].getBoundingClientRect().right - 20));
 updateBotInfoWidth();
 $(window).resize(updateBotInfoWidth);
@@ -114,190 +114,64 @@ removeOne = (arr, match) => {
 }
 
 /************** 
- * Logging
+ * Main Loop
 **************/
-log = (msg, quiet) => { console.log(msg); if (!quiet) game.msg(msg); }
-addLog = item => {
-    item.year = game.calendar.year;
-    var roundedDay = Math.round(game.calendar.day * 100) / 100
-    item.day = roundedDay + 100 * game.calendar.season;
-    state.history.push(item);
+mainLoop = () => {
+    doChores();
+    manageJobs();
+    state.queue = buyPrioritiesQueue(state.queue);
+    if (state.autoConverters) manageConverters();
+    loadUnicornRecipes();
+    doAutoCraft();
+    if (state.masterPlanMode) queueNewTechs();
+    updateUi();
+    countTicks();
 }
-logBuy = (bld, numBought) => addLog({ name: bld.name, type: "Buy", buy: bld.savedProps(true), num: numBought});
-logKitten = (numKittens, job) => addLog({ name: numKittens + " Kittens", type: "Kitten", kittens: numKittens, job: job});
-logFaith = () => {
-    var totalFaith = game.religion.faith;
-    addLog({ name: game.getDisplayValueExt(totalFaith) + " Faith", type: "Faith", faith: totalFaith});
-}
-logTrades = () => {
-    var totalTrades = state.totalTrades;
-    addLog({ name: game.getDisplayValueExt(totalTrades) + " Trades", type: "Trades", trades: totalTrades});
-}
-logReset = () => addLog({ name: "Reset", type: "Reset", kittens: game.village.sim.getKittens()});
-rotateLogs = () => {
-    state.previousHistories.push(state.history);
-    state.history = [];
-    //compress previous histories in advance so that saving doesn't need too much CPU
-    state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
-}
-if (!game.realResetAutomatic) game.realResetAutomatic = game.resetAutomatic;
-game.resetAutomatic = () => {
-    logFaith();
-    logReset();
-    rotateLogs();
-    state.queue = []; //todo reload master plan
-    state.jobQueue = [];
-    state.numKittens = 0;
-    state.kittensAssigned = 0;
-    state.populationIncrease = 0;
-    state.autoHunt = false;
-    state.autoSteel = false;
-    if (window.usingBotStarter) {
-        //based on resetAutomatic code
-		game.timer.scheduleEvent(dojo.hitch(this, function() {
-            game._resetInternal();
-            game.mobileSaveOnPause = false;
-            console.log("Reloading parent page")
-            window.parent.location.reload();
-        }));
+doChores = () => {
+    if (state.autoFarmer) gatherIntialCatnip();
+    if (state.autoSteel) craftAll("steel");
+    if (state.autoSeti) $('#observeBtn').click();
+    if (state.autoHunt && (isResourceFull("manpower") || getTotalDemand("manpower") === 0) && getResourceOwned("manpower") >= 100) { 
+        withLeader("Manager", () => $('a:contains("Send hunters")')[0].click());
+    }
+    if (state.autoBcoin) autoTradeBcoin();
+    if (state.autoReset && getResetThreshold(state.autoResetThreshold) < getBaseFaithProductionBonus(game.religion.faith)) {
+        if (!findQueue("Transcend") && !findQueue("Faith Reset")) {
+            enable("Faith Reset", "Religion", "Order of the Sun");
+        }
     } else {
-        game.realResetAutomatic();
+        disable("Faith Reset");
     }
 }
-recountKittens = (newJob) => {
-    var kittens = game.village.sim.getKittens();
-    if (state.populationIncrease > 0) {
-        state.populationIncrease--;
-        state.kittensAssigned++;
+manageJobs = () => {
+    //assigning first leader is one of the only things the bot will do with no way to disable it; maybe add an option?
+    assignFirstLeader();
+    if (state.autoFarmer) {
+        preventStarvation();
     }
-    if (state.populationIncrease === 0) {
-        state.kittensAssigned = kittens;
+    if (state.populationIncrease > 0 && game.village.isFreeKittens() && game.village.sim.getKittens() > state.kittensAssigned) {
+        var job = state.jobQueue.find(job => isJobEnabled(job))
+        if (job) {
+            state.jobQueue = removeOne(state.jobQueue, job);
+            state.jobQueue.push(job);
+        } else {
+            //job that's always enabled
+            job = "woodcutter";
+        }
+        //it's actually possible to cheat and click on a button that hasn't been revealed yet
+        withTab("Village", () => {
+            getJobButton(job).click();
+            log("Assigned new kitten to " + job);
+        });
+        recountKittens(job);
     }
-    if (kittens > state.numKittens) {
-        state.numKittens = kittens;
-        logKitten(kittens, newJob)
-    }
 }
-getBestResetPoint = (history, onlyLocalMaxima) =>
-    history
-        .filter(entry => entry.type === "Kitten" || entry.type === "Reset")
-        .map(entry => ({paragon: Math.max(0, entry.kittens - 70), year: entry.year + entry.day / 400}))
-        .filter(entry => entry.year > 0) //prevent Infinity and NaN with cryochambers
-        .map(entry => ({paragon: entry.paragon, year: entry.year, ratio: entry.paragon / entry.year}))
-		.filter((point, index, arr) => !onlyLocalMaxima || point.ratio > 0 && [arr[index - 1], arr[index + 1]].every(neighbor => !neighbor || point.ratio >= neighbor.ratio))
-        .sort((a, b) => b.ratio - a.ratio)
-
-/************** 
- * Save/Load
-**************/
-save = () => { localStorage.setItem("simba.state", exportSave()); console.log("Bot state saved"); }
-loadString = string => {
-    var parsed = JSON.parse(LZString.decompressFromBase64(string));
-    var rawQueue = parsed.queue;
-    parsed.queue = [];
-    if (parsed.previousHistoriesCompressed) { parsed.previousHistories = JSON.parse(LZString.decompressFromBase64(parsed.previousHistoriesCompressed)); }
-    state = parsed;
-    reloadQueue(rawQueue);
-}
-exportSave = () => {
-    var savedState = Object.assign({}, state);
-    delete(savedState.previousHistories); //use previousHistoriesCompressed instead to save CPU
-    return LZString.compressToBase64(JSON.stringify(savedState));
-}
-importSave = saveString => {
-    loadString(saveString);
-    loadDefaults();
-    initialize();
-}
-reloadQueue = queue => {
-    state.queue = [];
-    queue.forEach(item => enable(item.name, item.tab, item.panel, item.maxPriority, item.masterPlan));
-}
-load = () => {
-    var data = localStorage.getItem("simba.state");
-    if (data) {
-        loadString(data);
-    }
-    loadDefaults();
-    initialize();
-}
-loadDefaults = () => {
-    if (!window.state) state = {};
-    if (!window.botDebug) botDebug = {};
-    falseyDefaults = {
-        jobQueue: [],
-        populationIncrease: 0,
-        tradeTimer: 0,
-        blackcoinTimer: 0,
-        speed: 1,
-        desiredTicksPerLoop: 8,
-        queue: [],
-        ticks: game.ticks,
-        history: [],
-        previousHistories: [],
-        numKittens: game.village.sim.getKittens(),
-        kittensAssigned: game.village.sim.getKittens(),
-        leaderAssigned: game.village.leader ? true : false,
-        verboseQueue: 0,
-        disabledConverters: {},
-        tradeMessages: 0,
-        tradeResourceTotal: {}, 
-        totalTrades: 0,
-        lastTradeSeason: 0,
-        lastTradeQuantity: 0,
-        loopsUntilRun: 0,
-        ignoreNeeds: {},
-        ignoreSeason: {},
-        masterPlanMode: 0,
-        smartStorage: 0,
-        autoResetThreshold: 1, //should never be 0
-        restrictedRecipes: { timeCrystal: 2, sorrow: 2, relic: 2 },
-    }
-    Object.entries(falseyDefaults).forEach(entry => state[entry[0]] = state[entry[0]] || entry[1]);
-    if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
-    undefinedDefaults = {
-        desiredApi: 1,
-        autoCraftLevel: 1,
-        autoFarmer: 1,
-        autoSeti: true,
-        autoConverters: true,
-        runInGameLoop: true,
-    }
-    Object.entries(undefinedDefaults).forEach(entry => { if (state[entry[0]] === undefined) state[entry[0]] = entry[1] });
-}
-initialize = () => {
+countTicks = () => {
+    var ticksPassed = game.ticks - state.ticks;
+    if (ticksPassed !== state.ticksPerLoop) console.log(ticksPassed + " ticks passed (expected " + state.ticksPerLoop + ")")
     state.ticks = game.ticks;
-    setSpeed(state.speed);
-    createSettingsMenu();
-}
-if (!game.console.realSave) game.console.realSave = game.console.save;
-game.console.save = (data) => {
-    try {
-        save();
-    } catch (err) {
-        //eg. not enough storage
-        //todo warn the user more loudly?
-        console.error(err);
-    }
-    game.console.realSave(data);
-}
-wipeBotSave = () => localStorage.removeItem("simba.state");
-if (!game.real_wipe) game.real_wipe = game._wipe;
-game._wipe = () => {
-    if (window.usingBotStarter) {
-        //based on _wipe code
-		game.timer.scheduleEvent(dojo.hitch(this, function() {
-            wipeBotSave();
-            game.mobileSaveOnPause = false;
-            delete(LCstorage["com.nuclearunicorn.kittengame.savedata"]);
-            //don't bother wiping the language setting
-            console.log("Reloading parent page")
-            window.parent.location.reload();
-        }));
-    } else {
-        wipeBotSave();
-        game.real_wipe();
-    }
+    state.blackcoinTimer++;
+    state.tradeTimer++;
 }
 
 /************** 
@@ -538,125 +412,6 @@ buyPrioritiesQueue = (queue) => {
 }
 
 /************** 
- * Main Loop
-**************/
-mainLoop = () => {
-    doChores();
-    manageJobs();
-    state.queue = buyPrioritiesQueue(state.queue);
-    if (state.autoConverters) manageConverters();
-    loadUnicornRecipes();
-    doAutoCraft();
-    if (state.masterPlanMode) queueNewTechs();
-    updateUi();
-    countTicks();
-}
-doChores = () => {
-    if (state.autoFarmer) gatherIntialCatnip();
-    if (state.autoSteel) craftAll("steel");
-    if (state.autoSeti) $('#observeBtn').click();
-    if (state.autoHunt && (isResourceFull("manpower") || getTotalDemand("manpower") === 0) && getResourceOwned("manpower") >= 100) { 
-        withLeader("Manager", () => $('a:contains("Send hunters")')[0].click());
-    }
-    if (state.autoBcoin) autoTradeBcoin();
-    if (state.autoReset && getResetThreshold(state.autoResetThreshold) < getBaseFaithProductionBonus(game.religion.faith)) {
-        if (!findQueue("Transcend") && !findQueue("Faith Reset")) {
-            enable("Faith Reset", "Religion", "Order of the Sun");
-        }
-    } else {
-        disable("Faith Reset");
-    }
-}
-manageJobs = () => {
-    //assigning first leader is one of the only things the bot will do with no way to disable it; maybe add an option?
-    assignFirstLeader();
-    if (state.autoFarmer) {
-        preventStarvation();
-    }
-    if (state.populationIncrease > 0 && game.village.isFreeKittens() && game.village.sim.getKittens() > state.kittensAssigned) {
-        var job = state.jobQueue.find(job => isJobEnabled(job))
-        if (job) {
-            state.jobQueue = removeOne(state.jobQueue, job);
-            state.jobQueue.push(job);
-        } else {
-            //job that's always enabled
-            job = "woodcutter";
-        }
-        //it's actually possible to cheat and click on a button that hasn't been revealed yet
-        withTab("Village", () => {
-            getJobButton(job).click();
-            log("Assigned new kitten to " + job);
-        });
-        recountKittens(job);
-    }
-}
-countTicks = () => {
-    var ticksPassed = game.ticks - state.ticks;
-    if (ticksPassed !== state.ticksPerLoop) console.log(ticksPassed + " ticks passed (expected " + state.ticksPerLoop + ")")
-    state.ticks = game.ticks;
-    state.blackcoinTimer++;
-    state.tradeTimer++;
-}
-
-/************** 
- * Conversion
-**************/
-converters = ["smelter", "calciner", "biolab", "accelerator"]
-getEffectsByNamePattern = (effects, pattern) => {
-    return Object.keys(effects)
-        .filter(name => name.match(pattern))
-        .map(key => ({name: key.replace(pattern, ""), val: effects[key]}))
-}
-getConsumptionsPerTick = effects => getEffectsByNamePattern(effects, /PerTickCon$/)
-getProductionsPerTick = effects => getEffectsByNamePattern(effects, /PerTickAutoprod$/)
-//if adding is true, reject productions that, if added, would make the resource become full
-//otherwise, only reject productions of resources that are already full
-//either way, only reject productions if they cannot be crafted into something useful
-isUselessProduction = (production, adding) => {
-    return production.val === 0 || (
-        isResourceFull(production.name, adding ? production.val * getResourceConversionRatio(production.name) : 0)
-        && !autoCrafts.some(craft => 
-            canCraft(craft.name) && craft.prices.some(price => price.name === production.name) && getTotalDemand(craft.name) > 0
-        )
-    )
-}
-manageConverters = () => {
-    converters.map(name => game.bld.get(name)).forEach(converter => {
-        var productions = getProductionsPerTick(converter.effects);
-        if (converter.on && productions.length && productions.every(isUselessProduction)) {
-            console.log("Disabling " + converter.name);
-            enableConverter(converter, -1);
-            state.disabledConverters[converter.name] = Math.min(converter.val, 1 + (state.disabledConverters[converter.name] || 0));
-        } else if (state.disabledConverters[converter.name] && productions.some(production => !isUselessProduction(production, true))) {
-            console.log("Re-enabling " + converter.name);
-            enableConverter(converter, 1);
-            state.disabledConverters[converter.name]--;
-        }
-    })
-}
-getResourceConversionRatio = res => {
-    return getResourceGenericRatio(res) * (1 + game.prestige.getParagonProductionRatio() * 0.05);
-}
-enableConverter = (converter, amount) => {
-    if (state.api >= 1) {
-        converter.on = Math.max(0, Math.min(converter.val, converter.on + amount));
-        game.upgrade(converter.upgrades);
-    } else {
-        withTab("Bonfire", () => {
-            var outerButton = findButton(converter.label);
-            var button = amount > 0 ? getBuildingIncreaseButton(outerButton) : getBuildingDecreaseButton(outerButton);
-            for (var i = 0; i < Math.abs(amount); i++) {
-                button.click();
-            }
-        })
-    }
-}
-resetConverters = () => {
-    Object.entries(state.disabledConverters).forEach(disabled => enableConverter(game.bld.get(disabled[0]), disabled[1]))
-    state.disabledConverters = {};
-}
-
-/************** 
  * Resources
 **************/
 getResourceOwned = resName => game.resPool.get(resName).value
@@ -783,6 +538,64 @@ var getFursPerHunt = () => {
 var getIvoryPerHunt = () => {
     var maxResult = 50 + 40 * getHuntRatio();
     return maxResult / 2;
+}
+
+/************** 
+ * Conversion
+**************/
+converters = ["smelter", "calciner", "biolab", "accelerator"]
+getEffectsByNamePattern = (effects, pattern) => {
+    return Object.keys(effects)
+        .filter(name => name.match(pattern))
+        .map(key => ({name: key.replace(pattern, ""), val: effects[key]}))
+}
+getConsumptionsPerTick = effects => getEffectsByNamePattern(effects, /PerTickCon$/)
+getProductionsPerTick = effects => getEffectsByNamePattern(effects, /PerTickAutoprod$/)
+//if adding is true, reject productions that, if added, would make the resource become full
+//otherwise, only reject productions of resources that are already full
+//either way, only reject productions if they cannot be crafted into something useful
+isUselessProduction = (production, adding) => {
+    return production.val === 0 || (
+        isResourceFull(production.name, adding ? production.val * getResourceConversionRatio(production.name) : 0)
+        && !autoCrafts.some(craft => 
+            canCraft(craft.name) && craft.prices.some(price => price.name === production.name) && getTotalDemand(craft.name) > 0
+        )
+    )
+}
+manageConverters = () => {
+    converters.map(name => game.bld.get(name)).forEach(converter => {
+        var productions = getProductionsPerTick(converter.effects);
+        if (converter.on && productions.length && productions.every(isUselessProduction)) {
+            console.log("Disabling " + converter.name);
+            enableConverter(converter, -1);
+            state.disabledConverters[converter.name] = Math.min(converter.val, 1 + (state.disabledConverters[converter.name] || 0));
+        } else if (state.disabledConverters[converter.name] && productions.some(production => !isUselessProduction(production, true))) {
+            console.log("Re-enabling " + converter.name);
+            enableConverter(converter, 1);
+            state.disabledConverters[converter.name]--;
+        }
+    })
+}
+getResourceConversionRatio = res => {
+    return getResourceGenericRatio(res) * (1 + game.prestige.getParagonProductionRatio() * 0.05);
+}
+enableConverter = (converter, amount) => {
+    if (state.api >= 1) {
+        converter.on = Math.max(0, Math.min(converter.val, converter.on + amount));
+        game.upgrade(converter.upgrades);
+    } else {
+        withTab("Bonfire", () => {
+            var outerButton = findButton(converter.label);
+            var button = amount > 0 ? getBuildingIncreaseButton(outerButton) : getBuildingDecreaseButton(outerButton);
+            for (var i = 0; i < Math.abs(amount); i++) {
+                button.click();
+            }
+        })
+    }
+}
+resetConverters = () => {
+    Object.entries(state.disabledConverters).forEach(disabled => enableConverter(game.bld.get(disabled[0]), disabled[1]))
+    state.disabledConverters = {};
 }
 
 /************** 
@@ -2686,6 +2499,193 @@ updateUi = () => {
     updateSettingsMenu();
     specialUi = specialUis[getActiveTab()];
     if (specialUi) specialUi();
+}
+
+/************** 
+ * Logging
+**************/
+log = (msg, quiet) => { console.log(msg); if (!quiet) game.msg(msg); }
+addLog = item => {
+    item.year = game.calendar.year;
+    var roundedDay = Math.round(game.calendar.day * 100) / 100
+    item.day = roundedDay + 100 * game.calendar.season;
+    state.history.push(item);
+}
+logBuy = (bld, numBought) => addLog({ name: bld.name, type: "Buy", buy: bld.savedProps(true), num: numBought});
+logKitten = (numKittens, job) => addLog({ name: numKittens + " Kittens", type: "Kitten", kittens: numKittens, job: job});
+logFaith = () => {
+    var totalFaith = game.religion.faith;
+    addLog({ name: game.getDisplayValueExt(totalFaith) + " Faith", type: "Faith", faith: totalFaith});
+}
+logTrades = () => {
+    var totalTrades = state.totalTrades;
+    addLog({ name: game.getDisplayValueExt(totalTrades) + " Trades", type: "Trades", trades: totalTrades});
+}
+logReset = () => addLog({ name: "Reset", type: "Reset", kittens: game.village.sim.getKittens()});
+rotateLogs = () => {
+    state.previousHistories.push(state.history);
+    state.history = [];
+    //compress previous histories in advance so that saving doesn't need too much CPU
+    state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
+}
+if (!game.realResetAutomatic) game.realResetAutomatic = game.resetAutomatic;
+game.resetAutomatic = () => {
+    logFaith();
+    logReset();
+    rotateLogs();
+    state.queue = []; //todo reload master plan
+    state.jobQueue = [];
+    state.numKittens = 0;
+    state.kittensAssigned = 0;
+    state.populationIncrease = 0;
+    state.autoHunt = false;
+    state.autoSteel = false;
+    if (window.usingBotStarter) {
+        //based on resetAutomatic code
+		game.timer.scheduleEvent(dojo.hitch(this, function() {
+            game._resetInternal();
+            game.mobileSaveOnPause = false;
+            console.log("Reloading parent page")
+            window.parent.location.reload();
+        }));
+    } else {
+        game.realResetAutomatic();
+    }
+}
+recountKittens = (newJob) => {
+    var kittens = game.village.sim.getKittens();
+    if (state.populationIncrease > 0) {
+        state.populationIncrease--;
+        state.kittensAssigned++;
+    }
+    if (state.populationIncrease === 0) {
+        state.kittensAssigned = kittens;
+    }
+    if (kittens > state.numKittens) {
+        state.numKittens = kittens;
+        logKitten(kittens, newJob)
+    }
+}
+getBestResetPoint = (history, onlyLocalMaxima) =>
+    history
+        .filter(entry => entry.type === "Kitten" || entry.type === "Reset")
+        .map(entry => ({paragon: Math.max(0, entry.kittens - 70), year: entry.year + entry.day / 400}))
+        .filter(entry => entry.year > 0) //prevent Infinity and NaN with cryochambers
+        .map(entry => ({paragon: entry.paragon, year: entry.year, ratio: entry.paragon / entry.year}))
+		.filter((point, index, arr) => !onlyLocalMaxima || point.ratio > 0 && [arr[index - 1], arr[index + 1]].every(neighbor => !neighbor || point.ratio >= neighbor.ratio))
+        .sort((a, b) => b.ratio - a.ratio)
+
+/************** 
+ * Save/Load
+**************/
+save = () => { localStorage.setItem("simba.state", exportSave()); console.log("Bot state saved"); }
+loadString = string => {
+    var parsed = JSON.parse(LZString.decompressFromBase64(string));
+    var rawQueue = parsed.queue;
+    parsed.queue = [];
+    if (parsed.previousHistoriesCompressed) { parsed.previousHistories = JSON.parse(LZString.decompressFromBase64(parsed.previousHistoriesCompressed)); }
+    state = parsed;
+    reloadQueue(rawQueue);
+}
+exportSave = () => {
+    var savedState = Object.assign({}, state);
+    delete(savedState.previousHistories); //use previousHistoriesCompressed instead to save CPU
+    return LZString.compressToBase64(JSON.stringify(savedState));
+}
+importSave = saveString => {
+    loadString(saveString);
+    loadDefaults();
+    initialize();
+}
+reloadQueue = queue => {
+    state.queue = [];
+    queue.forEach(item => enable(item.name, item.tab, item.panel, item.maxPriority, item.masterPlan));
+}
+load = () => {
+    var data = localStorage.getItem("simba.state");
+    if (data) {
+        loadString(data);
+    }
+    loadDefaults();
+    initialize();
+}
+loadDefaults = () => {
+    if (!window.state) state = {};
+    if (!window.botDebug) botDebug = {};
+    falseyDefaults = {
+        jobQueue: [],
+        populationIncrease: 0,
+        tradeTimer: 0,
+        blackcoinTimer: 0,
+        speed: 1,
+        desiredTicksPerLoop: 8,
+        queue: [],
+        ticks: game.ticks,
+        history: [],
+        previousHistories: [],
+        numKittens: game.village.sim.getKittens(),
+        kittensAssigned: game.village.sim.getKittens(),
+        leaderAssigned: game.village.leader ? true : false,
+        verboseQueue: 0,
+        disabledConverters: {},
+        tradeMessages: 0,
+        tradeResourceTotal: {}, 
+        totalTrades: 0,
+        lastTradeSeason: 0,
+        lastTradeQuantity: 0,
+        loopsUntilRun: 0,
+        ignoreNeeds: {},
+        ignoreSeason: {},
+        masterPlanMode: 0,
+        smartStorage: 0,
+        autoResetThreshold: 1, //should never be 0
+        restrictedRecipes: { timeCrystal: 2, sorrow: 2, relic: 2 },
+    }
+    Object.entries(falseyDefaults).forEach(entry => state[entry[0]] = state[entry[0]] || entry[1]);
+    if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
+    undefinedDefaults = {
+        desiredApi: 1,
+        autoCraftLevel: 1,
+        autoFarmer: 1,
+        autoSeti: true,
+        autoConverters: true,
+        runInGameLoop: true,
+    }
+    Object.entries(undefinedDefaults).forEach(entry => { if (state[entry[0]] === undefined) state[entry[0]] = entry[1] });
+}
+initialize = () => {
+    state.ticks = game.ticks;
+    setSpeed(state.speed);
+    createSettingsMenu();
+}
+if (!game.console.realSave) game.console.realSave = game.console.save;
+game.console.save = (data) => {
+    try {
+        save();
+    } catch (err) {
+        //eg. not enough storage
+        //todo warn the user more loudly?
+        console.error(err);
+    }
+    game.console.realSave(data);
+}
+wipeBotSave = () => localStorage.removeItem("simba.state");
+if (!game.real_wipe) game.real_wipe = game._wipe;
+game._wipe = () => {
+    if (window.usingBotStarter) {
+        //based on _wipe code
+		game.timer.scheduleEvent(dojo.hitch(this, function() {
+            wipeBotSave();
+            game.mobileSaveOnPause = false;
+            delete(LCstorage["com.nuclearunicorn.kittengame.savedata"]);
+            //don't bother wiping the language setting
+            console.log("Reloading parent page")
+            window.parent.location.reload();
+        }));
+    } else {
+        wipeBotSave();
+        game.real_wipe();
+    }
 }
 
 /************** 
