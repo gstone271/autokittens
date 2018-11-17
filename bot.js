@@ -130,10 +130,8 @@ mainLoop = () => {
 doChores = () => {
     if (state.autoFarmer) gatherIntialCatnip();
     if (state.autoSteel) craftAll("steel");
-    if (state.autoSeti) $('#observeBtn').click();
-    if (state.autoHunt && (isResourceFull("manpower") || getTotalDemand("manpower") === 0) && getResourceOwned("manpower") >= 100) { 
-        withLeader("Manager", () => $('a:contains("Send hunters")')[0].click());
-    }
+    if (state.autoSeti) observeSky();
+    if (state.autoHunt) autoHunting();
     if (state.autoBcoin) autoTradeBcoin();
     if (state.autoReset && getResetThreshold(state.autoResetThreshold) < getBaseFaithProductionBonus(game.religion.faith)) {
         if (!findQueue("Transcend") && !findQueue("Faith Reset")) {
@@ -141,6 +139,27 @@ doChores = () => {
         }
     } else {
         disable("Faith Reset");
+    }
+}
+observeSky = () => {
+    if (state.api >= 1) {
+        if (game.calendar.observeRemainingTime) {
+            game.calendar.observeHandler();
+        }
+    } else {
+        $('#observeBtn').click();
+    }
+}
+autoHunting = () => {
+    if ((isResourceFull("manpower") || getTotalDemand("manpower") === 0) && getResourceOwned("manpower") >= 100) { 
+        withLeader("Manager", hunt);
+    }
+}
+hunt = () => {
+    if (state.api >= 1) {
+        game.huntAll();
+    } else {
+        $('a:contains("Send hunters")')[0].click();
     }
 }
 manageJobs = () => {
@@ -957,12 +976,16 @@ getFursStockNeeded = () => {
 }
 gatherIntialCatnip = () => {
     if (game.bld.get("field").val === 0 && getResourceOwned("catnip") < 10) {
-        withTab("Bonfire", () => {
-            var maxClicks = 10;
-            while (getResourceOwned("catnip") < 10 && maxClicks--) {
-                findButton("Gather catnip").click()
-            }
-        });
+        if (state.api >= 1) {
+            game.resPool.addResEvent("catnip", 10 - getResourceOwned("catnip")); 
+        } else {
+            withTab("Bonfire", () => {
+                var maxClicks = 10;
+                while (getResourceOwned("catnip") < 10 && maxClicks--) {
+                    findButton("Gather catnip").click()
+                }
+            });
+        }
     }
 }
 preventStarvation = () => {
