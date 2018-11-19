@@ -117,20 +117,22 @@ removeOne = (arr, match) => {
  * Main Loop
 **************/
 mainLoop = () => {
-    doChores();
+    doHarvestingChores();
     manageJobs();
     state.queue = buyPrioritiesQueue(state.queue);
     if (state.autoConverters) manageConverters();
-    loadUnicornRecipes();
-    doAutoCraft();
+    doSpendingChores();
     if (state.masterPlanMode) queueNewTechs();
     updateUi();
     countTicks();
 }
-doChores = () => {
+doHarvestingChores = () => {
     if (state.autoFarmer) gatherIntialCatnip();
     if (state.autoSteel) craftAll("steel");
     if (state.autoSeti) observeSky();
+}
+doSpendingChores = () => {
+    loadUnicornRecipes();
     if (state.autoHunt) autoHunting();
     if (state.autoBcoin) autoTradeBcoin();
     if (state.autoReset && getResetThreshold(state.autoResetThreshold) < getBaseFaithProductionBonus(game.religion.faith)) {
@@ -140,6 +142,7 @@ doChores = () => {
     } else {
         disable("Faith Reset");
     }
+    doAutoCraft();
 }
 observeSky = () => {
     if (state.api >= 1) {
@@ -1557,8 +1560,8 @@ Craft = class extends Queueable {
         super(name, tab, panel, maxPriority, masterPlan);
         this.resName = getCraftInternalName(name);
     }
-    buy() { 
-        return craftOne(this.resName)
+    buy() {
+        return craftMultiple(this.resName, 1)
     }
     getPrices() { 
         return getCraftPrices(this.resName)
