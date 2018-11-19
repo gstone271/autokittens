@@ -160,7 +160,7 @@ autoHunting = () => {
 }
 hunt = () => {
     if (state.api >= 1) {
-        game.huntAll();
+        game.village.huntAll();
     } else {
         $('a:contains("Send hunters")')[0].click();
     }
