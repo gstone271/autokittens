@@ -3,6 +3,7 @@ import math
 import multiprocessing
 import numpy
 
+# Generalized Beam Search: Based on parameters (see run function), can run GA, SA, HC, or a hybrid of these strategies.
 class GeneralizedBeamSearch:
     def cross(self, p1, p2, idx):
         return p1[:idx] + p2[idx:]
@@ -50,6 +51,10 @@ class GeneralizedBeamSearch:
         keepers = [ (fitness, False, gen) for (fitness, fresh, gen) in scored[:toKeep] ]
         return keepers + mutated + children
 
+    # Temperature Schedule (for SA): Defines odds of exploring a worse solution over time. Set to always 0 for non-SA
+    # Mutation Schedule: Defines odds of mutating an individual gene, over time
+    # Breeding portion: Defines number of breeding pairs per generation. Eg portion=1/3 means 2/3 of the populatin will be included in a breeding pair. Set to 0 for SA or HC.
+    # Mutating portion: Defines portion of population to mutate (without breeding) each generation. Set to 0 for pure GA.
     def run(self, problem, population, temperatureSchedule, mutationSchedule, breedingPortion, mutatingPortion, iterations, printProgress):
         printed = 0
         for i in range(iterations):
@@ -72,7 +77,10 @@ class GeneralizedBeamSearch:
 
     def printInfo(self, gen, problem): pass
 
+# Stuff specific to Knapsack Problem. Should be removed later, but useful as code template
 class KnapsackProblem(GeneralizedBeamSearch):
+    # score is the function that should send the genome to another computer to be tested for fitness in Simba
+    # we might want to keep a cache of recently-scored genomes, and use the cached result if we have duplicate genomes in the population, since scoring is extremely expensive
     def score(self, mut, problem):
         (objs, cap) = problem
         (fresh, gen) = mut
@@ -120,6 +128,7 @@ class ImprovedKnapsackProblem(KnapsackProblem):
                 totalValue += value
         return (totalValue, fresh, gen)
 
+# Code to find better parameters to GA/SA/HC. May be removed later, but useful as code template
 class MetaBeamSearch(GeneralizedBeamSearch):
     def __init__(self, subSearch, subIterations):
         self.subSearch = subSearch
@@ -168,8 +177,8 @@ class MetaBeamSearch(GeneralizedBeamSearch):
         gen = [ (random.random() - .5) * 4 for i in range(8) ]
         return self.score((True, gen), problem)
 
+#example parameters
 capacity = 1000
-
 def temperatureSchedule2(t, iterations):
     #return max((1 - t / iterations * 1.2) * 10000, 0)
     return pow(.98, (t)) * 10000 * max((1 - t / iterations * 1.2), 0)
@@ -180,6 +189,7 @@ def mutationSchedule(t, iterations):
     #return T * .002
     return 0.004
 
+#define and run different problems
 knapsack = KnapsackProblem()
 def knapsackTrial(j):
     numObjects = 20
