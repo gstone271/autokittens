@@ -194,6 +194,13 @@ countTicks = () => {
     state.ticks = game.ticks;
     state.blackcoinTimer++;
     state.tradeTimer++;
+    if (state.geneticAlgorithm && shouldReportFitness()) {
+        reportFitness();
+        if (!game.isPaused) {
+            game.togglePause();
+        }
+        setRunning(false);
+    }
 }
 
 /************** 
@@ -1421,6 +1428,31 @@ var clearMasterPlan = () => {
     state.queue = state.queue.filter(bld => !bld.masterPlan);
 }
 
+var gaTimeLimit = 1000; //years
+shouldReportFitness = () => {
+    return game.calendar.year >= gaTimeLimit || goalAchieved();
+}
+goalAchieved = () => {
+    return game.space.getProgram("moonMission").val;
+}
+calculateFitness = () => {
+    if (goalAchieved()) {
+        return 2000 + 4000 * (gaTimeLimit - game.calendar.year) + Math.round(10 * (400 - game.calendar.day));
+    } else {
+        return 10 * Object.values(game.science.metaCache).filter(x => x.researched).length
+            + 5 * game.village.sim.getKittens()
+            + 2 * game.workshop.upgrades.filter(x => x.researched).length
+            + 1 * game.bld.buildingsData.map(bld => bld.val).reduce((a, b) => a+b)
+            + 1 * Math.floor(game.religion.getProductionBonus())
+    }
+}
+reportFitness = () => {
+    if ($("#fitnessValue").length === 0) {
+        $("html").append("<div id='fitnessValue'>")
+    }
+    $("#fitnessValue").text(calculateFitness());
+}
+
 /************** 
  * Queueables
 **************/
@@ -2606,7 +2638,10 @@ getBestResetPoint = (history, onlyLocalMaxima) =>
 **************/
 save = () => { localStorage.setItem("simba.state", exportSave()); console.log("Bot state saved"); }
 loadString = string => {
-    var parsed = JSON.parse(LZString.decompressFromBase64(string));
+    loadDecompressed(LZString.decompressFromBase64(string));
+}
+loadDecompressed = string => {
+    var parsed = JSON.parse(string);
     var rawQueue = parsed.queue;
     parsed.queue = [];
     if (parsed.previousHistoriesCompressed) { parsed.previousHistories = JSON.parse(LZString.decompressFromBase64(parsed.previousHistoriesCompressed)); }
@@ -2619,7 +2654,10 @@ exportSave = () => {
     return LZString.compressToBase64(JSON.stringify(savedState));
 }
 importSave = saveString => {
-    loadString(saveString);
+    importSaveDecompressed(LZString.decompressFromBase64(string));
+}
+importSaveDecompressed = saveString => {
+    loadDecompressed(saveString);
     loadDefaults();
     initialize();
 }
@@ -2666,6 +2704,7 @@ loadDefaults = () => {
         smartStorage: 0,
         autoResetThreshold: 1, //should never be 0
         restrictedRecipes: { timeCrystal: 2, sorrow: 2, relic: 2 },
+        geneticAlgorithm: 0,
     }
     Object.entries(falseyDefaults).forEach(entry => state[entry[0]] = state[entry[0]] || entry[1]);
     if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
@@ -2700,7 +2739,7 @@ if (!game.real_wipe) game.real_wipe = game._wipe;
 game._wipe = () => {
     if (window.usingBotStarter) {
         //based on _wipe code
-		game.timer.scheduleEvent(dojo.hitch(this, function() {
+        game.timer.scheduleEvent(dojo.hitch(this, function() {
             wipeBotSave();
             game.mobileSaveOnPause = false;
             delete(LCstorage["com.nuclearunicorn.kittengame.savedata"]);
@@ -2746,13 +2785,6 @@ buy script (-> genetic algorithm)
 ------nuclear fission, biochemistry, genetics, telecommunication
 ----optional techs
 ------architecture, acoustics, drama and poetry, biology, combustion, metallurgy, robotics
---run scoring
-----10pt per science, building type
-----5pt per kitten
-----2pt per upgrade
-----1pt per building
-----1pt per %faith bonus
-----2000pt if moon +1pt/day early
 --compare with human performance
 ----human vs. human + bot vs. master plan
 ----human plays 10min/2hr (+10min at start of game?)
