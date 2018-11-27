@@ -8,16 +8,31 @@ class GeneralizedBeamSearch:
     def cross(self, p1, p2, idx):
         return p1[:idx] + p2[idx:]
 
-    def mutate(self, gen, mutationChance, alwaysChange):
-        numMutated = min(numpy.random.poisson(len(gen) * mutationChance) + alwaysChange, len(gen))
-        newGen = gen.copy()
-        for pos in random.sample(range(len(gen)), numMutated):
-            newGen[pos] = self.mutate1(newGen[pos])
-        return (alwaysChange, newGen)
+#    def mutate(self, gen, mutationChance, alwaysChange):
+#        numMutated = min(numpy.random.poisson(len(gen) * mutationChance) + alwaysChange, len(gen))
+#        newGen = gen.copy()
+#        for pos in random.sample(range(len(gen)), numMutated):
+#            newGen[pos] = self.mutate1(newGen[pos])
+#        return (alwaysChange, newGen)
+
+    #princess kim's implementation of mutate
+    def mutate(self, genome, mutationChance, alwaysChange):
+        #TODO: make it so that adding has a lower probability than removing?
+        #a random number of buildings to add
+        numAdded = min(numpy.random.poisson(len(gen) * mutationChance) + alwaysChange, len(gen))
+        #a random number of buildings to remove
+        numRemoved = min(numpy.random.poisson(len(gen) * mutationChance) + alwaysChange, len(gen))
+        newGenome = genome.copy()
+        for pos in random.sample(range(len(gen)), numRemoved):      #removes a building from a random position
+            del newGenome[pos]
+        for pos in random.sample(range(len(gen)), numAdded):        #inserts a random building at random positions
+            newGenome[pos].insert(pos, self.mutate1(newGenome[pos]))
+        return (alwaysChange, newGenome)
+
 
     def breed(self, p1, p2, pMut):
         crossoverIdx = random.randrange(0, len(p1))
-        (c1, c2) = tuple([ self.score(self.mutate(self.cross(a, b, crossoverIdx), pMut, mustMutate)) for (a, b, mustMutate) in [(p1, p2, True), (p2, p1, False)]])
+        (c1, c2) = tuple([self.mutate(self.cross(a, b, crossoverIdx), pMut, mustMutate) for (a, b, mustMutate) in [(p1, p2, True), (p2, p1, False)]])
         return (c1, c2)
 
     def sortGeneration(self, pop, T):
@@ -48,9 +63,16 @@ class GeneralizedBeamSearch:
         pairs = zip(breeders[:numPairs], breeders[numPairs:])
         # Might want to pull score out of breed to simplify parallelization
         children = [ child for (p1, p2) in pairs for child in self.breed(p1, p2, pMut)]
-        mutated = [ self.score(self.mutate(gen, pMut, True)) for (fitness, fresh, gen) in scored[:toMutate] ]
+        mutated = [ (self.mutate(gen, pMut, True)) for (fitness, fresh, gen) in scored[:toMutate] ]
+   
+        #children + mutated need to be scored
+        #concatenate the two lists
+        unscored = children + mutated
+        scored = [self.score(mut)for mut in unscored]
+        print(scored)
         keepers = [ (fitness, False, gen) for (fitness, fresh, gen) in scored[:toKeep] ]
-        return keepers + mutated + children
+        return keepers + scored
+#        return keepers + mutated + children
 
     # Temperature Schedule (for SA): Defines odds of exploring a worse solution over time. Set to always 0 for non-SA
     # Mutation Schedule: Defines odds of mutating an individual gene, over time
@@ -65,7 +87,7 @@ class GeneralizedBeamSearch:
             if (printProgress and pow(1.5, printed - 7) + printed*printed / 12 + printed * 2 - 3 <= i):
                 printed += 1
                 scores = [ score for (score, fresh, gen) in scored[:10] ]
-                print(f"Generation {i}: {scores}")
+                print("Generation {i}: {scores}")
                 if (len(scored[0][2]) < 50):
                     print(scored[0][2])
             population = self.newGeneration(scored, pMut, breedingPortion, mutatingPortion)
@@ -83,6 +105,10 @@ class KittensProblem(GeneralizedBeamSearch):
     def __init__(self, buildings, build_order_length):
         self.buildings = buildings
         self.build_order_length = build_order_length
+
+
+
+    
 
     # score is the function that should send the genome to another computer to be tested for fitness in Simba
     # we might want to keep a cache of recently-scored genomes, and use the cached result if we have duplicate genomes in the population, since scoring is extremely expensive
@@ -111,8 +137,12 @@ class KittensProblem(GeneralizedBeamSearch):
         print(",".join(gen[0:min(10, len(gen))]))
 
     def randomGenome(self):
-        gen = random.choices(self.buildings, k=self.build_order_length) #Returns a list of k-size elements
-        return self.score((True, gen)) #Returns the score that corresponds to that list of elements
+#        gen = random.choices(self.buildings, k=self.build_order_length) #Returns a list of k-size elements
+        gen = [] 
+        for pos in range(self.build_order_length):
+            gen.append(random.choice(self.buildings))
+#        return self.score((True, gen)) #Returns the score that corresponds to that list of elements
+        return gen      #returns UNSCORED genome?
 
 # Code to find better parameters to GA/SA/HC. May be removed later, but useful as code template
 # class MetaBeamSearch(GeneralizedBeamSearch):
@@ -184,10 +214,16 @@ def kittensTrial(j):
         "Library",
         "Mine"
     ]
-    build_order_length = 100
+
+#   build order length is used to initialize the genomes size at first. 
+#   size is not fixed, genomes can shrink or grow depending on how it is mutated    
+#   buildings can be bought (and should be bought) multiple times, so the build length is a multiple of the number of buildings
+    build_order_length = len(buildings) * 3
     kittensProblem = KittensProblem(buildings, build_order_length)
     populationSize = 800
-    population = [ kittensProblem.randomGenome() for i in range(populationSize) ]
+    #score population? 
+    unscored_population = [ kittensProblem.randomGenome() for i in range(populationSize) ]
+#    population = [kittensProblem.score(gen) for gen in unscored_population]
     return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 10, j == 0)
 
 if __name__ == "__main__":
