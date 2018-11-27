@@ -1593,7 +1593,7 @@ Craft = class extends Queueable {
         this.resName = getCraftInternalName(name);
     }
     buy() {
-        return craftMultiple(this.resName, 1)
+        return craftMultiple(game.workshop.getCraft(this.resName), 1)
     }
     getPrices() { 
         return getCraftPrices(this.resName)
@@ -1605,7 +1605,11 @@ Craft = class extends Queueable {
 
 Science = DataListQueueable(Object.values(game.science.metaCache), "Scientist")
 
-WorkshopUpgrade = DataListQueueable(game.workshop.upgrades, "Scientist");
+WorkshopUpgrade = class extends DataListQueueable(game.workshop.upgrades, "Scientist") {
+    isUnlocked() {
+        return super.isUnlocked() && game.bld.get("workshop").val;
+    }
+}
 
 Space = class extends DataListQueueable(Object.values(game.space.metaCache)) {
     constructor(name, tab, panel, maxPriority, masterPlan) {
