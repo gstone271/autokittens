@@ -19,14 +19,14 @@ class GeneralizedBeamSearch:
     def mutate(self, genome, mutationChance, alwaysChange):
         #TODO: make it so that adding has a lower probability than removing?
         #a random number of buildings to add
-        numAdded = min(numpy.random.poisson(len(gen) * mutationChance) + alwaysChange, len(gen))
+        numAdded = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
         #a random number of buildings to remove
-        numRemoved = min(numpy.random.poisson(len(gen) * mutationChance) + alwaysChange, len(gen))
+        numRemoved = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
         newGenome = genome.copy()
-        for pos in random.sample(range(len(gen)), numRemoved):      #removes a building from a random position
+        for pos in random.sample(range(len(genome)), numRemoved):      #removes a building from a random position
             del newGenome[pos]
-        for pos in random.sample(range(len(gen)), numAdded):        #inserts a random building at random positions
-            newGenome[pos].insert(pos, self.mutate1(newGenome[pos]))
+        for pos in random.sample(range(len(newGenome)), numAdded):        #inserts a random building at random positions
+            newGenome.insert(pos, self.mutate1(newGenome[pos]))
         return (alwaysChange, newGenome)
 
 
@@ -69,7 +69,6 @@ class GeneralizedBeamSearch:
         #concatenate the two lists
         unscored = children + mutated
         scored = [self.score(mut)for mut in unscored]
-        print(scored)
         keepers = [ (fitness, False, gen) for (fitness, fresh, gen) in scored[:toKeep] ]
         return keepers + scored
 #        return keepers + mutated + children
@@ -223,7 +222,7 @@ def kittensTrial(j):
     populationSize = 800
     #score population? 
     unscored_population = [ kittensProblem.randomGenome() for i in range(populationSize) ]
-#    population = [kittensProblem.score(gen) for gen in unscored_population]
+    population = [kittensProblem.score((True, gen)) for gen in unscored_population]
     return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 10, j == 0)
 
 if __name__ == "__main__":
