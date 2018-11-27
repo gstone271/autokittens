@@ -8,27 +8,12 @@ class GeneralizedBeamSearch:
     def cross(self, p1, p2, idx):
         return p1[:idx] + p2[idx:]
 
-#    def mutate(self, gen, mutationChance, alwaysChange):
-#        numMutated = min(numpy.random.poisson(len(gen) * mutationChance) + alwaysChange, len(gen))
-#        newGen = gen.copy()
-#        for pos in random.sample(range(len(gen)), numMutated):
-#            newGen[pos] = self.mutate1(newGen[pos])
-#        return (alwaysChange, newGen)
-
-    #princess kim's implementation of mutate
-    def mutate(self, genome, mutationChance, alwaysChange):
-        #TODO: make it so that adding has a lower probability than removing?
-        #a random number of buildings to add
-        numAdded = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
-        #a random number of buildings to remove
-        numRemoved = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
-        newGenome = genome.copy()
-        for pos in random.sample(range(len(genome)), numRemoved):      #removes a building from a random position
-            del newGenome[pos]
-        for pos in random.sample(range(len(newGenome)), numAdded):        #inserts a random building at random positions
-            newGenome.insert(pos, self.mutate1(newGenome[pos]))
-        return (alwaysChange, newGenome)
-
+    def mutate(self, gen, mutationChance, alwaysChange):
+        numMutated = min(numpy.random.poisson(len(gen) * mutationChance) + alwaysChange, len(gen))
+        newGen = gen.copy()
+        for pos in random.sample(range(len(gen)), numMutated):
+            newGen[pos] = self.mutate1(newGen[pos])
+        return (alwaysChange, newGen)
 
     def breed(self, p1, p2, pMut):
         crossoverIdx = random.randrange(0, len(p1))
@@ -105,10 +90,6 @@ class KittensProblem(GeneralizedBeamSearch):
         self.buildings = buildings
         self.build_order_length = build_order_length
 
-
-
-    
-
     # score is the function that should send the genome to another computer to be tested for fitness in Simba
     # we might want to keep a cache of recently-scored genomes, and use the cached result if we have duplicate genomes in the population, since scoring is extremely expensive
     def score(self, mut):
@@ -128,9 +109,19 @@ class KittensProblem(GeneralizedBeamSearch):
             fitness += 1
         return fitness
 
-    # Changes a single element of the build order
-    def mutate1(self, gene):
-        return random.choice(self.buildings)
+    #princess kim's implementation of mutate
+    def mutate(self, genome, mutationChance, alwaysChange):
+        #TODO: make it so that adding has a lower probability than removing?
+        #a random number of buildings to add
+        numAdded = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
+        #a random number of buildings to remove
+        numRemoved = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
+        newGenome = genome.copy()
+        for pos in random.sample(range(len(genome)), numRemoved):      #removes a building from a random position
+            del newGenome[pos]
+        for pos in random.sample(range(len(newGenome)), numAdded):        #inserts a random building at random positions
+            newGenome.insert(pos, random.choice(self.buildings))
+        return (alwaysChange, newGenome)
 
     def printInfo(self, gen):
         print(",".join(gen[0:min(10, len(gen))]))
@@ -143,54 +134,6 @@ class KittensProblem(GeneralizedBeamSearch):
 #        return self.score((True, gen)) #Returns the score that corresponds to that list of elements
         return gen      #returns UNSCORED genome?
 
-# Code to find better parameters to GA/SA/HC. May be removed later, but useful as code template
-# class MetaBeamSearch(GeneralizedBeamSearch):
-#     def __init__(self, subSearch, subIterations):
-#         self.subSearch = subSearch
-#         self.subIterations = subIterations
-#
-#     def sigmoid(self, gene):
-#         return 1 / (1 + math.exp(-gene))
-#
-#     def runSubTrial(self, instance, gen):
-#         (logBaseT, sigTExp, tLinear, logBaseMut, sigMutExp, mutLinear, sigBreedingPortion, sigMutatingPortion) = gen
-#         baseT = math.exp(logBaseT)
-#         tExp = self.sigmoid(sigTExp) * 2
-#         baseMut = math.exp(logBaseMut)
-#         mutExp = self.sigmoid(sigMutExp) * 2
-#         def temperatureSchedule(t, iterations):
-#             try:
-#                 return max(baseT * pow(tExp, t) * (1 + tLinear * t / iterations), 0)
-#             except OverflowError:
-#                 return math.inf
-#         def mutationSchedule(t, iterations):
-#             try:
-#                 return max(min(baseMut * pow(mutExp, t) * (1 + mutLinear * t / iterations), 1), 0)
-#             except OverflowError:
-#                 return 1
-#         breedingPortion = self.sigmoid(sigBreedingPortion) / 2
-#         mutatingPortion = self.sigmoid(sigMutatingPortion) * (1 - breedingPortion * 2)
-#         (subProblem, subPop) = instance
-#         return self.subSearch.run(subProblem, subPop, temperatureSchedule, mutationSchedule, breedingPortion, mutatingPortion, self.subIterations, False)
-#
-#     def score(self, mut, problem):
-#         (fresh, gen) = mut
-#         #todo def schedules based on float params
-#         with multiprocessing.Pool(24) as p:
-#             return (sum(p.starmap(self.runSubTrial, zip(problem, [gen] * len(problem)))) / len(problem), fresh, gen)
-#
-#     def mutate1(self, gene):
-#         return (gene + random.random() - .5) * (random.random() + .5)
-#
-#     #todo generalize capacity--include data in these objects
-#     def randomObj(self, capacity, numObjects, populationSize):
-#         objs = [ self.subSearch.randomObj(capacity) for i in range(numObjects) ]
-#         population = [ self.subSearch.randomGenome((objs, capacity)) for i in range(populationSize) ]
-#         return ((objs, capacity), population)
-#
-#     def randomGenome(self, problem):
-#         gen = [ (random.random() - .5) * 4 for i in range(8) ]
-#         return self.score((True, gen), problem)
 
 #example parameters
 def temperatureSchedule2(t, iterations):
