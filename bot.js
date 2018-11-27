@@ -2706,6 +2706,7 @@ loadDefaults = () => {
         ignoreSeason: {},
         masterPlanMode: 0,
         smartStorage: 0,
+        disableTimeskip: false,
         autoResetThreshold: 1, //should never be 0
         restrictedRecipes: { timeCrystal: 2, sorrow: 2, relic: 2 },
         geneticAlgorithm: 0,
