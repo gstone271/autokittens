@@ -108,7 +108,7 @@ class KittensProblem(GeneralizedBeamSearch):
         return random.choice(self.buildings)
 
     def printInfo(self, gen):
-        print(",".join(gen[0:min(10, len(gen))]))
+        print(toSimbaSettings(gen))
 
     def randomGenome(self):
         gen = random.choices(self.buildings, k=self.build_order_length) #Returns a list of k-size elements
@@ -174,18 +174,11 @@ def mutationSchedule(t, iterations):
     #return T * .002
     return 0.004
 
+
 #define and run different problems
 def kittensTrial(j):
-    buildings = [
-        "Field",
-        "Hut",
-        "Barn",
-        "Pasture",
-        "Library",
-        "Mine"
-    ]
     build_order_length = 100
-    kittensProblem = KittensProblem(buildings, build_order_length)
+    kittensProblem = KittensProblem(allQueueables, build_order_length)
     populationSize = 800
     population = [ kittensProblem.randomGenome() for i in range(populationSize) ]
     return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 10, j == 0)
@@ -193,9 +186,49 @@ def kittensTrial(j):
 # Turns a genome into a save file that Simba can understand and import
 # Call Simba's importSaveDecompressed on the return value of this function
 def toSimbaSettings(genome):
-    queue = ",".join([f'{{"name":"{name}","tab":"Bonfire","panel":""}}' for name in genome])
-    jobQueue = "" #todo put jobs in the genome
+    blds = []
+    for name in genome:
+        for (membersOfType, tab, panel) in queueableTypes:
+            if name in membersOfType:
+                blds.append(f'{{"name":"{name}","tab":"{tab}","panel":"{panel}"}}')
+                break
+    queue = ",".join(blds)
+    jobQueue = ",".join([f'"{job}"' for job in genome if job in jobsSet])
     return f'{{"queue": [{queue}], "jobQueue": [{jobQueue}], "geneticAlgorithm": true, "speed": 128, "disableTimeskip": true, "desiredTicksPerLoop": 8}}'
+
+buildings = [
+    "Catnip field",
+    "Hut",
+    "Barn",
+    "Pasture",
+    "Library",
+    "Mine"
+]
+upgrades = [
+    "Mineral Hoes",
+    "Mineral Axe",
+    "Iron Hoes",
+    "Iron Axe",
+]
+science = [
+    "Calendar",
+    "Agriculture",
+    "Mining",
+    "Archery",
+]
+queueableTypes = [(set(buildings), "Bonfire", ""), (set(upgrades), "Workshop", "Upgrades"), (set(science), "Science", "")]
+jobs = [
+    "woodcutter",
+    "scholar",
+    "miner",
+    "farmer",
+    "hunter",
+    "geologist",
+    "priest",
+]
+jobsSet = set(jobs)
+allQueueables = buildings + upgrades + science + jobs
+
 
 if __name__ == "__main__":
     kittensTrial(0)
