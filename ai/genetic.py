@@ -53,9 +53,9 @@ class GeneralizedBeamSearch:
         #children + mutated need to be scored
         #concatenate the two lists
         unscored = children + mutated
-        scored = [self.score(mut)for mut in unscored]
+        newscored = [self.score(mut)for mut in unscored]
         keepers = [ (fitness, False, gen) for (fitness, fresh, gen) in scored[:toKeep] ]
-        return keepers + scored
+        return keepers + newscored
 #        return keepers + mutated + children
 
     # Temperature Schedule (for SA): Defines odds of exploring a worse solution over time. Set to always 0 for non-SA
@@ -97,16 +97,32 @@ class KittensProblem(GeneralizedBeamSearch):
         return (self.fitness_function(gen), fresh, gen)
 
     # TODO: this should simulate the game and compute a score. The current implementation is a stub for testing.
+#    def fitness_function(self, gen):
+#        fitness = 0
+#        if gen[0] == "Field":
+#            fitness += 1
+#        if gen[1] == "Hut":
+#            fitness += 1
+#        if gen[2] == "Barn":
+#            fitness += 1
+#        if gen[3] == "Library":
+#            fitness += 1
+#        return fitness
+#
+    #working off of Griffin's suggestion, this arbitrary fitness function will find the first instance of 'field'
+    #then it will check if a Hut comes after field. 
+    #ideal pattern would be Field, Hut, Barn, Library
     def fitness_function(self, gen):
         fitness = 0
-        if gen[0] == "Field":
-            fitness += 1
-        if gen[1] == "Hut":
-            fitness += 1
-        if gen[2] == "Barn":
-            fitness += 1
-        if gen[3] == "Library":
-            fitness += 1
+        FList = ["Field", "Hut", "Barn", "Library"]
+        increment = 0
+
+        for pos in range(len(gen)):
+            if gen[pos] == FList[increment]:
+                increment = (increment+1)%len(FList)
+                fitness += 1
+            else:
+                fitness -= 1
         return fitness
 
     #princess kim's implementation of mutate
@@ -170,7 +186,7 @@ def kittensTrial(j):
     #score population? 
     unscored_population = [ kittensProblem.randomGenome() for i in range(populationSize) ]
     population = [kittensProblem.score((True, gen)) for gen in unscored_population]
-    return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 10, j == 0)
+    return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 100, j == 0)
 
 if __name__ == "__main__":
     kittensTrial(0)
