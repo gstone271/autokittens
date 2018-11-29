@@ -16,7 +16,7 @@ class GeneralizedBeamSearch:
         return (alwaysChange, newGen)
 
     def breed(self, p1, p2, pMut):
-        crossoverIdx = random.randrange(0, len(p1))
+        crossoverIdx = random.randrange(0, min(len(p1), len(p2)) + 1)
         (c1, c2) = tuple([self.mutate(self.cross(a, b, crossoverIdx), pMut, mustMutate) for (a, b, mustMutate) in [(p1, p2, True), (p2, p1, False)]])
         return (c1, c2)
 
@@ -114,7 +114,7 @@ class KittensProblem(GeneralizedBeamSearch):
     #ideal pattern would be Field, Hut, Barn, Library
     def fitness_function(self, gen):
         fitness = 0
-        FList = ["Field", "Hut", "Barn", "Library"]
+        FList = ["Catnip field", "Hut", "Barn", "Library"]
         increment = 0
 
         for pos in range(len(gen)):
@@ -133,13 +133,11 @@ class KittensProblem(GeneralizedBeamSearch):
         #a random number of buildings to remove
         numRemoved = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
         newGenome = genome.copy()
-        for x in range (numRemoved):    #loop numRemoved times
+        for x in range(numRemoved):    #loop numRemoved times
             pos = random.randrange(len(newGenome)) 
             del newGenome[pos]    
-#        for pos in random.sample(range(len(NewGenome)), numRemoved):      #removes a building from a random position
-#            del newGenome[pos]
-
-        for pos in random.sample(range(len(newGenome)), numAdded):        #inserts a random building at random positions
+        for x in range(numAdded):
+            pos = random.randrange(len(newGenome) + 1) 
             newGenome.insert(pos, random.choice(self.buildings))
         return (alwaysChange, newGenome)
 
