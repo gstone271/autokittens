@@ -190,5 +190,12 @@ def kittensTrial(j):
     population = [ kittensProblem.randomGenome() for i in range(populationSize) ]
     return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 10, j == 0)
 
+# Turns a genome into a save file that Simba can understand and import
+# Call Simba's importSaveDecompressed on the return value of this function
+def toSimbaSettings(genome):
+    queue = ",".join([f'{{"name":"{name}","tab":"Bonfire","panel":""}}' for name in genome])
+    jobQueue = "" #todo put jobs in the genome
+    return f'{{"queue": [{queue}], "jobQueue": [{jobQueue}], "geneticAlgorithm": true, "speed": 128, "disableTimeskip": true, "desiredTicksPerLoop": 8}}'
+
 if __name__ == "__main__":
     kittensTrial(0)
