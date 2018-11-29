@@ -71,7 +71,7 @@ class GeneralizedBeamSearch:
             if (printProgress and pow(1.5, printed - 7) + printed*printed / 12 + printed * 2 - 3 <= i):
                 printed += 1
                 scores = [ score for (score, fresh, gen) in scored[:10] ]
-                print("Generation {i}: {scores}")
+                print(f"Generation {i}: {scores}")
                 if (len(scored[0][2]) < 50):
                     print(scored[0][2])
             population = self.newGeneration(scored, pMut, breedingPortion, mutatingPortion)
@@ -117,8 +117,12 @@ class KittensProblem(GeneralizedBeamSearch):
         #a random number of buildings to remove
         numRemoved = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
         newGenome = genome.copy()
-        for pos in random.sample(range(len(genome)), numRemoved):      #removes a building from a random position
-            del newGenome[pos]
+        for x in range (numRemoved):    #loop numRemoved times
+            pos = random.randrange(len(newGenome)) 
+            del newGenome[pos]    
+#        for pos in random.sample(range(len(NewGenome)), numRemoved):      #removes a building from a random position
+#            del newGenome[pos]
+
         for pos in random.sample(range(len(newGenome)), numAdded):        #inserts a random building at random positions
             newGenome.insert(pos, random.choice(self.buildings))
         return (alwaysChange, newGenome)
