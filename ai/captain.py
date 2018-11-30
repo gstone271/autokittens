@@ -49,13 +49,20 @@ class Captain:
         TODO combine resultsByComputer into one list
         #get results back, combine into list, return
 
+backupComputer = "babbage.cs.pdx.edu"
+
 def runOneComputer(hostname, genomes):
     genome_file = TODO_file_named_after_hostname
     fitness_file = TODO_file_named_after_hostname
     pickle.dump(genomes, genome_file)
     try:
-        subprocess.run(["ssh", hostname, f"python3 ~/simba/ai/scotty.py {hostname}"], check=True)
+        subprocess.run(["ssh", hostname, f"python3 ~/simba/ai/scotty.py {hostname}"], check=True, timeout=(60 * 30))
         fitnesses = pickle.load(fitness_file)
         return fitnesses
-    except CalledProcessError:
-        TODO
+    except (CalledProcessError, TimeoutExpired) as err:
+        if hostname == backupComputer:
+            print("Warning: Backup computer job failed:", err)
+            return [0] * len(genomes)
+        else:
+            print(f"Warning: {hostname} job failed:", err)
+            return runOneComputer(backupComputer, genomes)
