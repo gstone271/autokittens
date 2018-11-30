@@ -15,7 +15,9 @@ from selenium.common.exceptions import TimeoutException
 def run_browser(baseDir, simbaSettings): #Runs the chrome browser
 	with open(os.path.join(baseDir, "bot.js")) as f:
 		botJs = f.read()
-	driver = webdriver.Chrome() #Can be changed to Firefox as well
+	options = webdriver.ChromeOptions()
+	options.add_argument('headless')
+	driver = webdriver.Chrome(chrome_options=options) #Can be changed to Firefox as well
 	driver.get("http://bloodrizer.ru/games/kittens/") #Loads the kittens game
 	#Wait for deferred loading
 	#initGame unhides the #game element
