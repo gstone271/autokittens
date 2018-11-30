@@ -49,6 +49,14 @@ class Captain:
         TODO combine resultsByComputer into one list
         #get results back, combine into list, return
 
+def isComputerRunning(computer):
+    return subprocess.run(["ping", "-c", "1", computer]).returncode == 0
+
+def getWorkingComputers(computerList):
+    with Pool(len(computerList)) as pool:
+        pingResults = pool.map(isComputerRunning, computerList)
+    return [ computer for (computer, isRunning) in zip(computerList, pingResults) if isRunning ]
+
 backupComputer = "babbage.cs.pdx.edu"
 
 def runOneComputer(hostname, genomes):
