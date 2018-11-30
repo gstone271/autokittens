@@ -9,14 +9,17 @@
 # selenium starts Simba, baris will do
 # baris: get fitness from simba
 # me: get genome to each computer (captain)
-def startScotty(self, genomeList):
-    #this function should be parallel, using multiprocessing.Pool again
+from multiprocessing import Pool
+import pickle
+import sys
 
+def startScotty(self, genomeList):
+    genomes = len(genomeList)     
     fitnessList = list()
     #run simba with each genome
-    for x in genomeList:
-        fitness = startSimba(genomeList[x])
-        fitnessList.append((fitness, genomeList[x]))
+    with Pool(processes = genomes) as pool:
+        fitnessList = pool.map(func = startSimba, iterable =genomeList)
+    return fitnessList
 
 if __name__ == '__main__':
     hostname = sys.argv[1]

@@ -44,10 +44,11 @@ class Captain:
                     genomeList.pop(0)
                     remain = remain - 1
             splitGenomes.append((thisCompsName, thisCompsGenomes))
+        results = list()
         with Pool(processes = computers) as pool:
             resultsByComputer = pool.starmap(func = runOneComputer, iterable = splitGenomes)
-        TODO combine resultsByComputer into one list
-        #get results back, combine into list, return
+            results.append(resultsByComputer)
+        return results
 
 def isComputerRunning(computer):
     return subprocess.run(["ping", "-c", "1", computer]).returncode == 0
