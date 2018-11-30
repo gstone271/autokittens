@@ -1589,6 +1589,9 @@ Building = class extends DataListQueueable(game.bld.buildingsData) {
         }
         return prices;
     }
+    isUnlocked() {
+        return super.isUnlocked() || ["Hut", "Library"].includes(this.name);
+    }
 }
 
 Craft = class extends Queueable {
