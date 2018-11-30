@@ -13,7 +13,8 @@
 # Author: Kallen Harvey
 # Sources noted where used.
 from multiprocessing import Pool
-from scotty import startScotty
+import pickle
+import subprocess
 
 #from genetic import (genome class/where genome info is stored)
 #list node has 1 computer (string of name/address) and many genomes 
@@ -44,5 +45,17 @@ class Captain:
                     remain = remain - 1
             splitGenomes.append((thisCompsName, thisCompsGenomes))
         with Pool(processes = computers) as pool:
-            pool.starmap(func = startScotty, iterable = splitGenomes)
-            #get results back, combine into list, return
+            resultsByComputer = pool.starmap(func = runOneComputer, iterable = splitGenomes)
+        TODO combine resultsByComputer into one list
+        #get results back, combine into list, return
+
+def runOneComputer(hostname, genomes):
+    genome_file = TODO_file_named_after_hostname
+    fitness_file = TODO_file_named_after_hostname
+    pickle.dump(genomes, genome_file)
+    try:
+        subprocess.run(["ssh", hostname, f"python3 ~/simba/ai/scotty.py {hostname}"], check=True)
+        fitnesses = pickle.load(fitness_file)
+        return fitnesses
+    except CalledProcessError:
+        TODO
