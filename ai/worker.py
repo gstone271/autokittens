@@ -6,13 +6,14 @@
 
 import sys
 import os
+import re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
-def run_browser(baseDir, simbaSettings): #Runs the chrome browser
+def run_browser(baseDir, simbaSettings, displayPage=False): #Runs the chrome browser
 	with open(os.path.join(baseDir, "bot.js")) as f:
 		botJs = f.read()
 	options = webdriver.ChromeOptions()
@@ -37,7 +38,9 @@ def run_browser(baseDir, simbaSettings): #Runs the chrome browser
 		timeout_seconds = 60
 		element = WebDriverWait(driver, timeout_seconds).until( #Waiting for element Simba will create when it's done
 			EC.presence_of_element_located((By.ID, "fitnessValue")))
-		result = float(element.text.strip()) #Retrieves fitness score as a float
+		if displayPage:
+		    print(re.sub(r'\n[\s]*\n', '\n', driver.find_element_by_tag_name('html').text))
+		result = int(element.get_attribute('innerHTML').strip()) #Retrieves fitness score
 	except TimeoutException:
 		#JS failed to create result element within timeout
 		result = 0
@@ -46,8 +49,8 @@ def run_browser(baseDir, simbaSettings): #Runs the chrome browser
 	return result
 
 def main(argv): #Used for testing. Import file as a module and call run browser
-	defaultSettings = '{"queue":[]}'
-	run_browser(os.getcwd(), defaultSettings)
+	defaultSettings = '{"queue": [{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Hut","tab":"Bonfire","panel":""},{"name":"Barn","tab":"Bonfire","panel":""},{"name":"Library","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Hut","tab":"Bonfire","panel":""},{"name":"Barn","tab":"Bonfire","panel":""},{"name":"Library","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Hut","tab":"Bonfire","panel":""},{"name":"Barn","tab":"Bonfire","panel":""},{"name":"Library","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Hut","tab":"Bonfire","panel":""},{"name":"Barn","tab":"Bonfire","panel":""},{"name":"Library","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Hut","tab":"Bonfire","panel":""},{"name":"Barn","tab":"Bonfire","panel":""},{"name":"Library","tab":"Bonfire","panel":""}], "jobQueue": [], "geneticAlgorithm": true, "speed": 2048, "disableTimeskip": true, "desiredTicksPerLoop": 8, "running": true}'
+	print(run_browser(os.getcwd(), defaultSettings, True))
 
 if __name__ == '__main__':
 	main(sys.argv)
