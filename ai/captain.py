@@ -56,7 +56,7 @@ def runOneComputer(hostname, genomes):
     fitness_file = TODO_file_named_after_hostname
     pickle.dump(genomes, genome_file)
     try:
-        subprocess.run(["ssh", hostname, f"python3 ~/simba/ai/scotty.py {hostname}"], check=True, timeout=(60 * 30))
+        subprocess.run(["ssh", hostname, f"nice -n 5 python3 ~/simba/ai/scotty.py {hostname}"], check=True, timeout=(60 * 30))
         fitnesses = pickle.load(fitness_file)
         return fitnesses
     except (CalledProcessError, TimeoutExpired) as err:
