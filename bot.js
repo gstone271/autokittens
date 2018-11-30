@@ -1447,10 +1447,14 @@ calculateFitness = () => {
     }
 }
 reportFitness = () => {
+    fitnessDiv = $("#fitnessValue");
     if ($("#fitnessValue").length === 0) {
-        $("html").append("<div id='fitnessValue'>")
+        fitnessDiv = $("<div id='fitnessValue'>");
     }
-    $("#fitnessValue").text(calculateFitness());
+    fitnessDiv.text(calculateFitness());
+    if ($("#fitnessValue").length === 0) {
+        $("html").append(fitnessDiv);
+    }
 }
 
 /************** 

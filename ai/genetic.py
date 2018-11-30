@@ -16,8 +16,8 @@ class GeneralizedBeamSearch:
         return (alwaysChange, newGen)
 
     def breed(self, p1, p2, pMut):
-        crossoverIdx = random.randrange(0, len(p1))
-        (c1, c2) = tuple([ self.score(self.mutate(self.cross(a, b, crossoverIdx), pMut, mustMutate)) for (a, b, mustMutate) in [(p1, p2, True), (p2, p1, False)]])
+        crossoverIdx = random.randrange(0, min(len(p1), len(p2)) + 1)
+        (c1, c2) = tuple([self.mutate(self.cross(a, b, crossoverIdx), pMut, mustMutate) for (a, b, mustMutate) in [(p1, p2, True), (p2, p1, False)]])
         return (c1, c2)
 
     def sortGeneration(self, pop, T):
@@ -48,9 +48,15 @@ class GeneralizedBeamSearch:
         pairs = zip(breeders[:numPairs], breeders[numPairs:])
         # Might want to pull score out of breed to simplify parallelization
         children = [ child for (p1, p2) in pairs for child in self.breed(p1, p2, pMut)]
-        mutated = [ self.score(self.mutate(gen, pMut, True)) for (fitness, fresh, gen) in scored[:toMutate] ]
+        mutated = [ (self.mutate(gen, pMut, True)) for (fitness, fresh, gen) in scored[:toMutate] ]
+   
+        #children + mutated need to be scored
+        #concatenate the two lists
+        unscored = children + mutated
+        newscored = [self.score(mut)for mut in unscored]
         keepers = [ (fitness, False, gen) for (fitness, fresh, gen) in scored[:toKeep] ]
-        return keepers + mutated + children
+        return keepers + newscored
+#        return keepers + mutated + children
 
     # Temperature Schedule (for SA): Defines odds of exploring a worse solution over time. Set to always 0 for non-SA
     # Mutation Schedule: Defines odds of mutating an individual gene, over time
@@ -91,77 +97,61 @@ class KittensProblem(GeneralizedBeamSearch):
         return (self.fitness_function(gen), fresh, gen)
 
     # TODO: this should simulate the game and compute a score. The current implementation is a stub for testing.
+#    def fitness_function(self, gen):
+#        fitness = 0
+#        if gen[0] == "Field":
+#            fitness += 1
+#        if gen[1] == "Hut":
+#            fitness += 1
+#        if gen[2] == "Barn":
+#            fitness += 1
+#        if gen[3] == "Library":
+#            fitness += 1
+#        return fitness
+#
+    #working off of Griffin's suggestion, this arbitrary fitness function will find the first instance of 'field'
+    #then it will check if a Hut comes after field. 
+    #ideal pattern would be Field, Hut, Barn, Library
     def fitness_function(self, gen):
         fitness = 0
-        if gen[0] == "Field":
-            fitness += 1
-        if gen[1] == "Hut":
-            fitness += 1
-        if gen[2] == "Barn":
-            fitness += 1
-        if gen[3] == "Library":
-            fitness += 1
+        FList = ["Catnip field", "Hut", "Barn", "Library"]
+        increment = 0
+
+        for pos in range(len(gen)):
+            if gen[pos] == FList[increment]:
+                increment = (increment+1)%len(FList)
+                fitness += 1
+            else:
+                fitness -= 1
         return fitness
 
-    # Changes a single element of the build order
-    def mutate1(self, gene):
-        return random.choice(self.buildings)
+    #princess kim's implementation of mutate
+    def mutate(self, genome, mutationChance, alwaysChange):
+        #TODO: make it so that adding has a lower probability than removing?
+        #a random number of buildings to add
+        numAdded = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
+        #a random number of buildings to remove
+        numRemoved = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
+        newGenome = genome.copy()
+        for x in range(numRemoved):    #loop numRemoved times
+            pos = random.randrange(len(newGenome)) 
+            del newGenome[pos]    
+        for x in range(numAdded):
+            pos = random.randrange(len(newGenome) + 1) 
+            newGenome.insert(pos, random.choice(self.buildings))
+        return (alwaysChange, newGenome)
 
     def printInfo(self, gen):
-        print(",".join(gen[0:min(10, len(gen))]))
+        print(toSimbaSettings(gen))
 
     def randomGenome(self):
-        gen = random.choices(self.buildings, k=self.build_order_length) #Returns a list of k-size elements
-        return self.score((True, gen)) #Returns the score that corresponds to that list of elements
+#        gen = random.choices(self.buildings, k=self.build_order_length) #Returns a list of k-size elements
+        gen = [] 
+        for pos in range(self.build_order_length):
+            gen.append(random.choice(self.buildings))
+#        return self.score((True, gen)) #Returns the score that corresponds to that list of elements
+        return gen      #returns UNSCORED genome?
 
-# Code to find better parameters to GA/SA/HC. May be removed later, but useful as code template
-# class MetaBeamSearch(GeneralizedBeamSearch):
-#     def __init__(self, subSearch, subIterations):
-#         self.subSearch = subSearch
-#         self.subIterations = subIterations
-#
-#     def sigmoid(self, gene):
-#         return 1 / (1 + math.exp(-gene))
-#
-#     def runSubTrial(self, instance, gen):
-#         (logBaseT, sigTExp, tLinear, logBaseMut, sigMutExp, mutLinear, sigBreedingPortion, sigMutatingPortion) = gen
-#         baseT = math.exp(logBaseT)
-#         tExp = self.sigmoid(sigTExp) * 2
-#         baseMut = math.exp(logBaseMut)
-#         mutExp = self.sigmoid(sigMutExp) * 2
-#         def temperatureSchedule(t, iterations):
-#             try:
-#                 return max(baseT * pow(tExp, t) * (1 + tLinear * t / iterations), 0)
-#             except OverflowError:
-#                 return math.inf
-#         def mutationSchedule(t, iterations):
-#             try:
-#                 return max(min(baseMut * pow(mutExp, t) * (1 + mutLinear * t / iterations), 1), 0)
-#             except OverflowError:
-#                 return 1
-#         breedingPortion = self.sigmoid(sigBreedingPortion) / 2
-#         mutatingPortion = self.sigmoid(sigMutatingPortion) * (1 - breedingPortion * 2)
-#         (subProblem, subPop) = instance
-#         return self.subSearch.run(subProblem, subPop, temperatureSchedule, mutationSchedule, breedingPortion, mutatingPortion, self.subIterations, False)
-#
-#     def score(self, mut, problem):
-#         (fresh, gen) = mut
-#         #todo def schedules based on float params
-#         with multiprocessing.Pool(24) as p:
-#             return (sum(p.starmap(self.runSubTrial, zip(problem, [gen] * len(problem)))) / len(problem), fresh, gen)
-#
-#     def mutate1(self, gene):
-#         return (gene + random.random() - .5) * (random.random() + .5)
-#
-#     #todo generalize capacity--include data in these objects
-#     def randomObj(self, capacity, numObjects, populationSize):
-#         objs = [ self.subSearch.randomObj(capacity) for i in range(numObjects) ]
-#         population = [ self.subSearch.randomGenome((objs, capacity)) for i in range(populationSize) ]
-#         return ((objs, capacity), population)
-#
-#     def randomGenome(self, problem):
-#         gen = [ (random.random() - .5) * 4 for i in range(8) ]
-#         return self.score((True, gen), problem)
 
 #example parameters
 def temperatureSchedule2(t, iterations):
@@ -174,28 +164,66 @@ def mutationSchedule(t, iterations):
     #return T * .002
     return 0.004
 
+
 #define and run different problems
 def kittensTrial(j):
-    buildings = [
-        "Field",
-        "Hut",
-        "Barn",
-        "Pasture",
-        "Library",
-        "Mine"
-    ]
-    build_order_length = 100
-    kittensProblem = KittensProblem(buildings, build_order_length)
+#   build order length is used to initialize the genomes size at first. 
+#   size is not fixed, genomes can shrink or grow depending on how it is mutated    
+#   buildings can be bought (and should be bought) multiple times, so the build length is a multiple of the number of buildings
+    build_order_length = len(buildings) * 3
+    kittensProblem = KittensProblem(allQueueables, build_order_length)
     populationSize = 800
-    population = [ kittensProblem.randomGenome() for i in range(populationSize) ]
-    return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 10, j == 0)
+    #score population? 
+    unscored_population = [ kittensProblem.randomGenome() for i in range(populationSize) ]
+    population = [kittensProblem.score((True, gen)) for gen in unscored_population]
+    return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 100, j == 0)
 
 # Turns a genome into a save file that Simba can understand and import
 # Call Simba's importSaveDecompressed on the return value of this function
 def toSimbaSettings(genome):
-    queue = ",".join([f'{{"name":"{name}","tab":"Bonfire","panel":""}}' for name in genome])
-    jobQueue = "" #todo put jobs in the genome
-    return f'{{"queue": [{queue}], "jobQueue": [{jobQueue}], "geneticAlgorithm": true, "speed": 128, "disableTimeskip": true, "desiredTicksPerLoop": 8}}'
+    blds = []
+    for name in genome:
+        for (membersOfType, tab, panel) in queueableTypes:
+            if name in membersOfType:
+                blds.append(f'{{"name":"{name}","tab":"{tab}","panel":"{panel}"}}')
+                break
+    queue = ",".join(blds)
+    jobQueue = ",".join([f'"{job}"' for job in genome if job in jobsSet])
+    return f'{{"queue": [{queue}], "jobQueue": [{jobQueue}], "geneticAlgorithm": true, "speed": 128, "disableTimeskip": true, "desiredTicksPerLoop": 8, "running": true}}'
+
+buildings = [
+    "Catnip field",
+    "Hut",
+    "Barn",
+    "Pasture",
+    "Library",
+    "Mine"
+]
+upgrades = [
+    "Mineral Hoes",
+    "Mineral Axe",
+    "Iron Hoes",
+    "Iron Axe",
+]
+science = [
+    "Calendar",
+    "Agriculture",
+    "Mining",
+    "Archery",
+]
+queueableTypes = [(set(buildings), "Bonfire", ""), (set(upgrades), "Workshop", "Upgrades"), (set(science), "Science", "")]
+jobs = [
+    "woodcutter",
+    "scholar",
+    "miner",
+    "farmer",
+    "hunter",
+    "geologist",
+    "priest",
+]
+jobsSet = set(jobs)
+allQueueables = buildings + upgrades + science + jobs
+
 
 if __name__ == "__main__":
     kittensTrial(0)
