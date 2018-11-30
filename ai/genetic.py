@@ -189,7 +189,7 @@ def toSimbaSettings(genome):
                 break
     queue = ",".join(blds)
     jobQueue = ",".join([f'"{job}"' for job in genome if job in jobsSet])
-    return f'{{"queue": [{queue}], "jobQueue": [{jobQueue}], "geneticAlgorithm": true, "speed": 128, "disableTimeskip": true, "desiredTicksPerLoop": 8}}'
+    return f'{{"queue": [{queue}], "jobQueue": [{jobQueue}], "geneticAlgorithm": true, "speed": 128, "disableTimeskip": true, "desiredTicksPerLoop": 8, "running": true}}'
 
 buildings = [
     "Catnip field",
