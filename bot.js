@@ -1598,6 +1598,14 @@ Building = class extends DataListQueueable(game.bld.buildingsData) {
     isUnlocked() {
         return super.isUnlocked() || ["Hut", "Library"].includes(this.name);
     }
+    buy() {
+        var result = super.buy();
+        if (result && this.data.val == 1 && this.data.on == 0) {
+            //enable the first copy
+            this.data.on = 1;
+        }
+        return result;
+    }
 }
 
 Craft = class extends Queueable {
