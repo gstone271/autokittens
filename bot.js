@@ -168,6 +168,11 @@ hunt = () => {
 manageJobs = () => {
     //assigning first leader is one of the only things the bot will do with no way to disable it; maybe add an option?
     assignFirstLeader();
+    if (getUnlockedJobs() > state.jobsUnlocked && state.geneticAlgorithm) {
+        state.jobQueue = state.originalJobQueue;
+        reassignAllJobs();
+        state.jobsUnlocked = getUnlockedJobs();
+    }
     if (state.autoFarmer) {
         preventStarvation();
     }
@@ -175,7 +180,8 @@ manageJobs = () => {
         assignNewKittenJob();
     }
 }
-assignNewKittenJob = () => {
+getUnlockedJobs = () => getJobCounts().filter(job => isJobEnabled(job.name)).length
+getNextQueuedJob = () => {
     var job = state.jobQueue.find(job => isJobEnabled(job))
     if (job) {
         state.jobQueue = removeOne(state.jobQueue, job);
@@ -184,12 +190,42 @@ assignNewKittenJob = () => {
         //job that's always enabled
         job = "woodcutter";
     }
+    return job;
+}
+assignNewKittenJob = () => {
+    var job = getNextQueuedJob();
     //it's actually possible to cheat and click on a button that hasn't been revealed yet
     withTab("Village", () => {
         getJobButton(job).click();
         log("Assigned new kitten to " + job);
     });
     recountKittens(job);
+}
+reassignAllJobs = () => {
+    var goalJobs = { farmer: state.temporaryFarmers }
+    for (var k = 0; k < game.village.sim.getKittens() - state.temporaryFarmers; k++) {
+        var job = getNextQueuedJob();
+        goalJobs[job] = (goalJobs[job] || 0) + 1;
+    }
+    console.log(goalJobs)
+    withTab("Village", () => {
+        Object.keys(goalJobs).forEach(jobName => {
+            var toReduce = getJobCounts().find(job => job.name == jobName).val - goalJobs[jobName];
+            for (var i = 0; i < toReduce; i++) {
+                log("Unassigning " + jobName)
+                decreaseJob(jobName);
+            }
+        });
+    })
+    withTab("Village", () => {
+        Object.keys(goalJobs).forEach(jobName => {
+            var toIncrease = goalJobs[jobName] - getJobCounts().find(job => job.name == jobName).val;
+            for (var i = 0; i < toIncrease; i++) {
+                log("Assigning " + jobName)
+                increaseJob(jobName);
+            }
+        });
+    })
 }
 countTicks = () => {
     var ticksPassed = game.ticks - state.ticks;
@@ -2744,6 +2780,7 @@ loadDefaults = () => {
         kittensAssigned: game.village.sim.getKittens(),
         leaderAssigned: game.village.leader ? true : false,
         temporaryFarmers: 0,
+        jobsUnlocked: 1,
         verboseQueue: 0,
         disabledConverters: {},
         tradeMessages: 0,
@@ -2776,6 +2813,7 @@ loadDefaults = () => {
 initialize = () => {
     if (state.geneticAlgorithm) {
         window.confirm = () => true;
+        state.originalJobQueue = state.jobQueue;
     }
     state.ticks = game.ticks;
     setSpeed(state.speed);
