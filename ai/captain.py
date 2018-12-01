@@ -107,7 +107,7 @@ def run(genomeList):
     generationStartTime = time.time()
     result = start(computerList, genomeList)
     timePassed = time.time() - generationStartTime
-    with open(f'./logs/{startTime}/timings.log', 'w') as f:
+    with open(f'./logs/{startTime}/timings.log', 'a') as f:
         print(timePassed, file=f)
     return result
 
