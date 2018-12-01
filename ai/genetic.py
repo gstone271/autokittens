@@ -186,9 +186,15 @@ def kittensTrial(j):
 def toSimbaSettings(genome):
     blds = []
     genome = ["Catnip field"] * 20 + genome
+    seen = set()
     for name in genome:
         for (membersOfType, tab, panel) in queueableTypes:
             if name in membersOfType:
+                if (tab in ["Workshop", "Science"]):
+                    if name in seen:
+                        break
+                    else:
+                        seen.add(name)
                 blds.append(f'{{"name":"{name}","tab":"{tab}","panel":"{panel}"}}')
                 break
     queue = ",".join(blds)
@@ -197,9 +203,10 @@ def toSimbaSettings(genome):
 
 buildings = [
   "Catnip field",
+  "Catnip field", #include twice to encourage building more
   "Pasture",
   "Aqueduct",
-  "Hydro Plant",
+  #"Hydro Plant",
   "Hut",
   "Log House",
   "Mansion",
@@ -209,46 +216,44 @@ buildings = [
   "Bio Lab",
   "Barn",
   "Warehouse",
-  "Harbor",
+  "Harbour",
   "Mine",
   "Quarry",
   "Lumber Mill",
   "Oil Well",
-  "Accelerator",
+  #"Accelerator",
   "Steamworks",
   "Magneto",
   "Smelter",
   "Calciner",
   "Factory",
   "Reactor",
-  "Ampitheatre",
-  "Broadcast Tower",
+  "Amphitheatre",
+  #"Broadcast Tower",
   "Chapel",
   "Temple",
   "Workshop",
   "Tradepost"
+  #Mint, Solar Farm, Chronosphere useless
 ]
 
 upgrades = [
-        ("Ironwood Huts","Reinforced Warehouses"),( "Concrete Huts","Concrete Pillars"), ("Titanium Reflectors","Navigation"), ("Astrolabe","Navigation"),( "Biofuel Processing","Biochemistry"),( "GM Catnip", "Genetics"),( "Expanded Barns", "Barn"),( "Reinforced Barns","Barn"),( "Titanium Barns","Reinforced Barns"),( "Alloy Barns","Chemistry"),( "Concrete Barns","Concrete Pillars"),( "Reinforced Warehouses","Steel"),( "Titanium Warehouses", "Silos"), ("Silos", "Ironwood Huts"), ("Alloy Warehouses", "Chemistry"),( "Concrete Warehouses", "Concrete Pillars"), ("Expanded Cargo", "Navigation"), ( "Deep Mining", "Steel"),("Reinforced Saw", "Construction"),( "Steel Saw","Physics"),( "Titanium Saw","Steel Saw"),( "Alloy Saw","Titanium Saw"),( "Pumpjack", "Mechanization"),("Oil Refinery", "Combustion"),("Oil Distillation","Rocketry"),( "Printing Press", "Machinery"),("Offset Press", "Combustion"),( "High Pressure Engine", "Steel"),( "Fuel Injectors","Combustion"),( "Gold Ore", "Currency"),("Coal Furnace", " Steel"),("Electrolytic Smelting", "Metallurgy"),("Oxidation", "Metallurgy"),( "Rotary Kiln", "Robotics"), ("Caravanserai", "Navigation"),( "Bolas","Mining"),( "Hunting Armour","Metal Working"),( "Celestial Mechanics", "Mathematics"),("Composite Bow", "Construction"),("Catnip Enrichment", "Construction"),( "Register","Writing"),("Steel Axe","Steel"),("Steel Armour", "Steel"),("Crossbow", "Machinery"),("Titanium Axe","Navigation"),( "Pyrolysis", "Physics"),("Alloy Axe", "Chemistry"),( "Alloy Armour","Chemistry"),( "Geodesy", "Geology"),( "Biofuel processing", "Biochemistry"),( "Logistics", "Industrialization"),( "Concrete Pillars", "Mechanization"),("Mining Drill","Metallurgy"),( "Refrigeration", "Electronics"),("CAD System", "Electronics"),("Telecommunication", "Electronics"),( "Factory Logistics","Electronics"),( "Robotic Assistance", "Electronics")
+   ("Mineral Hoes", "Workshop"), ("Mineral Axe", "Workshop"), ("Iron Hoes", "Workshop"), ("Iron Axe", "Workshop"),
+("Ironwood Huts","Reinforced Warehouses"),( "Concrete Huts","Concrete Pillars"), ("Titanium Reflectors","Navigation"), ("Astrolabe","Navigation"),( "Biofuel processing","Biochemistry"),( "GM Catnip", "Genetics"),( "Expanded Barns", "Barn"),( "Reinforced Barns","Barn"),( "Titanium Barns","Reinforced Barns"),( "Alloy Barns","Chemistry"),( "Concrete Barns","Concrete Pillars"),( "Reinforced Warehouses","Steel"),( "Titanium Warehouses", "Silos"), ("Silos", "Ironwood Huts"), ("Alloy Warehouses", "Chemistry"),( "Concrete Warehouses", "Concrete Pillars"), ("Expanded Cargo", "Navigation"), ( "Deep Mining", "Steel"),("Reinforced Saw", "Construction"),( "Steel Saw","Physics"),( "Titanium Saw","Steel Saw"),( "Alloy Saw","Titanium Saw"),( "Pumpjack", "Mechanization"),("Oil Refinery", "Combustion"),("Oil Distillation","Rocketry"),( "Printing Press", "Machinery"),("Offset Press", "Combustion"),( "High Pressure Engine", "Steel"),( "Fuel Injectors","Combustion"),( "Gold Ore", "Currency"),("Coal Furnace", " Steel"),("Electrolytic Smelting", "Metallurgy"),("Oxidation", "Metallurgy"),( "Rotary Kiln", "Robotics"), ("Caravanserai", "Navigation"),( "Bolas","Mining"),( "Hunting Armour","Metal Working"),( "Celestial Mechanics", "Mathematics"),("Composite Bow", "Construction"),("Catnip Enrichment", "Construction"),( "Register","Writing"),("Steel Axe","Steel"),("Steel Armour", "Steel"),("Crossbow", "Machinery"),("Titanium Axe","Navigation"),( "Pyrolysis", "Physics"),("Alloy Axe", "Chemistry"),( "Alloy Armour","Chemistry"),( "Geodesy", "Geology"),( "Biofuel processing", "Biochemistry"),( "Logistics", "Industrialization"),( "Concrete Pillars", "Mechanization"),("Mining Drill","Metallurgy"),( "Refrigeration", "Electronics"),("CAD System", "Electronics"),("Telecommunication", "Electronics"),( "Factory Logistics","Electronics"),( "Robotic Assistance", "Electronics")
 ]
 
 
 religion = [
-    ("Scholasticism", "Temple"), ("Golden Spire", "Temple"), ("Sun Altar", "Temple"), ("Stained Glass", "Temple"), ("Basilica", "Temple"), ( "Templars", "Temple"), ("Apocrypha", "Temple"), ("Transcendence", "Temple")
+    ("Scholasticism", "Theology"), ("Golden Spire", "Theology"), ("Sun Altar", "Theology"), ("Stained Glass", "Theology"), ("Basilica", "Theology"), ( "Templars", "Theology"), ("Apocrypha", "Theology"), ("Transcendence", "Theology")
 ]
 
-tech = [
+science = [
     ("Calendar", "Library"),("Agriculture","Calendar"), ( "Mining", "Agriculture"),( "Archery", "Agriculture"),("Metal Working", "Mining"),( "Mathematics","Animal Husbandry"), ( "Animal Husbandry", "Archery"), ("Civil Service","Animal Husbandry"),( "Construction","Animal Husbandry"), ( "Currency", "Civil Service"), ( "Engineering", "Construction"),("Steel", "Writing"),( "Writing", "Engineering"),( "Machinery", "Writing"),("Philosophy","Writing"),( "Theology","Philosophy"),( "Astronomy","Theology"),( "Biology", "Geology"),( "Geology", "Navigation"),( "Navigation","Astronomy"),( "Architecture", "Navigation"),("Acoustics", "Architecture"),( "Biochemistry","Biology"),( "Chemistry", "Physics"),( "Physics", "Navigation"),( "Drama and Poetry", "Acoustics"),( "Genetics", "Biochemistry"),( "Electricity","Physics"),( "Metallurgy", "Industrialization"),( "Industrialization", "Electricity"),( "Combustion", "Industrialization"),( "Mechanization", "Industrialization"),("Robotics", "Electronics"),( "Electronics", "Mechanization"),( "Rocketry", "Electronics")
 ]
 
-upgrades = [
-    "Mineral Hoes",
-    "Mineral Axe",
-    "Iron Hoes",
-    "Iron Axe",
-]
-queueableTypes = [(set(buildings), "Bonfire", ""), (set(upgrades), "Workshop", "Upgrades"), (set(science), "Science", "")]
+def techsOf(techList):
+    return [tech for (tech, requirement) in techList]
+queueableTypes = [(set(buildings), "Bonfire", ""), (set(techsOf(upgrades)), "Workshop", "Upgrades"), (set(techsOf(science)), "Science", "")]
 jobs = [
     "woodcutter",
     "scholar",
@@ -259,7 +264,7 @@ jobs = [
     "priest",
 ]
 jobsSet = set(jobs)
-allQueueables = buildings + upgrades + science + jobs
+allQueueables = buildings + techsOf(upgrades) + techsOf(science) + jobs
 
 
 if __name__ == "__main__":
