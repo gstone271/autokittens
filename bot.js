@@ -123,7 +123,7 @@ mainLoop = () => {
     if (state.autoConverters) manageConverters();
     doSpendingChores();
     if (state.masterPlanMode) queueNewTechs();
-    updateUi();
+    if (!state.geneticAlgorithm) updateUi();
     countTicks();
 }
 doHarvestingChores = () => {
@@ -1428,7 +1428,7 @@ var clearMasterPlan = () => {
     state.queue = state.queue.filter(bld => !bld.masterPlan);
 }
 
-var gaTimeLimit = 1000; //years
+var gaTimeLimit = 100; //years
 shouldReportFitness = () => {
     return game.calendar.year >= gaTimeLimit || goalAchieved();
 }
@@ -2575,10 +2575,12 @@ updateUi = () => {
 **************/
 log = (msg, quiet) => { console.log(msg); if (!quiet) game.msg(msg); }
 addLog = item => {
-    item.year = game.calendar.year;
-    var roundedDay = Math.round(game.calendar.day * 100) / 100
-    item.day = roundedDay + 100 * game.calendar.season;
-    state.history.push(item);
+    if (!state.geneticAlgorithm) {
+        item.year = game.calendar.year;
+        var roundedDay = Math.round(game.calendar.day * 100) / 100
+        item.day = roundedDay + 100 * game.calendar.season;
+        state.history.push(item);
+    }
 }
 logBuy = (bld, numBought) => addLog({ name: bld.name, type: "Buy", buy: bld.savedProps(true), num: numBought});
 logKitten = (numKittens, job) => addLog({ name: numKittens + " Kittens", type: "Kitten", kittens: numKittens, job: job});
@@ -2734,6 +2736,12 @@ initialize = () => {
     state.ticks = game.ticks;
     setSpeed(state.speed);
     createSettingsMenu();
+}
+if (!game.realSave) game.realSave = game.save;
+game.save = () => {
+    if (!state.geneticAlgorithm) {
+        game.realSave();
+    }
 }
 if (!game.console.realSave) game.console.realSave = game.console.save;
 game.console.save = (data) => {
