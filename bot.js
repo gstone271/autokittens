@@ -1830,7 +1830,15 @@ SendExplorers = class extends Queueable {
     getPrices() {
         return [{ name: "manpower", val: 1000 }];
     }
-    //TODO detect when new races are available
+    isEnabled() {
+        return game.diplomacy.hasUnlockedRaces() && (
+            ["lizards", "griffins", "sharks"].some(race => !game.diplomacy.get(race).unlocked)
+            || !game.diplomacy.get("nagas").unlocked && game.resPool.get("culture").value >= 1500
+            || !game.diplomacy.get("zebras").unlocked && game.resPool.get("ship").value >= 1
+            || !game.diplomacy.get("spiders").unlocked && game.resPool.get("ship").value >= 100 && game.resPool.get("science").maxValue > 125000
+            || !game.diplomacy.get("dragons").unlocked && game.science.get("nuclearFission").researched
+        )
+    }
 }
 FeedElders = class extends Queueable {
     constructor(name, tab, panel, maxPriority, masterPlan) {
