@@ -1022,7 +1022,7 @@ getJobCounts = () => {
         val: game.village.sim.kittens.filter(kitten => kitten.job === job.name).length
     }));
 }
-getJobLongName = jobName => game.village.jobs.find(job => job.name === jobName).title;
+getJobLongName = jobName => jobName && game.village.jobs.find(job => job.name === jobName).title;
 getJobShortName = jobLongName => game.village.jobs.find(job => job.title === jobLongName).name;
 getJobButton = jobName => findButton(getJobLongName(jobName));
 //decrease button uses en dash (–), not hyphen (-)
