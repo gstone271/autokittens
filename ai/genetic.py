@@ -185,21 +185,25 @@ def kittensTrial(j):
 # Call Simba's importSaveDecompressed on the return value of this function
 def toSimbaSettings(genome):
     blds = []
-    genome = "Moon Mission" + ["Catnip field"] * 20 + genome + "Orbital Launch"
+    genome = ["Moon Mission"] + ["Catnip field"] * 20 + genome + ["Orbital Launch"]
     seen = set()
     for name in genome:
         for (membersOfType, tab, panel) in queueableTypes:
             if name in membersOfType:
-                if (tab in ["Workshop", "Science", "Religion"]):
+                if tab in {"Workshop", "Science", "Religion"}:
                     if name in seen:
                         break
-                    else:
+                    seen.add(name)
+                elif tab == "Trade":
+                    panel = name
+                    if name not in seen:
+                        blds.append(f'{{"name":"Send explorers","tab":"Trade","panel":""}}')
                         seen.add(name)
                 blds.append(f'{{"name":"{name}","tab":"{tab}","panel":"{panel}"}}')
                 break
     queue = ",".join(blds)
     jobQueue = ",".join([f'"{job}"' for job in genome if job in jobsSet])
-    return f'{{"queue": [{queue}], "jobQueue": [{jobQueue}], "geneticAlgorithm": true, "speed": 8192, "disableTimeskip": true, "desiredTicksPerLoop": 16, "running": true}}'
+    return f'{{"queue": [{queue}], "jobQueue": [{jobQueue}], "geneticAlgorithm": true, "speed": 4096, "disableTimeskip": true, "desiredTicksPerLoop": 16, "running": true}}'
 
 buildings = [
   "Catnip field",
@@ -233,7 +237,8 @@ buildings = [
   "Chapel",
   "Temple",
   "Workshop",
-  "Tradepost"
+  "Tradepost",
+  "Unic. Pasture"
   #Mint, Solar Farm, Chronosphere useless
 ]
 
@@ -257,9 +262,22 @@ space = [
     "Moon Mission",
 ]
 
+trade = [
+    "Lizards",
+    "Sharks",
+    "Griffins",
+    "Nagas",
+    "Zebras", # need this for titanium!
+    "Spiders",
+]
+
+craft = [
+    "Trade Ship" # need this for titanium!
+]
+
 def techsOf(techList):
     return [tech for (tech, requirement) in techList]
-queueableTypes = [(set(buildings), "Bonfire", ""), (set(techsOf(upgrades)), "Workshop", "Upgrades"), (set(techsOf(science)), "Science", "")], (set(techsOf(religion)), "Religion", "Order Of The Sun"), (set(space), "Space", "Ground Control")
+queueableTypes = [(set(buildings), "Bonfire", ""), (set(techsOf(upgrades)), "Workshop", "Upgrades"), (set(techsOf(science)), "Science", ""), (set(techsOf(religion)), "Religion", "Order of the Sun"), (set(space), "Space", "Ground Control"), (set(trade), "Trade", ""), (set(craft), "Workshop", "Crafting")]
 jobs = [
     "woodcutter",
     "scholar",
@@ -270,7 +288,7 @@ jobs = [
     "priest",
 ]
 jobsSet = set(jobs)
-allQueueables = buildings + techsOf(upgrades) + techsOf(science) + jobs
+allQueueables = buildings + techsOf(upgrades) + techsOf(science) + jobs + techsOf(religion) + trade + craft
 
 
 if __name__ == "__main__":
