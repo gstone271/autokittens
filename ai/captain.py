@@ -16,7 +16,8 @@ from multiprocessing import Pool
 import pickle
 import subprocess
 from subprocess import DEVNULL
-
+import os
+import time
 
 #from genetic import (genome class/where genome info is stored)
 
@@ -38,7 +39,7 @@ def runOneComputer(hostname, genomes):
     with open(hostG, 'wb') as genome_file:
         pickle.dump(genomes, genome_file)
     try:
-        subprocess.run(["ssh", "-q", hostname, f"bash -c '. ~/cs541ve/bin/activate; nice -n 5 python3 ~/simba/ai/scotty.py {hostname} 2>>~/simba/errors.log'"], stderr=DEVNULL, check=True, timeout=(60 * 30))
+        subprocess.run(["ssh", "-q", hostname, f"bash -c '. ~/cs541ve/bin/activate; nice -n 5 python3 ~/simba/ai/scotty.py {hostname} 2>>~/simba/ai/logs/{startTime}/errors.log'"], stderr=DEVNULL, check=True, timeout=(60 * 30))
         fitness_file = open(hostF, 'rb')
         fitnesses = pickle.load(fitness_file)
         return fitnesses
@@ -91,12 +92,17 @@ exampleGenomes = [['miner', 'Catnip field', 'woodcutter', 'miner', 'Library', 'm
 
 compFile = "./computers.txt"
 fullComputerList = list()
+startTime = round(time.time())
 
 def run(genomeList):
     global fullComputerList
     if (fullComputerList == list()):
         with open(compFile) as f:
             fullComputerList = [line.rstrip('\n') for line in f]
+        try:
+            os.mkdir(f'./logs/{startTime}')
+        except FileExistsError:
+            pass
     computerList = getWorkingComputers(fullComputerList)
     return start(computerList, genomeList)
 
