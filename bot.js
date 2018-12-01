@@ -1798,12 +1798,13 @@ PromoteLeader = class extends Queueable {
         
     }
     getLeaderRank() {
-        return game.village.leader.rank;
+        return game.village.leader && game.village.leader.rank;
     }
     getPrices() {
         return [{ name: "gold", val: 25 * (this.getLeaderRank() + 1) }];
     }
     isEnabled() {
+        if (!game.village.leader) return false;
         var rank = this.getLeaderRank();
         var expNeeded = 500 * Math.pow(1.75, rank);
         return rank < 10 && game.village.leader.exp >= expNeeded;

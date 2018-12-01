@@ -275,9 +275,14 @@ craft = [
     "Trade Ship" # need this for titanium!
 ]
 
+special = [
+    "Promote kittens",
+    "Hold Festival"
+]
+
 def techsOf(techList):
     return [tech for (tech, requirement) in techList]
-queueableTypes = [(set(buildings), "Bonfire", ""), (set(techsOf(upgrades)), "Workshop", "Upgrades"), (set(techsOf(science)), "Science", ""), (set(techsOf(religion)), "Religion", "Order of the Sun"), (set(space), "Space", "Ground Control"), (set(trade), "Trade", ""), (set(craft), "Workshop", "Crafting")]
+queueableTypes = [(set(buildings), "Bonfire", ""), (set(techsOf(upgrades)), "Workshop", "Upgrades"), (set(techsOf(science)), "Science", ""), (set(techsOf(religion)), "Religion", "Order of the Sun"), (set(space), "Space", "Ground Control"), (set(trade), "Trade", ""), (set(craft), "Workshop", "Crafting"), (set(special), "Village", "Management")]
 jobs = [
     "woodcutter",
     "scholar",
@@ -288,7 +293,7 @@ jobs = [
     "priest",
 ]
 jobsSet = set(jobs)
-allQueueables = buildings + techsOf(upgrades) + techsOf(science) + jobs + techsOf(religion) + trade + craft
+allQueueables = buildings + techsOf(upgrades) + techsOf(science) + jobs + techsOf(religion) + trade + craft + special
 
 
 if __name__ == "__main__":
