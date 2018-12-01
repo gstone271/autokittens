@@ -194,12 +194,17 @@ countTicks = () => {
     state.ticks = game.ticks;
     state.blackcoinTimer++;
     state.tradeTimer++;
-    if (state.geneticAlgorithm && shouldReportFitness()) {
+    if (state.geneticAlgorithm) {
         reportFitness();
-        if (!game.isPaused) {
-            game.togglePause();
+        if (shouldStopRun()) {
+            if ($("#runFinished").length === 0) {
+                $("html").append('<div id="runFinished">');
+            }
+            if (!game.isPaused) {
+                game.togglePause();
+            }
+            setRunning(false);
         }
-        setRunning(false);
     }
 }
 
@@ -1428,8 +1433,8 @@ var clearMasterPlan = () => {
     state.queue = state.queue.filter(bld => !bld.masterPlan);
 }
 
-var gaTimeLimit = 10; //years
-shouldReportFitness = () => {
+var gaTimeLimit = 200; //years
+shouldStopRun = () => {
     return game.calendar.year >= gaTimeLimit || goalAchieved();
 }
 goalAchieved = () => {
@@ -1447,12 +1452,13 @@ calculateFitness = () => {
     }
 }
 reportFitness = () => {
-    fitnessDiv = $("#fitnessValue");
-    if ($("#fitnessValue").length === 0) {
+    var fitnessDiv = $("#fitnessValue");
+    var add = fitnessDiv.length === 0;
+    if (add) {
         fitnessDiv = $("<div id='fitnessValue'>");
     }
     fitnessDiv.text(calculateFitness());
-    if ($("#fitnessValue").length === 0) {
+    if (add) {
         $("html").append(fitnessDiv);
     }
 }
