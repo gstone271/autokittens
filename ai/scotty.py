@@ -23,8 +23,10 @@ def startScotty(self, genomeList):
 
 if __name__ == '__main__':
     hostname = sys.argv[1]
-    genome_file = TODO_file_named_after_hostname
-    fitness_file = TODO_file_named_after_hostname
+    geneFile = "./compGenomes/" + hostname
+    fitFile = "./compFitness/" + hostname
+    genome_file = open(geneFile, "rb")
+    fitness_file = open(fitFile, "wb")
     genomes = pickle.load(genome_file)
-    fitnesses = TODO_startScotty
+    fitnesses = startScotty(genomes)
     pickle.dump(fitnesses, fitness_file)

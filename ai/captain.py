@@ -35,6 +35,14 @@ class Captain:
         for x in range(computers):
             thisCompsGenomes = list()
             thisCompsName = computerList[x]
+            #create genome and fitness files (for scotty)
+            firstDot = thisCompsName.find('.')
+            nm = thisCompsName[:firstDot]
+            hostG = "./compGenomes/" + nm
+            fGene = open(hostG, "x")
+            hostF = "./compFitness/" + nm
+            fFit = open(hostF, "x")
+            #get genomes from list
             for i in range(loops):
                 #from 0 to loops-1, load genomeList[0] into new list for computer[x]
                 thisCompsGenomes.append(genomeList[0])
