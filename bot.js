@@ -171,7 +171,7 @@ manageJobs = () => {
     if (state.autoFarmer) {
         preventStarvation();
     }
-    if (state.populationIncrease > 0 && game.village.isFreeKittens() && game.village.sim.getKittens() > state.kittensAssigned) {
+    if (game.village.isFreeKittens() && (state.geneticAlgorithm || state.populationIncrease > 0 && game.village.sim.getKittens() > state.kittensAssigned)) {
         var job = state.jobQueue.find(job => isJobEnabled(job))
         if (job) {
             state.jobQueue = removeOne(state.jobQueue, job);
