@@ -169,6 +169,54 @@ def mutationSchedule(t, iterations):
 
 #define and run different problems
 def kittensTrial(j):
+    buildings = [
+      "Catnip Field",
+      "Pasture",
+      "Aqueduct",
+      "Hydro Plant",
+      "Hut",
+      "Log House",
+      "Mansion",
+      "Library",
+      "Academy",
+      "Observatory",
+      "Bio Lab",
+      "Barn",
+      "Warehouse",
+      "Harbor",
+      "Mine",
+      "Quarry",
+      "Lumber Mill",
+      "Oil Well",
+      "Accelerator",
+      "Steamworks",
+      "Magneto",
+      "Smelter",
+      "Calciner",
+      "Factory",
+      "Reactor",
+      "Ampitheatre",
+      "Broadcast Tower",
+      "Chapel",
+      "Temple",
+      "Workshop",
+      "Tradepost"
+    ]
+
+    upgrades = [
+            ("Ironwood Huts","Reinforced Warehouses"),( "Concrete Huts","Concrete Pillars"), ("Titanium Reflectors","Navigation"), ("Astrolabe","Navigation"),( "Biofuel Processing","Biochemistry"),( "GM Catnip", "Genetics"),( "Expanded Barns", "Barn"),( "Reinforced Barns","Barn"),( "Titanium Barns","Reinforced Barns"),( "Alloy Barns","Chemistry"),( "Concrete Barns","Concrete Pillars"),( "Reinforced Warehouses","Steel"),( "Titanium Warehouses", "Silos"), ("Silos", "Ironwood Huts"), ("Alloy Warehouses", "Chemistry"),( "Concrete Warehouses", "Concrete Pillars"), ("Expanded Cargo", "Navigation"), ( "Deep Mining", "Steel"),("Reinforced Saw", "Construction"),( "Steel Saw","Physics"),( "Titanium Saw","Steel Saw"),( "Alloy Saw","Titanium Saw"),( "Pumpjack", "Mechanization"),("Oil Refinery", "Combustion"),("Oil Distillation","Rocketry"),( "Printing Press", "Machinery"),("Offset Press", "Combustion"),( "High Pressure Engine", "Steel"),( "Fuel Injectors","Combustion"),( "Gold Ore", "Currency"),("Coal Furnace", " Steel"),("Electrolytic Smelting", "Metallurgy"),("Oxidation", "Metallurgy"),( "Rotary Kiln", "Robotics"), ("Caravanserai", "Navigation"),( "Bolas","Mining"),( "Hunting Armour","Metal Working"),( "Celestial Mechanics", "Mathematics"),("Composite Bow", "Construction"),("Catnip Enrichment", "Construction"),( "Register","Writing"),("Steel Axe","Steel"),("Steel Armour", "Steel"),("Crossbow", "Machinery"),("Titanium Axe","Navigation"),( "Pyrolysis", "Physics"),("Alloy Axe", "Chemistry"),( "Alloy Armour","Chemistry"),( "Geodesy", "Geology"),( "Biofuel processing", "Biochemistry"),( "Logistics", "Industrialization"),( "Concrete Pillars", "Mechanization"),("Mining Drill","Metallurgy"),( "Refrigeration", "Electronics"),("CAD System", "Electronics"),("Telecommunication", "Electronics"),( "Factory Logistics","Electronics"),( "Robotic Assistance", "Electronics")
+    ]
+
+
+    religion = [
+        ("Scholasticism", "Temple"), ("Golden Spire", "Temple"), ("Sun Altar", "Temple"), ("Stained Glass", "Temple"), ("Basilica", "Temple"), ( "Templars", "Temple"), ("Apocrypha", "Temple"), ("Transcendence", "Temple")
+    ]
+
+    tech = [
+        ("Calendar", "Library"),("Agriculture","Calendar"), ( "Mining", "Agriculture"),( "Archery", "Agriculture"),("Metal Working", "Mining"),( "Mathematics","Animal Husbandry"), ( "Animal Husbandry", "Archery"), ("Civil Service","Animal Husbandry"),( "Construction","Animal Husbandry"), ( "Currency", "Civil Service"), ( "Engineering", "Construction"),("Steel", "Writing"),( "Writing", "Engineering"),( "Machinery", "Writing"),("Philosophy","Writing"),( "Theology","Philosophy"),( "Astronomy","Theology"),( "Biology", "Geology"),( "Geology", "Navigation"),( "Navigation","Astronomy"),( "Architecture", "Navigation"),("Acoustics", "Architecture"),( "Biochemistry","Biology"),( "Chemistry", "Physics"),( "Physics", "Navigation"),( "Drama and Poetry", "Acoustics"),( "Genetics", "Biochemistry"),( "Electricity","Physics"),( "Metallurgy", "Industrialization"),( "Industrialization", "Electricity"),( "Combustion", "Industrialization"),( "Mechanization", "Industrialization"),("Robotics", "Electronics"),( "Electronics", "Mechanization"),( "Rocketry", "Electronics")
+    ]
+
+
 #   build order length is used to initialize the genomes size at first. 
 #   size is not fixed, genomes can shrink or grow depending on how it is mutated    
 #   buildings can be bought (and should be bought) multiple times, so the build length is a multiple of the number of buildings
