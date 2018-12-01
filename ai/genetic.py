@@ -175,11 +175,11 @@ def kittensTrial(j):
 #   buildings can be bought (and should be bought) multiple times, so the build length is a multiple of the number of buildings
     build_order_length = len(allQueueables) * 3
     kittensProblem = KittensProblem(allQueueables, build_order_length)
-    populationSize = 100
+    populationSize = 60 * 8 * 3 // 2
     #score population? 
     unscored_population = [ (True, kittensProblem.randomGenome()) for i in range(populationSize) ]
     population = kittensProblem.scoreAll(unscored_population)
-    return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 50, j == 0)
+    return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 100, j == 0)
 
 # Turns a genome into a save file that Simba can understand and import
 # Call Simba's importSaveDecompressed on the return value of this function
