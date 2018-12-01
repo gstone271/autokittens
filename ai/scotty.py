@@ -12,6 +12,8 @@
 from multiprocessing import Pool
 import pickle
 import sys
+import subprocess
+from subprocess import DEVNULL
 from worker import run_browser
 from genetic import toSimbaSettings
 
@@ -21,6 +23,8 @@ def startScotty(genomeList):
     #run simba with each genome
     with Pool(processes = genomes) as pool:
         fitnessList = pool.map(func = simbaSetup, iterable =genomeList)
+    subprocess.run(["pkill", "chromedriver"], stderr=DEVNULL, stdout=DEVNULL)
+    subprocess.run(["pkill", "chrome"], stderr=DEVNULL, stdout=DEVNULL)
     return fitnessList
 
 def simbaSetup(genome):
