@@ -109,6 +109,7 @@ def run(genomeList):
     timePassed = time.time() - generationStartTime
     with open(f'./logs/{startTime}/timings.log', 'w') as f:
         print(timePassed, file=f)
+    return result
 
 if __name__ == '__main__':
     genomeList = exampleGenomes
