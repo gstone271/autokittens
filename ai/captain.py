@@ -22,7 +22,7 @@ import time
 #from genetic import (genome class/where genome info is stored)
 
 def isComputerRunning(computer):
-    return subprocess.run(["ping", "-c", "1", computer], stdout=DEVNULL).returncode == 0
+    return subprocess.run(["ping", "-c", "1", "-4", computer], stdout=DEVNULL).returncode == 0
 
 def getWorkingComputers(computerList):
     with Pool(len(computerList)) as pool:
