@@ -185,12 +185,12 @@ def kittensTrial(j):
 # Call Simba's importSaveDecompressed on the return value of this function
 def toSimbaSettings(genome):
     blds = []
-    genome = ["Catnip field"] * 20 + genome
+    genome = "Moon Mission" + ["Catnip field"] * 20 + genome + "Orbital Launch"
     seen = set()
     for name in genome:
         for (membersOfType, tab, panel) in queueableTypes:
             if name in membersOfType:
-                if (tab in ["Workshop", "Science"]):
+                if (tab in ["Workshop", "Science", "Religion"]):
                     if name in seen:
                         break
                     else:
@@ -244,16 +244,22 @@ upgrades = [
 
 
 religion = [
-    ("Scholasticism", "Theology"), ("Golden Spire", "Theology"), ("Sun Altar", "Theology"), ("Stained Glass", "Theology"), ("Basilica", "Theology"), ( "Templars", "Theology"), ("Apocrypha", "Theology"), ("Transcendence", "Theology")
+    ("Scholasticism", "Theology"), ("Golden Spire", "Theology"), ("Sun Altar", "Theology"), ("Stained Glass", "Theology"), ("Basilica", "Theology"), ( "Templars", "Theology"), #("Apocrypha", "Theology"), ("Transcendence", "Theology")
 ]
 
 science = [
     ("Calendar", "Library"),("Agriculture","Calendar"), ( "Mining", "Agriculture"),( "Archery", "Agriculture"),("Metal Working", "Mining"),( "Mathematics","Animal Husbandry"), ( "Animal Husbandry", "Archery"), ("Civil Service","Animal Husbandry"),( "Construction","Animal Husbandry"), ( "Currency", "Civil Service"), ( "Engineering", "Construction"),("Steel", "Writing"),( "Writing", "Engineering"),( "Machinery", "Writing"),("Philosophy","Writing"),( "Theology","Philosophy"),( "Astronomy","Theology"),( "Biology", "Geology"),( "Geology", "Navigation"),( "Navigation","Astronomy"),( "Architecture", "Navigation"),("Acoustics", "Architecture"),( "Biochemistry","Biology"),( "Chemistry", "Physics"),( "Physics", "Navigation"),( "Drama and Poetry", "Acoustics"),( "Genetics", "Biochemistry"),( "Electricity","Physics"),( "Metallurgy", "Industrialization"),( "Industrialization", "Electricity"),( "Combustion", "Industrialization"),( "Mechanization", "Industrialization"),("Robotics", "Electronics"),( "Electronics", "Mechanization"),( "Rocketry", "Electronics")
 ]
 
+#space is special, and not included as a regular queueable
+space = [
+    "Orbital Launch",
+    "Moon Mission",
+]
+
 def techsOf(techList):
     return [tech for (tech, requirement) in techList]
-queueableTypes = [(set(buildings), "Bonfire", ""), (set(techsOf(upgrades)), "Workshop", "Upgrades"), (set(techsOf(science)), "Science", "")]
+queueableTypes = [(set(buildings), "Bonfire", ""), (set(techsOf(upgrades)), "Workshop", "Upgrades"), (set(techsOf(science)), "Science", "")], (set(techsOf(religion)), "Religion", "Order Of The Sun"), (set(space), "Space", "Ground Control")
 jobs = [
     "woodcutter",
     "scholar",
