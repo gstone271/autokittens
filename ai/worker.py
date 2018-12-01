@@ -33,7 +33,7 @@ def run_browser(simbaSettings, displayPage=False): #Runs the chrome browser
                 EC.visibility_of(driver.find_element(By.ID, "game"))) #Tries for 20 seconds to load kittens game
                 #We are waiting for the game to open for 20 seconds. Once it opens we will launch Simba
         except TimeoutException: #If the game does not load in 20 seconds
-            print("Warning: Unable to start game")
+            print("Warning: Unable to start game", file=sys.stderr)
             driver.close() #Close the game
             return 0
         driver.execute_script(botJs) #Loads Simba (bot js)
@@ -46,14 +46,14 @@ def run_browser(simbaSettings, displayPage=False): #Runs the chrome browser
             WebDriverWait(driver, timeout_seconds).until( #Waiting for element Simba will create when it's done
                     EC.presence_of_element_located((By.ID, "runFinished")))
         except TimeoutException:
-            print("Warning: Worker timeout")
+            print("Warning: Worker timeout", file=sys.stderr)
 
         try:
             fitnessElement = WebDriverWait(driver, 1).until( #Get the fitness
                     EC.presence_of_element_located((By.ID, "fitnessValue")))
             result = int(fitnessElement.get_attribute('innerHTML').strip()) #Retrieves fitness score
         except TimeoutException:
-            print("Warning: Unable to retrieve fitness value")
+            print("Warning: Unable to retrieve fitness value", file=sys.stderr)
             result = 0
 
         if displayPage:

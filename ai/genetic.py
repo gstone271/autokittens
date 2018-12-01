@@ -2,6 +2,7 @@ import random
 import math
 import multiprocessing
 import numpy
+import pickle
 from worker import run_browser
 import captain
 
@@ -80,6 +81,8 @@ class GeneralizedBeamSearch:
                 print(f"Generation {i}: {scores}")
                 if (len(scored[0][2]) < 50):
                     print(scored[0][2])
+            with open(f'./logs/{captain.startTime}/gen_{i}', 'wb') as f:
+                pickle.dump(population, f)
             population = self.newGeneration(scored, pMut, breedingPortion, mutatingPortion)
         scored = self.sortGeneration(population, 0)
         if (printProgress):
@@ -171,7 +174,7 @@ def kittensTrial(j):
 #   buildings can be bought (and should be bought) multiple times, so the build length is a multiple of the number of buildings
     build_order_length = len(allQueueables) * 3
     kittensProblem = KittensProblem(allQueueables, build_order_length)
-    populationSize = 10
+    populationSize = 100
     #score population? 
     unscored_population = [ (True, kittensProblem.randomGenome()) for i in range(populationSize) ]
     population = kittensProblem.scoreAll(unscored_population)
