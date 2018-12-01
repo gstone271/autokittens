@@ -172,21 +172,24 @@ manageJobs = () => {
         preventStarvation();
     }
     if (game.village.isFreeKittens() && (state.geneticAlgorithm || state.populationIncrease > 0 && game.village.sim.getKittens() > state.kittensAssigned)) {
-        var job = state.jobQueue.find(job => isJobEnabled(job))
-        if (job) {
-            state.jobQueue = removeOne(state.jobQueue, job);
-            state.jobQueue.push(job);
-        } else {
-            //job that's always enabled
-            job = "woodcutter";
-        }
-        //it's actually possible to cheat and click on a button that hasn't been revealed yet
-        withTab("Village", () => {
-            getJobButton(job).click();
-            log("Assigned new kitten to " + job);
-        });
-        recountKittens(job);
+        assignNewKittenJob();
     }
+}
+assignNewKittenJob = () => {
+    var job = state.jobQueue.find(job => isJobEnabled(job))
+    if (job) {
+        state.jobQueue = removeOne(state.jobQueue, job);
+        state.jobQueue.push(job);
+    } else {
+        //job that's always enabled
+        job = "woodcutter";
+    }
+    //it's actually possible to cheat and click on a button that hasn't been revealed yet
+    withTab("Village", () => {
+        getJobButton(job).click();
+        log("Assigned new kitten to " + job);
+    });
+    recountKittens(job);
 }
 countTicks = () => {
     var ticksPassed = game.ticks - state.ticks;
@@ -1006,7 +1009,18 @@ gatherIntialCatnip = () => {
 preventStarvation = () => {
     if (getResourceOwned("catnip") < getWinterCatnipStockNeeded(false, 0, true) && game.science.get("agriculture").researched) {
         log("Making a farmer to prevent starvation (needed " + game.getDisplayValueExt(getWinterCatnipStockNeeded(false, 0, true)) + " catnip)")
-        switchToJob("farmer");
+        var jobReduced = switchToJob("farmer");
+        if (jobReduced && state.geneticAlgorithm) {
+            state.jobQueue.unshift(jobReduced);
+        }
+        state.temporaryFarmers++;
+    } else if (state.temporaryFarmers > 0 && getResourceOwned("catnip") > getWinterCatnipStockNeeded(false, getResourcePerTickPerKitten("catnip", "farmer"), false)) {
+        log("Returning a farmer to work");
+        withTab("Village", () => {
+            decreaseJob("farmer");
+        });
+        state.temporaryFarmers--;
+        assignNewKittenJob();
     }
 }
 setAutoFarmer = auto => {
@@ -1031,6 +1045,7 @@ decreaseJob = jobName => getJobButton(jobName).find('a:contains("[–]")')[0].cl
 increaseJob = jobName => getJobButton(jobName).find('a:contains("[+]")')[0].click();
 isJobEnabled = jobName => game.village.jobs.find(job => job.name === jobName).unlocked;
 switchToJob = jobName => {
+    var jobReduced = null;
     if (isJobEnabled(jobName)) {
         withTab("Village", () => {
             if (game.village.isFreeKittens() && state.populationIncrease) {
@@ -1040,6 +1055,7 @@ switchToJob = jobName => {
                 var mostCommonJob = maxBy(getJobCounts().filter(job => job.name !== jobName), job => job.val);
                 if (mostCommonJob.val > 0) {
                     decreaseJob(mostCommonJob.name);
+                    jobReduced = mostCommonJob.name;
                 }
             }
             if (game.village.isFreeKittens()) {
@@ -1052,6 +1068,7 @@ switchToJob = jobName => {
     } else {
         console.error("Job " + jobName + " not unlocked yet!");
     }
+    return jobReduced;
 }
 resourceEffectNames = ["GlobalRatio", "Ratio", "RatioReligion", "SuperRatio"]
 /**
@@ -2726,6 +2743,7 @@ loadDefaults = () => {
         numKittens: game.village.sim.getKittens(),
         kittensAssigned: game.village.sim.getKittens(),
         leaderAssigned: game.village.leader ? true : false,
+        temporaryFarmers: 0,
         verboseQueue: 0,
         disabledConverters: {},
         tradeMessages: 0,
