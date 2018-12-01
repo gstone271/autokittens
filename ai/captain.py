@@ -97,5 +97,5 @@ if __name__ == '__main__':
         computerList.append([line.rstrip('\n') for line in f])
     genomeList = list()
     for x in range(5):
-        genomeList.append(KittensProblem.randomGenome())
+        genomeList.append(KittensProblem.randomGenome(self))
     start(computerList, genomeList)
