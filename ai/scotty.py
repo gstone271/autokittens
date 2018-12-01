@@ -12,14 +12,21 @@
 from multiprocessing import Pool
 import pickle
 import sys
+from worker import run_browser
+from genetic import toSimbaSettings
 
 def startScotty(genomeList):
-    genomes = len(genomeList)     
+    genomes = len(genomeList)
     fitnessList = list()
     #run simba with each genome
     with Pool(processes = genomes) as pool:
-        fitnessList = pool.map(func = startSimba, iterable =genomeList)
+        fitnessList = pool.map(func = simbaSetup, iterable =genomeList)
     return fitnessList
+
+def simbaSetup(genome):
+    simbaSettings = toSimbaSettings(genome)
+    fitness = run_browser(simbaSettings)
+    return fitness
 
 if __name__ == '__main__':
     hostname = sys.argv[1]
