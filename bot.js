@@ -500,7 +500,7 @@ getPrice = (prices, res) => (prices.filter(price => price.name === res)[0] || {v
 //TODO calculate if resource production is zero (getEffectiveProduction -- make sure all events are ok)
 getTotalDemand = res => {
     //this could be optimized a lot...
-    var prices = flattenArr(state.queue.map(bld => bld.getPrices()).filter(prices => haveEnoughStorage(prices)));
+    var prices = flattenArr(state.queue.filter(bld => bld.isEnabled()).map(bld => bld.getPrices()).filter(prices => haveEnoughStorage(prices)));
     var allPrices = [];
     var maxDepth = 10;
     while (prices.length && maxDepth--) {
