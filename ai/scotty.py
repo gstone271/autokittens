@@ -25,8 +25,8 @@ if __name__ == '__main__':
     hostname = sys.argv[1]
     geneFile = "./compGenomes/" + hostname
     fitFile = "./compFitness/" + hostname
-    genome_file = open(geneFile, "rb")
-    fitness_file = open(fitFile, "wb")
+    genome_file = open(geneFile, 'rb')
+    fitness_file = open(fitFile, 'wb')
     genomes = pickle.load(genome_file)
     fitnesses = startScotty(genomes)
     pickle.dump(fitnesses, fitness_file)

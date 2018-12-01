@@ -39,9 +39,9 @@ class Captain:
             firstDot = thisCompsName.find('.')
             nm = thisCompsName[:firstDot]
             hostG = "./compGenomes/" + nm
-            fGene = open(hostG, "x")
+            open(hostG, "x")
             hostF = "./compFitness/" + nm
-            fFit = open(hostF, "x")
+            open(hostF, "x")
             #get genomes from list
             for i in range(loops):
                 #from 0 to loops-1, load genomeList[0] into new list for computer[x]
@@ -69,8 +69,10 @@ def getWorkingComputers(computerList):
 backupComputer = "babbage.cs.pdx.edu"
 
 def runOneComputer(hostname, genomes):
-    genome_file = TODO_file_named_after_hostname
-    fitness_file = TODO_file_named_after_hostname
+    hostG = "./compGenomes/" + hostname
+    hostF = "./compFitness/" + hostname
+    genome_file = open(hostG, 'wb')
+    fitness_file = open(hostF, 'rb')
     pickle.dump(genomes, genome_file)
     try:
         subprocess.run(["ssh", hostname, f"nice -n 5 python3 ~/simba/ai/scotty.py {hostname}"], check=True, timeout=(60 * 30))
