@@ -30,11 +30,10 @@ def simbaSetup(genome):
 
 if __name__ == '__main__':
     hostname = sys.argv[1]
-    geneFile = "./compGenomes/" + hostname
-    fitFile = "./compFitness/" + hostname
+    geneFile = "./simba/ai/compGenomes/" + hostname
+    fitFile = "./simba/ai/compFitness/" + hostname
     genome_file = open(geneFile, 'rb')
     fitness_file = open(fitFile, 'wb')
-    genomes = list()
-    genomes.append(pickle.load(genome_file))
+    genomes = pickle.load(genome_file)
     fitnesses = startScotty(genomes)
     pickle.dump(fitnesses, fitness_file)
