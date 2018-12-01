@@ -169,14 +169,47 @@ def mutationSchedule(t, iterations):
 #define and run different problems
 def kittensTrial(j):
     buildings = [
-        "Field",
-        "Hut",
-        "Barn",
-        "Pasture",
-        "Library",
-        "Mine"
+      "Catnip Field",
+      "Pasture",
+      "Aqueduct",
+      "Hydro Plant",
+      "Hut",
+      "Log House",
+      "Mansion",
+      "Library",
+      "Academy",
+      "Observatory",
+      "Bio Lab",
+      "Barn",
+      "Warehouse",
+      "Harbor",
+      "Mine",
+      "Quarry",
+      "Lumber Mill",
+      "Oil Well",
+      "Accelerator",
+      "Steamworks",
+      "Magneto",
+      "Smelter",
+      "Calciner",
+      "Factory",
+      "Reactor",
+      "Ampitheatre",
+      "Broadcast Tower",
+      "Chapel",
+      "Temple",
+      "Workshop",
+      "Tradepost"
     ]
 
+    upgrades = [
+        "Ironwood Huts", "Concrete Huts", "Unobtainium Huts", "Elidium Huts", "Titanium Reflectors", "Unobtainium Reflectors", "Eludium Reflectors", "Astrolabe", "Biofuel Processing", "GM Catnip", "Expanded Barns", "Reinforced Barns", "Titanium Barns", "Alloy Barns", "Concrete Barns", "Reinforced Warehouses", "Titanium Warehouses", "Alloy Warehouses", "Concrete Warehouses", "Storage Bunkers", "Expanded Cargo", "Deep Mining", "Reinforced Saw", "Steel Saw", "Titanium Saw", "Alloy Saw", "Pumpjack", "Oil Refinery", "Oil Distillation", "Energy Rifts", "Stasis Chambers", "Void Energy", "Dark Energy", "Tachyon Accelerators", "LHC", "Printing Press", "Offset Press", "High Pressure Engine", "Fuel Injectors", "Gold Ore", "Coal Furnace", "Electrolytic Smelting", "Oxidation", "Automated Plants", "Nuclear Plants", "Rotary Kiln", "Fluidized Reactors", "Enriched Uranium", "Cold Fusion", "Thorium Reactors", "Satellite Radio", "Theology", "Scholasticism",
+        "Golden Spire", "Sun Altar", "Stained Glass", "Basilica", "Templars", "Caravanserai", "Bolas", "Hunting Armour", "Celestial Mechanics", "Composite Bow", "Catnip Enrichment", "Register","Steel Axe","Steel Armour", "Crossbow", "Titanium Axe", "Pyrolysis", "Alloy Axe", "Alloy Armour", "Geodesy", "Biofuel processing", "Logistics", "Concrete Pillars", "Mining Drill", "Refrigeration", "CAD System", "Telecommunication", "Factory Logistics", "Robotic Assistance"
+    ]
+
+    tech = [
+        "Calendar", "Agriculture", "Mining", "Archery", "Metal Working", "Mathematics", "Animal Husbandry", "Civil Service", "Construction", "Currency", "Engineering", "Steel", "Writing", "Machinery", "Philosophy", "Theology", "Astronomy", "Biology", "Geology", "Navigation", "Architecture", "Acoustics", "Biochemistry", "Chemistry", "Physics", "Drama and Poetry", "Genetics", "Electricity", "Metallurgy", "Industrialization", "Combustion", "Mechanization", "Robotics", "Electronics", "Rocketry"
+    ]
 #   build order length is used to initialize the genomes size at first. 
 #   size is not fixed, genomes can shrink or grow depending on how it is mutated    
 #   buildings can be bought (and should be bought) multiple times, so the build length is a multiple of the number of buildings
