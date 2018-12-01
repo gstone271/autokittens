@@ -16,47 +16,8 @@ from multiprocessing import Pool
 import pickle
 import subprocess
 
-#from genetic import (genome class/where genome info is stored)
-#list node has 1 computer (string of name/address) and many genomes 
-class Captain:
-    def start(self, computerList, genomeList):
-        computers = len(computerList)
-        genomes = len(genomeList)
-        if (computers == 0):
-            print("Computer List empty")
-            return
-        if (genomes == 0):
-            print("Genome List empty")
-            return
 
-        remain = genomes % computers
-        loops = genomes / computers
-        splitGenomes = list()
-        for x in range(computers):
-            thisCompsGenomes = list()
-            thisCompsName = computerList[x]
-            #create genome and fitness files (for scotty)
-            firstDot = thisCompsName.find('.')
-            nm = thisCompsName[:firstDot]
-            hostG = "./compGenomes/" + nm
-            open(hostG, "x")
-            hostF = "./compFitness/" + nm
-            open(hostF, "x")
-            #get genomes from list
-            for i in range(loops):
-                #from 0 to loops-1, load genomeList[0] into new list for computer[x]
-                thisCompsGenomes.append(genomeList[0])
-                genomeList.pop(0)
-                if (remain != 0):
-                    thisCompsGenomes.append(genomeList[0])
-                    genomeList.pop(0)
-                    remain = remain - 1
-            splitGenomes.append((thisCompsName, thisCompsGenomes))
-        results = list()
-        with Pool(processes = computers) as pool:
-            resultsByComputer = pool.starmap(func = runOneComputer, iterable = splitGenomes)
-            results.append(resultsByComputer)
-        return results
+#from genetic import (genome class/where genome info is stored)
 
 def isComputerRunning(computer):
     return subprocess.run(["ping", "-c", "1", computer]).returncode == 0
@@ -85,3 +46,56 @@ def runOneComputer(hostname, genomes):
         else:
             print(f"Warning: {hostname} job failed:", err)
             return runOneComputer(backupComputer, genomes)
+
+#list node has 1 computer (string of name/address) and many genomes 
+def start(computerList, genomeList):
+    computers = len(computerList)
+    genomes = len(genomeList)
+    if (computers == 0):
+        print("Computer List empty")
+        return
+    if (genomes == 0):
+        print("Genome List empty")
+        return
+
+    remain = genomes % computers
+    loops = genomes / computers
+    splitGenomes = list()
+    for x in range(computers):
+        thisCompsGenomes = list()
+        thisCompsName = computerList[x]
+        #create genome and fitness files (for scotty)
+        firstDot = thisCompsName.find('.')
+        nm = thisCompsName[:firstDot]
+        hostG = "./compGenomes/" + nm
+        open(hostG, "x")
+        hostF = "./compFitness/" + nm
+        open(hostF, "x")
+        #get genomes from list
+        for i in range(loops):
+            #from 0 to loops-1, load genomeList[0] into new list for computer[x]
+            thisCompsGenomes.append(genomeList[0])
+            genomeList.pop(0)
+            if (remain != 0):
+                thisCompsGenomes.append(genomeList[0])
+                genomeList.pop(0)
+                remain = remain - 1
+            splitGenomes.append((thisCompsName, thisCompsGenomes))
+    results = list()
+    with Pool(processes = computers) as pool:
+        resultsByComputer = pool.starmap(func = runOneComputer, iterable = splitGenomes)
+        results.append(resultsByComputer)
+    return results
+
+
+from genetic import KittensProblem
+
+if __name__ == '__main__':
+    compFile = "./computers.txt"
+    computerList = list()
+    with open(compFile) as f:
+        computerList.append([line.rstrip('\n') for line in f])
+    genomeList = list()
+    for x in range(5):
+        genomeList.append(KittensProblem.randomGenome())
+    start(computerList, genomeList)
