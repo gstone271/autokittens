@@ -2739,6 +2739,9 @@ loadDefaults = () => {
     Object.entries(undefinedDefaults).forEach(entry => { if (state[entry[0]] === undefined) state[entry[0]] = entry[1] });
 }
 initialize = () => {
+    if (state.geneticAlgorithm) {
+        window.confirm = () => true;
+    }
     state.ticks = game.ticks;
     setSpeed(state.speed);
     createSettingsMenu();
