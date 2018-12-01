@@ -1428,7 +1428,7 @@ var clearMasterPlan = () => {
     state.queue = state.queue.filter(bld => !bld.masterPlan);
 }
 
-var gaTimeLimit = 100; //years
+var gaTimeLimit = 10; //years
 shouldReportFitness = () => {
     return game.calendar.year >= gaTimeLimit || goalAchieved();
 }
