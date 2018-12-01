@@ -2,3 +2,4 @@ ai/compGenomes/*
 ai/compFitness/*
 *.swp
 *.log
+ai/logs/*
