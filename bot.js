@@ -1014,7 +1014,7 @@ preventStarvation = () => {
             state.jobQueue.unshift(jobReduced);
         }
         state.temporaryFarmers++;
-    } else if (state.temporaryFarmers > 0 && getResourceOwned("catnip") > getWinterCatnipStockNeeded(false, getResourcePerTickPerKitten("catnip", "farmer"), false)) {
+    } else if (state.temporaryFarmers > 0 && getResourceOwned("catnip") > getWinterCatnipStockNeeded(true, -game.village.catnipPerKitten + getResourcePerTickPerKitten("catnip", "farmer") * 1.65, false)) {
         log("Returning a farmer to work");
         withTab("Village", () => {
             decreaseJob("farmer");
