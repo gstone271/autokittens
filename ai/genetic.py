@@ -2,6 +2,7 @@ import random
 import math
 import multiprocessing
 import numpy
+from worker import run_browser
 
 # Generalized Beam Search: Based on parameters (see run function), can run GA, SA, HC, or a hybrid of these strategies.
 class GeneralizedBeamSearch:
@@ -94,21 +95,9 @@ class KittensProblem(GeneralizedBeamSearch):
     # we might want to keep a cache of recently-scored genomes, and use the cached result if we have duplicate genomes in the population, since scoring is extremely expensive
     def score(self, mut):
         (fresh, gen) = mut
-        return (self.fitness_function(gen), fresh, gen)
+        return (run_browser(toSimbaSettings(gen)), fresh, gen)
+        #return (self.fitness_function(gen), fresh, gen)
 
-    # TODO: this should simulate the game and compute a score. The current implementation is a stub for testing.
-#    def fitness_function(self, gen):
-#        fitness = 0
-#        if gen[0] == "Field":
-#            fitness += 1
-#        if gen[1] == "Hut":
-#            fitness += 1
-#        if gen[2] == "Barn":
-#            fitness += 1
-#        if gen[3] == "Library":
-#            fitness += 1
-#        return fitness
-#
     #working off of Griffin's suggestion, this arbitrary fitness function will find the first instance of 'field'
     #then it will check if a Hut comes after field. 
     #ideal pattern would be Field, Hut, Barn, Library
@@ -162,7 +151,7 @@ def temperatureSchedule0(t, iterations):
 def mutationSchedule(t, iterations):
     #return (1 - t / iterations) * 0.002
     #return T * .002
-    return 0.004
+    return 0.04
 
 
 #define and run different problems
@@ -170,18 +159,19 @@ def kittensTrial(j):
 #   build order length is used to initialize the genomes size at first. 
 #   size is not fixed, genomes can shrink or grow depending on how it is mutated    
 #   buildings can be bought (and should be bought) multiple times, so the build length is a multiple of the number of buildings
-    build_order_length = len(buildings) * 3
+    build_order_length = len(allQueueables) * 3
     kittensProblem = KittensProblem(allQueueables, build_order_length)
-    populationSize = 800
+    populationSize = 10
     #score population? 
     unscored_population = [ kittensProblem.randomGenome() for i in range(populationSize) ]
     population = [kittensProblem.score((True, gen)) for gen in unscored_population]
-    return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 100, j == 0)
+    return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 50, j == 0)
 
 # Turns a genome into a save file that Simba can understand and import
 # Call Simba's importSaveDecompressed on the return value of this function
 def toSimbaSettings(genome):
     blds = []
+    genome = ["Catnip field"] * 20 + genome
     for name in genome:
         for (membersOfType, tab, panel) in queueableTypes:
             if name in membersOfType:
@@ -189,7 +179,7 @@ def toSimbaSettings(genome):
                 break
     queue = ",".join(blds)
     jobQueue = ",".join([f'"{job}"' for job in genome if job in jobsSet])
-    return f'{{"queue": [{queue}], "jobQueue": [{jobQueue}], "geneticAlgorithm": true, "speed": 128, "disableTimeskip": true, "desiredTicksPerLoop": 8, "running": true}}'
+    return f'{{"queue": [{queue}], "jobQueue": [{jobQueue}], "geneticAlgorithm": true, "speed": 8192, "disableTimeskip": true, "desiredTicksPerLoop": 8, "running": true}}'
 
 buildings = [
     "Catnip field",
