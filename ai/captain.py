@@ -78,7 +78,7 @@ def runOneComputer(hostname, genomes):
         subprocess.run(["ssh", hostname, f"nice -n 5 python3 ~/simba/ai/scotty.py {hostname}"], check=True, timeout=(60 * 30))
         fitnesses = pickle.load(fitness_file)
         return fitnesses
-    except (CalledProcessError, TimeoutExpired) as err:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
         if hostname == backupComputer:
             print("Warning: Backup computer job failed:", err)
             return [0] * len(genomes)

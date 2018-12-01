@@ -13,7 +13,7 @@ from multiprocessing import Pool
 import pickle
 import sys
 
-def startScotty(self, genomeList):
+def startScotty(genomeList):
     genomes = len(genomeList)     
     fitnessList = list()
     #run simba with each genome
@@ -27,6 +27,7 @@ if __name__ == '__main__':
     fitFile = "./compFitness/" + hostname
     genome_file = open(geneFile, 'rb')
     fitness_file = open(fitFile, 'wb')
-    genomes = pickle.load(genome_file)
+    genomes = list()
+    genomes.append(pickle.load(genome_file))
     fitnesses = startScotty(genomes)
     pickle.dump(fitnesses, fitness_file)
