@@ -23,8 +23,6 @@ def startScotty(genomeList):
     #run simba with each genome
     with Pool(processes = genomes) as pool:
         fitnessList = pool.map(func = simbaSetup, iterable =genomeList)
-    subprocess.run(["pkill", "chromedriver"], stderr=DEVNULL, stdout=DEVNULL)
-    subprocess.run(["pkill", "chrome"], stderr=DEVNULL, stdout=DEVNULL)
     return fitnessList
 
 def simbaSetup(genome):
@@ -32,12 +30,20 @@ def simbaSetup(genome):
     fitness = run_browser(simbaSettings)
     return fitness
 
+def cleanupChrome():
+    subprocess.run(["pkill", "chromedriver"], stderr=DEVNULL, stdout=DEVNULL)
+    subprocess.run(["pkill", "chrome"], stderr=DEVNULL, stdout=DEVNULL)
+
 if __name__ == '__main__':
+    cleanupChrome()
     hostname = sys.argv[1]
     geneFile = "./simba/ai/compGenomes/" + hostname
     fitFile = "./simba/ai/compFitness/" + hostname
     genome_file = open(geneFile, 'rb')
     fitness_file = open(fitFile, 'wb')
     genomes = pickle.load(genome_file)
-    fitnesses = startScotty(genomes)
-    pickle.dump(fitnesses, fitness_file)
+    try:
+        fitnesses = startScotty(genomes)
+        pickle.dump(fitnesses, fitness_file)
+    finally:
+        cleanupChrome()
