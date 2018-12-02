@@ -164,7 +164,7 @@ def temperatureSchedule0(t, iterations):
 def mutationSchedule(t, iterations):
     #return (1 - t / iterations) * 0.002
     #return T * .002
-    return 0.04
+    return 0.01
 
 
 #define and run different problems
