@@ -864,6 +864,7 @@ getEnoughResource = res => {
 }
 getEnoughCraft = res =>
     state.queue
+        .filter((x, i, a) => x.isEnabled() && a.findIndex(o => o.name == x.name) == i)
         .map(bld => bld.getPrices())
         .concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched) //save some compendiums midgame
             .map(tech => tech.prices))
