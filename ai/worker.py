@@ -46,8 +46,8 @@ def run_browser(simbaSettings, displayPage=False): #Runs the chrome browser
         try:
             # When the simulation is finished, the JS will create an element
             # with ID "fitnessValue"
-            timeout_seconds = 600
-            WebDriverWait(driver, timeout_seconds, 3).until( #Waiting for element Simba will create when it's done
+            timeout_seconds = 1000
+            WebDriverWait(driver, timeout_seconds, 6).until( #Waiting for element Simba will create when it's done
                     EC.presence_of_element_located((By.ID, "runFinished")))
         except TimeoutException:
             print("Warning: Worker timeout", file=sys.stderr)

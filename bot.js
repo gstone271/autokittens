@@ -1490,7 +1490,7 @@ var clearMasterPlan = () => {
     state.queue = state.queue.filter(bld => !bld.masterPlan);
 }
 
-var gaTimeLimit = 200; //years
+var gaTimeLimit = 300; //years
 shouldStopRun = () => {
     return game.calendar.year >= gaTimeLimit || goalAchieved();
 }
@@ -1499,7 +1499,7 @@ goalAchieved = () => {
 }
 calculateFitness = () => {
     if (goalAchieved()) {
-        return 2000 + 4000 * (gaTimeLimit - game.calendar.year) + Math.round(10 * (400 - game.calendar.day));
+        return 3000 + 4000 * (gaTimeLimit - game.calendar.year) + Math.round(10 * (400 - game.calendar.day));
     } else {
         return 20 * Object.values(game.science.metaCache).filter(x => x.researched).length
             + 5 * game.village.sim.getKittens()
