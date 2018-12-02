@@ -2137,6 +2137,9 @@ game.tick = () => {
             }
         }
     }
+    if (game.ui.realUpdate) {
+        game.ui.realUpdate();
+    }
 }
 
 /************** 
@@ -2832,6 +2835,8 @@ initialize = () => {
     if (state.geneticAlgorithm) {
         window.confirm = () => true;
         state.originalJobQueue = state.jobQueue;
+        game.ui.realUpdate = game.ui.update;
+        game.ui.update = game.ui.updateTabs;
     }
     state.ticks = game.ticks;
     setSpeed(state.speed);
