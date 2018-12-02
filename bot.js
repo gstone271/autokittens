@@ -415,9 +415,11 @@ getResourcesToReserve = (effectivePrices, ticksNeeded, reserved) => {
 }
 findPriorities = (queue, reserved) => {
     var priorities = [];
+    var seen = {}
     queue.forEach(found => {
         var prices = found.getPrices();
-        if (found.isEnabled() && haveEnoughStorage(prices, reserved)) {
+        if (!seen[found.name] && found.isEnabled() && haveEnoughStorage(prices, reserved)) {
+            seen[found.name] = true;
             var unavailableResources = prices.map(price => price.name).filter(res => reserved.get(res).current > getResourceOwned(res));
             var viable = unavailableResources.length ? false : true;
             var effectivePrices = getEffectivePrices(prices, reserved);
