@@ -86,8 +86,9 @@ class GeneralizedBeamSearch:
 
 # Stuff specific to Knapsack Problem. Should be removed later, but useful as code template
 class KittensProblem(GeneralizedBeamSearch):
-    def __init__(self, buildings, build_order_length):
+    def __init__(self, buildings, build_order_length, techVals):
         self.buildings = buildings
+        self.techVals = techVals
         self.build_order_length = build_order_length
         #add tech array of fixed size (number of techs)
 
@@ -97,19 +98,6 @@ class KittensProblem(GeneralizedBeamSearch):
         (fresh, gen) = mut
         return (self.fitness_function(gen), fresh, gen)
 
-    # TODO: this should simulate the game and compute a score. The current implementation is a stub for testing.
-#    def fitness_function(self, gen):
-#        fitness = 0
-#        if gen[0] == "Field":
-#            fitness += 1
-#        if gen[1] == "Hut":
-#            fitness += 1
-#        if gen[2] == "Barn":
-#            fitness += 1
-#        if gen[3] == "Library":
-#            fitness += 1
-#        return fitness
-#
     #working off of Griffin's suggestion, this arbitrary fitness function will find the first instance of 'field'
     #then it will check if a Hut comes after field. 
     #ideal pattern would be Field, Hut, Barn, Library
@@ -127,42 +115,44 @@ class KittensProblem(GeneralizedBeamSearch):
         return fitness
 
     #princess kim's implementation of mutate
-    def mutate(self, genome, mutationChance, alwaysChange):   #TODO: pass in tech array?
+    def mutate(self, genome, mutationChance, alwaysChange):   
         #TODO: chance of removing should be lower than chance of adding
         #a random number of buildings to add
         numAdded = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
         #a random number of buildings to remove
         numRemoved = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
+        #a random number of techs to mutate (copy numAdded/Removed logic for now
+        numTechMut = min(numpy.random.poisson(len(self.techVals) * mutationChance) + alwaysChange, len(self.techVals))
+
         newGenome = genome.copy()
         for x in range (numRemoved):    #loop numRemoved times
             pos = random.randrange(len(newGenome)) 
             del newGenome[pos]    
-
-#TODO: mutate tech array
-#   gets random number of techs to mutate
-#       numTech = min(numpy.random.poisson(len(tech)) * mutationChance) + alwaysChange, len(tech))
-#       for t in range (len(tech)):
-#           pos = random.randrange(len(tech)) #pick a random index to mutate
-#           mutate tech[pos]
-#
         for pos in random.sample(range(len(newGenome)), numAdded):        #inserts a random building at random positions
             newGenome.insert(pos, random.choice(self.buildings))
         return (alwaysChange, newGenome)
-
+    
+        #now mutate techVals
+        for t in range(len(techVals)):
+            pos = random.randrange(len(techVals)) 
+            #mutate techVals[pos]
+            techVals = techVals-2 *pos
+#TODO: mutate tech array
     def printInfo(self, gen):
         print(",".join(gen[0:min(10, len(gen))]))
 
+    def AddTech(self, pos, gen):
+        #given a position - check tech[pos,1] to get its prereq and check if that prereq exists in genome?
+        prereq = tech[pos,1]
+        count = techVals[pos]
+        newGenome = gen.copy()
 
-#TODO: create or modify a method that adds takes the desired tech and takes it's value from the tech array
-#   to determine where to put it once it finds its prereq in the genome.
-#   ex: tech[3] is to be added to genome. check if it's prereq is in the genome
-#           if it exists
-#               take tech[3] value and place it that many spaces away from it's prereq in the genome
-#
-#
+        for x in range(len(newGenome)):
+            if(newGenome[x] == tech[pos,1]):
+                newGenome.insert(pos+count, tech[pos,0])
+                return
 
     def randomGenome(self):
-#        gen = random.choices(self.buildings, k=self.build_order_length) #Returns a list of k-size elements
         gen = [] 
         for pos in range(self.build_order_length):
             gen.append(random.choice(self.buildings))
@@ -235,7 +225,9 @@ def kittensTrial(j):
 #   size is not fixed, genomes can shrink or grow depending on how it is mutated    
 #   buildings can be bought (and should be bought) multiple times, so the build length is a multiple of the number of buildings
     build_order_length = len(buildings) * 3
-    kittensProblem = KittensProblem(buildings, build_order_length)
+    techVals = []
+    techVals = [random.randrange(5) for T in range (len(tech))]
+    kittensProblem = KittensProblem(buildings, build_order_length, techVals)
     populationSize = 800
     #score population? 
     unscored_population = [ kittensProblem.randomGenome() for i in range(populationSize) ]
