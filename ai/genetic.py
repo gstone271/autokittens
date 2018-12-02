@@ -89,6 +89,7 @@ class KittensProblem(GeneralizedBeamSearch):
     def __init__(self, buildings, build_order_length):
         self.buildings = buildings
         self.build_order_length = build_order_length
+        #add tech array of fixed size (number of techs)
 
     # score is the function that should send the genome to another computer to be tested for fitness in Simba
     # we might want to keep a cache of recently-scored genomes, and use the cached result if we have duplicate genomes in the population, since scoring is extremely expensive
@@ -126,8 +127,8 @@ class KittensProblem(GeneralizedBeamSearch):
         return fitness
 
     #princess kim's implementation of mutate
-    def mutate(self, genome, mutationChance, alwaysChange):
-        #TODO: make it so that adding has a lower probability than removing?
+    def mutate(self, genome, mutationChance, alwaysChange):   #TODO: pass in tech array?
+        #TODO: chance of removing should be lower than chance of adding
         #a random number of buildings to add
         numAdded = min(numpy.random.poisson(len(genome) * mutationChance) + alwaysChange, len(genome))
         #a random number of buildings to remove
@@ -136,15 +137,29 @@ class KittensProblem(GeneralizedBeamSearch):
         for x in range (numRemoved):    #loop numRemoved times
             pos = random.randrange(len(newGenome)) 
             del newGenome[pos]    
-#        for pos in random.sample(range(len(NewGenome)), numRemoved):      #removes a building from a random position
-#            del newGenome[pos]
 
+#TODO: mutate tech array
+#   gets random number of techs to mutate
+#       numTech = min(numpy.random.poisson(len(tech)) * mutationChance) + alwaysChange, len(tech))
+#       for t in range (len(tech)):
+#           pos = random.randrange(len(tech)) #pick a random index to mutate
+#           mutate tech[pos]
+#
         for pos in random.sample(range(len(newGenome)), numAdded):        #inserts a random building at random positions
             newGenome.insert(pos, random.choice(self.buildings))
         return (alwaysChange, newGenome)
 
     def printInfo(self, gen):
         print(",".join(gen[0:min(10, len(gen))]))
+
+
+#TODO: create or modify a method that adds takes the desired tech and takes it's value from the tech array
+#   to determine where to put it once it finds its prereq in the genome.
+#   ex: tech[3] is to be added to genome. check if it's prereq is in the genome
+#           if it exists
+#               take tech[3] value and place it that many spaces away from it's prereq in the genome
+#
+#
 
     def randomGenome(self):
 #        gen = random.choices(self.buildings, k=self.build_order_length) #Returns a list of k-size elements
@@ -215,7 +230,7 @@ def kittensTrial(j):
         ("Calendar", "Library"),("Agriculture","Calendar"), ( "Mining", "Agriculture"),( "Archery", "Agriculture"),("Metal Working", "Mining"),( "Mathematics","Animal Husbandry"), ( "Animal Husbandry", "Archery"), ("Civil Service","Animal Husbandry"),( "Construction","Animal Husbandry"), ( "Currency", "Civil Service"), ( "Engineering", "Construction"),("Steel", "Writing"),( "Writing", "Engineering"),( "Machinery", "Writing"),("Philosophy","Writing"),( "Theology","Philosophy"),( "Astronomy","Theology"),( "Biology", "Geology"),( "Geology", "Navigation"),( "Navigation","Astronomy"),( "Architecture", "Navigation"),("Acoustics", "Architecture"),( "Biochemistry","Biology"),( "Chemistry", "Physics"),( "Physics", "Navigation"),( "Drama and Poetry", "Acoustics"),( "Genetics", "Biochemistry"),( "Electricity","Physics"),( "Metallurgy", "Industrialization"),( "Industrialization", "Electricity"),( "Combustion", "Industrialization"),( "Mechanization", "Industrialization"),("Robotics", "Electronics"),( "Electronics", "Mechanization"),( "Rocketry", "Electronics")
     ]
 
-
+    
 #   build order length is used to initialize the genomes size at first. 
 #   size is not fixed, genomes can shrink or grow depending on how it is mutated    
 #   buildings can be bought (and should be bought) multiple times, so the build length is a multiple of the number of buildings
@@ -224,6 +239,7 @@ def kittensTrial(j):
     populationSize = 800
     #score population? 
     unscored_population = [ kittensProblem.randomGenome() for i in range(populationSize) ]
+    #TODO: initialize tech array. 
     population = [kittensProblem.score((True, gen)) for gen in unscored_population]
     return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 100, j == 0)
 
