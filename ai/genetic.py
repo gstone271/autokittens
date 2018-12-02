@@ -188,6 +188,9 @@ def kittensTrial(j):
         population = kittensProblem.scoreAll(unscored_population)
     else:
         population = pickle.load(open(sys.argv[1], 'rb'))
+        if len(sys.argv) > 2 and sys.argv[2] == "rescore":
+            unscored_population = [ (fresh, gen) for (fitness, fresh, gen) in population ]
+            population = kittensProblem.scoreAll(unscored_population)
     return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 100, j == 0)
 
 # Turns a genome into a save file that Simba can understand and import
