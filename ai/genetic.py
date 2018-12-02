@@ -82,8 +82,13 @@ class GeneralizedBeamSearch:
                 print(f"Generation {i}: {scores}")
                 if (len(scored[0][2]) < 50):
                     print(scored[0][2])
-            with open(f'./logs/{captain.startTime}/gen_{i}', 'wb') as f:
-                pickle.dump(population, f)
+            with open(f'./logs/{captain.startTime}/gen_{i}', 'wb') as genomeDump:
+                pickle.dump(scored, genomeDump)
+            with open(f'./logs/{captain.startTime}/bestScores.log', 'a') as bestLog:
+                scores = [ score for (score, fresh, gen) in scored[:10] ]
+                positiveScores = [ score for (score, fresh, gen) in scored if score > 0 ]
+                average = sum(positiveScores) / max(len(positiveScores), 1)
+                print(f"Generation {i}: Avg: {average} Top 10: {scores}", file=bestLog)
             population = self.newGeneration(scored, pMut, breedingPortion, mutatingPortion)
         scored = self.sortGeneration(population, 0)
         if (printProgress):
@@ -174,9 +179,10 @@ def kittensTrial(j):
 #   build order length is used to initialize the genomes size at first. 
 #   size is not fixed, genomes can shrink or grow depending on how it is mutated    
 #   buildings can be bought (and should be bought) multiple times, so the build length is a multiple of the number of buildings
+    captain.makeLogFolder()
     build_order_length = len(allQueueables) * 3
     kittensProblem = KittensProblem(allQueueables, build_order_length)
-    if len(sys.argv <= 1):
+    if len(sys.argv) <= 1:
         populationSize = 60 * 8 * 3 // 2
         unscored_population = [ (True, kittensProblem.randomGenome()) for i in range(populationSize) ]
         population = kittensProblem.scoreAll(unscored_population)

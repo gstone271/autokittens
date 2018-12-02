@@ -94,15 +94,17 @@ compFile = "./computers.txt"
 fullComputerList = list()
 startTime = round(time.time())
 
+def makeLogFolder():
+    try:
+        os.mkdir(f'./logs/{startTime}')
+    except FileExistsError:
+        pass
+
 def run(genomeList):
     global fullComputerList
     if (fullComputerList == list()):
         with open(compFile) as f:
             fullComputerList = [line.rstrip('\n') for line in f]
-        try:
-            os.mkdir(f'./logs/{startTime}')
-        except FileExistsError:
-            pass
     computerList = getWorkingComputers(fullComputerList)
     generationStartTime = time.time()
     result = start(computerList, genomeList)
