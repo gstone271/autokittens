@@ -14,6 +14,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import WebDriverException
 
 def run_browser(simbaSettings, displayPage=False): #Runs the chrome browser
     baseDir = os.path.abspath(os.path.join(sys.path[0], os.pardir))
@@ -24,8 +25,9 @@ def run_browser(simbaSettings, displayPage=False): #Runs the chrome browser
     options.add_argument('disable-web-security')
     if not displayPage:
         options.add_argument('headless')
-    driver = webdriver.Chrome(chrome_options=options) #Can be changed to Firefox as well
+    driver = None
     try:
+        driver = webdriver.Chrome(chrome_options=options) #Can be changed to Firefox as well
         #driver.get("http://bloodrizer.ru/games/kittens/") #Loads the kittens game
         driver.get("file:///u/gstone/kitten-game/index.html") #Loads the kittens game
         #Wait for deferred loading
@@ -61,10 +63,14 @@ def run_browser(simbaSettings, displayPage=False): #Runs the chrome browser
         if displayPage:
             print(re.sub(r'\n[\s]*\n', '\n', driver.find_element_by_tag_name('html').text))
         return result
+    except WebDriverException as ex:
+        print("Warning: Selenium run failed:", ex, file=sys.stderr)
+        return 0
     finally:
         try:
-            driver.close() #Closes everything: Simba and kittens game
-        except selenium.common.exceptions.WebDriverException:
+            if driver:
+                driver.close() #Closes everything: Simba and kittens game
+        except WebDriverException:
             print("Warning: Chrome did not close promptly", file=sys.stderr)
 
 def main(argv): #Used for testing. Import file as a module and call run browser
