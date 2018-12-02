@@ -290,7 +290,7 @@ jobs = [
     "farmer",
     "hunter",
     "geologist",
-    "priest",
+    #"priest",
 ]
 jobsSet = set(jobs)
 allQueueables = buildings + techsOf(upgrades) + techsOf(science) + jobs + techsOf(religion) + trade + craft + special
