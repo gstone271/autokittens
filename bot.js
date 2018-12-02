@@ -498,16 +498,16 @@ getResourceInternalName = resTitle => resourceNameCache[resTitle].name;
 fixPriceTitle = price => ({ val: price.val, name: getResourceTitle(price.name) });
 getPrice = (prices, res) => (prices.filter(price => price.name === res)[0] || {val: 0}).val
 //TODO calculate if resource production is zero (getEffectiveProduction -- make sure all events are ok)
-getTotalDemand = res => {
+getTotalDemand = (res, craftOnly) => {
     //this could be optimized a lot...
-    var prices = flattenArr(state.queue.filter(bld => bld.isEnabled()).map(bld => bld.getPrices()).filter(prices => haveEnoughStorage(prices)));
+    var prices = flattenArr(state.queue.filter(bld => bld.isEnabled()).filter((x, i, a) => a.findIndex(o => o.name == x.name) == i).map(bld => bld.getPrices()).filter(prices => haveEnoughStorage(prices)));
     var allPrices = [];
-    var maxDepth = 10;
-    while (prices.length && maxDepth--) {
-        if (!maxDepth) console.error("Infinite loop for " + res)
-        allPrices = allPrices.concat(prices);
+    var depth = 0;
+    while (prices.length && depth < 10) {
+        if (depth == 9) console.error("Infinite loop for " + res)
+        if (depth || !craftOnly) allPrices = allPrices.concat(prices);
         prices = flattenArr(prices
-            .filter(price => canCraft(price.name))
+            .filter(price => canCraft(price.name) && getResourceOwned(price.name) < price.val)
             .map(price => multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)))))
     }
     return allPrices
@@ -631,7 +631,7 @@ isUselessProduction = (production, adding) => {
     return production.val === 0 || (
         isResourceFull(production.name, adding ? production.val * getResourceConversionRatio(production.name) : 0)
         && !autoCrafts.some(craft => 
-            canCraft(craft.name) && craft.prices.some(price => price.name === production.name) && getTotalDemand(craft.name) > 0
+            canCraft(craft.name) && craft.prices.some(price => price.name === production.name) && getTotalDemand(craft.name, true) > 0
         )
     )
 }
