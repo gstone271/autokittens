@@ -123,7 +123,7 @@ mainLoop = () => {
     if (state.autoConverters) manageConverters();
     doSpendingChores();
     if (state.masterPlanMode) queueNewTechs();
-    updateUi();
+    if (!state.geneticAlgorithm) updateUi();
     countTicks();
 }
 doHarvestingChores = () => {
@@ -168,25 +168,64 @@ hunt = () => {
 manageJobs = () => {
     //assigning first leader is one of the only things the bot will do with no way to disable it; maybe add an option?
     assignFirstLeader();
+    if (getUnlockedJobs() > state.jobsUnlocked && state.geneticAlgorithm) {
+        state.jobQueue = state.originalJobQueue;
+        reassignAllJobs();
+        state.jobsUnlocked = getUnlockedJobs();
+    }
     if (state.autoFarmer) {
         preventStarvation();
     }
-    if (state.populationIncrease > 0 && game.village.isFreeKittens() && game.village.sim.getKittens() > state.kittensAssigned) {
-        var job = state.jobQueue.find(job => isJobEnabled(job))
-        if (job) {
-            state.jobQueue = removeOne(state.jobQueue, job);
-            state.jobQueue.push(job);
-        } else {
-            //job that's always enabled
-            job = "woodcutter";
-        }
-        //it's actually possible to cheat and click on a button that hasn't been revealed yet
-        withTab("Village", () => {
-            getJobButton(job).click();
-            log("Assigned new kitten to " + job);
-        });
-        recountKittens(job);
+    if (game.village.isFreeKittens() && (state.geneticAlgorithm || state.populationIncrease > 0 && game.village.sim.getKittens() > state.kittensAssigned)) {
+        assignNewKittenJob();
     }
+}
+getUnlockedJobs = () => getJobCounts().filter(job => isJobEnabled(job.name)).length
+getNextQueuedJob = () => {
+    var job = state.jobQueue.find(job => isJobEnabled(job))
+    if (job) {
+        state.jobQueue = removeOne(state.jobQueue, job);
+        state.jobQueue.push(job);
+    } else {
+        //job that's always enabled
+        job = "woodcutter";
+    }
+    return job;
+}
+assignNewKittenJob = () => {
+    var job = getNextQueuedJob();
+    //it's actually possible to cheat and click on a button that hasn't been revealed yet
+    withTab("Village", () => {
+        getJobButton(job).click();
+        log("Assigned new kitten to " + job);
+    });
+    recountKittens(job);
+}
+reassignAllJobs = () => {
+    var goalJobs = { farmer: state.temporaryFarmers }
+    for (var k = 0; k < game.village.sim.getKittens() - state.temporaryFarmers; k++) {
+        var job = getNextQueuedJob();
+        goalJobs[job] = (goalJobs[job] || 0) + 1;
+    }
+    console.log(goalJobs)
+    withTab("Village", () => {
+        Object.keys(goalJobs).forEach(jobName => {
+            var toReduce = getJobCounts().find(job => job.name == jobName).val - goalJobs[jobName];
+            for (var i = 0; i < toReduce; i++) {
+                log("Unassigning " + jobName)
+                decreaseJob(jobName);
+            }
+        });
+    })
+    withTab("Village", () => {
+        Object.keys(goalJobs).forEach(jobName => {
+            var toIncrease = goalJobs[jobName] - getJobCounts().find(job => job.name == jobName).val;
+            for (var i = 0; i < toIncrease; i++) {
+                log("Assigning " + jobName)
+                increaseJob(jobName);
+            }
+        });
+    })
 }
 countTicks = () => {
     var ticksPassed = game.ticks - state.ticks;
@@ -194,6 +233,18 @@ countTicks = () => {
     state.ticks = game.ticks;
     state.blackcoinTimer++;
     state.tradeTimer++;
+    if (state.geneticAlgorithm) {
+        reportFitness();
+        if (shouldStopRun()) {
+            if ($("#runFinished").length === 0) {
+                $("html").append('<div id="runFinished">');
+            }
+            if (!game.isPaused) {
+                game.togglePause();
+            }
+            setRunning(false);
+        }
+    }
 }
 
 /************** 
@@ -364,9 +415,11 @@ getResourcesToReserve = (effectivePrices, ticksNeeded, reserved) => {
 }
 findPriorities = (queue, reserved) => {
     var priorities = [];
+    var seen = {}
     queue.forEach(found => {
         var prices = found.getPrices();
-        if (found.isEnabled() && haveEnoughStorage(prices, reserved)) {
+        if (!seen[found.name] && found.isEnabled() && haveEnoughStorage(prices, reserved)) {
+            seen[found.name] = true;
             var unavailableResources = prices.map(price => price.name).filter(res => reserved.get(res).current > getResourceOwned(res));
             var viable = unavailableResources.length ? false : true;
             var effectivePrices = getEffectivePrices(prices, reserved);
@@ -447,16 +500,16 @@ getResourceInternalName = resTitle => resourceNameCache[resTitle].name;
 fixPriceTitle = price => ({ val: price.val, name: getResourceTitle(price.name) });
 getPrice = (prices, res) => (prices.filter(price => price.name === res)[0] || {val: 0}).val
 //TODO calculate if resource production is zero (getEffectiveProduction -- make sure all events are ok)
-getTotalDemand = res => {
+getTotalDemand = (res, craftOnly) => {
     //this could be optimized a lot...
-    var prices = flattenArr(state.queue.map(bld => bld.getPrices()).filter(prices => haveEnoughStorage(prices)));
+    var prices = flattenArr(state.queue.filter(bld => bld.isEnabled()).filter((x, i, a) => a.findIndex(o => o.name == x.name) == i).map(bld => bld.getPrices()).filter(prices => haveEnoughStorage(prices)));
     var allPrices = [];
-    var maxDepth = 10;
-    while (prices.length && maxDepth--) {
-        if (!maxDepth) console.error("Infinite loop for " + res)
-        allPrices = allPrices.concat(prices);
+    var depth = 0;
+    while (prices.length && depth < 10) {
+        if (depth == 9) console.error("Infinite loop for " + res)
+        if (depth || !craftOnly) allPrices = allPrices.concat(prices);
         prices = flattenArr(prices
-            .filter(price => canCraft(price.name))
+            .filter(price => canCraft(price.name) && getResourceOwned(price.name) < price.val)
             .map(price => multiplyPrices(getCraftPrices(price.name), Math.ceil(price.val / getCraftRatio(price.name)))))
     }
     return allPrices
@@ -471,7 +524,7 @@ getSafeStorage = (res, autoCraftLevel, additionalProduction) => {
     return max === Infinity ? max : max - autoCraftLevel * state.ticksPerLoop * (getEffectiveResourcePerTick(res, state.ticksPerLoop) + additionalProduction);
 }
 haveEnoughStorage = (prices, reserved) => {
-    return prices.every(price => getSafeStorage(price.name) >= price.val + (reserved ? reserved.get(price.name).current : 0))
+    return prices.every(price => getSafeStorage(price.name, state.autoCraftLevel * 2/3) >= price.val + (reserved ? reserved.get(price.name).current : 0))
         || canAfford(prices, reserved)
 }
 isResourceFull = (res, additionalProduction) => getResourceOwned(res) >= getSafeStorage(res, Math.max(state.autoCraftLevel, 1), additionalProduction);
@@ -580,7 +633,7 @@ isUselessProduction = (production, adding) => {
     return production.val === 0 || (
         isResourceFull(production.name, adding ? production.val * getResourceConversionRatio(production.name) : 0)
         && !autoCrafts.some(craft => 
-            canCraft(craft.name) && craft.prices.some(price => price.name === production.name) && getTotalDemand(craft.name) > 0
+            canCraft(craft.name) && craft.prices.some(price => price.name === production.name) && getTotalDemand(craft.name, true) > 0
         )
     )
 }
@@ -589,8 +642,10 @@ manageConverters = () => {
         var productions = getProductionsPerTick(converter.effects);
         if (converter.on && productions.length && productions.every(isUselessProduction)) {
             console.log("Disabling " + converter.name);
-            enableConverter(converter, -1);
-            state.disabledConverters[converter.name] = Math.min(converter.val, 1 + (state.disabledConverters[converter.name] || 0));
+            while (converter.on && productions.every(isUselessProduction)) {
+                enableConverter(converter, -1);
+                state.disabledConverters[converter.name] = Math.min(converter.val, 1 + (state.disabledConverters[converter.name] || 0));
+            }
         } else if (state.disabledConverters[converter.name] && productions.some(production => !isUselessProduction(production, true))) {
             console.log("Re-enabling " + converter.name);
             enableConverter(converter, 1);
@@ -809,6 +864,7 @@ getEnoughResource = res => {
 }
 getEnoughCraft = res =>
     state.queue
+        .filter((x, i, a) => x.isUnlocked() && a.findIndex(o => o.name == x.name) == i)
         .map(bld => bld.getPrices())
         .concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched) //save some compendiums midgame
             .map(tech => tech.prices))
@@ -994,7 +1050,18 @@ gatherIntialCatnip = () => {
 preventStarvation = () => {
     if (getResourceOwned("catnip") < getWinterCatnipStockNeeded(false, 0, true) && game.science.get("agriculture").researched) {
         log("Making a farmer to prevent starvation (needed " + game.getDisplayValueExt(getWinterCatnipStockNeeded(false, 0, true)) + " catnip)")
-        switchToJob("farmer");
+        var jobReduced = switchToJob("farmer");
+        if (jobReduced && state.geneticAlgorithm) {
+            state.jobQueue.unshift(jobReduced);
+        }
+        state.temporaryFarmers++;
+    } else if (state.temporaryFarmers > 0 && getResourceOwned("catnip") > getWinterCatnipStockNeeded(true, -game.village.catnipPerKitten + getResourcePerTickPerKitten("catnip", "farmer") * 1.65, false)) {
+        log("Returning a farmer to work");
+        withTab("Village", () => {
+            decreaseJob("farmer");
+        });
+        state.temporaryFarmers--;
+        assignNewKittenJob();
     }
 }
 setAutoFarmer = auto => {
@@ -1010,7 +1077,7 @@ getJobCounts = () => {
         val: game.village.sim.kittens.filter(kitten => kitten.job === job.name).length
     }));
 }
-getJobLongName = jobName => game.village.jobs.find(job => job.name === jobName).title;
+getJobLongName = jobName => jobName && game.village.jobs.find(job => job.name === jobName).title;
 getJobShortName = jobLongName => game.village.jobs.find(job => job.title === jobLongName).name;
 getJobButton = jobName => findButton(getJobLongName(jobName));
 //decrease button uses en dash (–), not hyphen (-)
@@ -1019,6 +1086,7 @@ decreaseJob = jobName => getJobButton(jobName).find('a:contains("[–]")')[0].cl
 increaseJob = jobName => getJobButton(jobName).find('a:contains("[+]")')[0].click();
 isJobEnabled = jobName => game.village.jobs.find(job => job.name === jobName).unlocked;
 switchToJob = jobName => {
+    var jobReduced = null;
     if (isJobEnabled(jobName)) {
         withTab("Village", () => {
             if (game.village.isFreeKittens() && state.populationIncrease) {
@@ -1028,6 +1096,7 @@ switchToJob = jobName => {
                 var mostCommonJob = maxBy(getJobCounts().filter(job => job.name !== jobName), job => job.val);
                 if (mostCommonJob.val > 0) {
                     decreaseJob(mostCommonJob.name);
+                    jobReduced = mostCommonJob.name;
                 }
             }
             if (game.village.isFreeKittens()) {
@@ -1040,6 +1109,7 @@ switchToJob = jobName => {
     } else {
         console.error("Job " + jobName + " not unlocked yet!");
     }
+    return jobReduced;
 }
 resourceEffectNames = ["GlobalRatio", "Ratio", "RatioReligion", "SuperRatio"]
 /**
@@ -1421,6 +1491,36 @@ var clearMasterPlan = () => {
     state.queue = state.queue.filter(bld => !bld.masterPlan);
 }
 
+var gaTimeLimit = 300; //years
+shouldStopRun = () => {
+    return game.calendar.year >= gaTimeLimit || goalAchieved();
+}
+goalAchieved = () => {
+    return game.space.getProgram("moonMission").val;
+}
+calculateFitness = () => {
+    if (goalAchieved()) {
+        return 3000 + 4000 * (gaTimeLimit - game.calendar.year) + Math.round(10 * (400 - game.calendar.day));
+    } else {
+        return 20 * Object.values(game.science.metaCache).filter(x => x.researched).length
+            + 5 * game.village.sim.getKittens()
+            + 2 * game.workshop.upgrades.filter(x => x.researched).length
+            + 1 * game.bld.buildingsData.map(bld => bld.val).reduce((a, b) => a+b)
+            + 1 * Math.floor(game.religion.getProductionBonus())
+    }
+}
+reportFitness = () => {
+    var fitnessDiv = $("#fitnessValue");
+    var add = fitnessDiv.length === 0;
+    if (add) {
+        fitnessDiv = $("<div id='fitnessValue'>");
+    }
+    fitnessDiv.text(calculateFitness());
+    if (add) {
+        $("html").append(fitnessDiv);
+    }
+}
+
 /************** 
  * Queueables
 **************/
@@ -1553,6 +1653,17 @@ Building = class extends DataListQueueable(game.bld.buildingsData) {
         }
         return prices;
     }
+    isUnlocked() {
+        return super.isUnlocked() || ["Hut", "Library"].includes(this.name);
+    }
+    buy() {
+        var result = super.buy();
+        if (result && this.data.val == 1 && this.data.on == 0) {
+            //enable the first copy
+            this.data.on = 1;
+        }
+        return result;
+    }
 }
 
 Craft = class extends Queueable {
@@ -1561,7 +1672,7 @@ Craft = class extends Queueable {
         this.resName = getCraftInternalName(name);
     }
     buy() {
-        return craftMultiple(this.resName, 1)
+        return craftMultiple(game.workshop.getCraft(this.resName), 1)
     }
     getPrices() { 
         return getCraftPrices(this.resName)
@@ -1573,7 +1684,11 @@ Craft = class extends Queueable {
 
 Science = DataListQueueable(Object.values(game.science.metaCache), "Scientist")
 
-WorkshopUpgrade = DataListQueueable(game.workshop.upgrades, "Scientist");
+WorkshopUpgrade = class extends DataListQueueable(game.workshop.upgrades, "Scientist") {
+    isUnlocked() {
+        return super.isUnlocked() && game.bld.get("workshop").val;
+    }
+}
 
 Space = class extends DataListQueueable(Object.values(game.space.metaCache)) {
     constructor(name, tab, panel, maxPriority, masterPlan) {
@@ -1658,7 +1773,8 @@ Trade = class extends DataListQueueable(game.diplomacy.races, "Merchant") {
         return quantityTraded;
     }
     isEnabled() {
-        return (this.needProduct(1) || this.overrideNeeds())
+        return this.data.unlocked
+            && (this.needProduct(1) || this.overrideNeeds())
             && (this.bestSeason() || this.ignoreSeason())
             && (this.name !== "Leviathans" || game.diplomacy.get("leviathans").duration);
     }
@@ -1741,12 +1857,13 @@ PromoteLeader = class extends Queueable {
         
     }
     getLeaderRank() {
-        return game.village.leader.rank;
+        return game.village.leader && game.village.leader.rank;
     }
     getPrices() {
         return [{ name: "gold", val: 25 * (this.getLeaderRank() + 1) }];
     }
     isEnabled() {
+        if (!game.village.leader) return false;
         var rank = this.getLeaderRank();
         var expNeeded = 500 * Math.pow(1.75, rank);
         return rank < 10 && game.village.leader.exp >= expNeeded;
@@ -1761,8 +1878,11 @@ HoldFestival = class extends Queueable {
     getPrices() {
         return [{ name: "manpower", val: 1500 }, { name: "culture", val: 5000 }, { name: "parchment", val: 2500 }];
     }
+    isUnlocked() {
+        return game.science.get("drama").researched;
+    }
     isEnabled() {
-        return game.calendar.festivalDays <= 10 * game.prestige.getPerk("carnivals").researched;
+        return this.isUnlocked() && game.calendar.festivalDays <= 10 * game.prestige.getPerk("carnivals").researched;
     }
 }
 SendExplorers = class extends Queueable {
@@ -1773,7 +1893,15 @@ SendExplorers = class extends Queueable {
     getPrices() {
         return [{ name: "manpower", val: 1000 }];
     }
-    //TODO detect when new races are available
+    isEnabled() {
+        return game.diplomacy.hasUnlockedRaces() && (
+            ["lizards", "griffins", "sharks"].some(race => !game.diplomacy.get(race).unlocked)
+            || !game.diplomacy.get("nagas").unlocked && game.resPool.get("culture").value >= 1500
+            || !game.diplomacy.get("zebras").unlocked && game.resPool.get("ship").value >= 1
+            || !game.diplomacy.get("spiders").unlocked && game.resPool.get("ship").value >= 100 && game.resPool.get("science").maxValue > 125000
+            || !game.diplomacy.get("dragons").unlocked && game.science.get("nuclearFission").researched
+        )
+    }
 }
 FeedElders = class extends Queueable {
     constructor(name, tab, panel, maxPriority, masterPlan) {
@@ -1920,7 +2048,16 @@ slowDown = () => setSpeed(state.speed / 2);
 if (!game.realUpdateModel) game.realUpdateModel = game.updateModel;
 game.updateModel = () => {
     if (!(state.disableTimeskip && game.isRendering)) {
-        for (var i = 0; i < Math.min(state.speed, state.ticksPerLoop); i++) { 
+        var speed = Math.min(state.speed, state.ticksPerLoop);
+        var realTimerUpdate = null;
+        if (speed >= 8) {
+			game.village.updateResourceProduction();
+            game.updateCaches();
+            realTimerUpdate = game.timer.update;
+            //patch out this most expensive function
+            game.timer.update = () => undefined;
+        }
+        for (var i = 0; i < speed; i++) { 
             if (i !== 0) {
                 game.calendar.tick();
                 //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
@@ -1930,6 +2067,10 @@ game.updateModel = () => {
             }
             game.realUpdateModel(); 
         }
+        if (realTimerUpdate) {
+            game.timer.update = realTimerUpdate;
+            game.timer.update();
+        } 
     }
 }
 if (!game.realRender) game.realRender = game.render;
@@ -1999,6 +2140,9 @@ game.tick = () => {
                 state.loopsUntilRun--;
             }
         }
+    }
+    if (game.ui.realUpdate) {
+        game.ui.realUpdate();
     }
 }
 
@@ -2532,10 +2676,12 @@ updateUi = () => {
 **************/
 log = (msg, quiet) => { console.log(msg); if (!quiet) game.msg(msg); }
 addLog = item => {
-    item.year = game.calendar.year;
-    var roundedDay = Math.round(game.calendar.day * 100) / 100
-    item.day = roundedDay + 100 * game.calendar.season;
-    state.history.push(item);
+    if (!state.geneticAlgorithm) {
+        item.year = game.calendar.year;
+        var roundedDay = Math.round(game.calendar.day * 100) / 100
+        item.day = roundedDay + 100 * game.calendar.season;
+        state.history.push(item);
+    }
 }
 logBuy = (bld, numBought) => addLog({ name: bld.name, type: "Buy", buy: bld.savedProps(true), num: numBought});
 logKitten = (numKittens, job) => addLog({ name: numKittens + " Kittens", type: "Kitten", kittens: numKittens, job: job});
@@ -2606,7 +2752,10 @@ getBestResetPoint = (history, onlyLocalMaxima) =>
 **************/
 save = () => { localStorage.setItem("simba.state", exportSave()); console.log("Bot state saved"); }
 loadString = string => {
-    var parsed = JSON.parse(LZString.decompressFromBase64(string));
+    loadDecompressed(LZString.decompressFromBase64(string));
+}
+loadDecompressed = string => {
+    var parsed = JSON.parse(string);
     var rawQueue = parsed.queue;
     parsed.queue = [];
     if (parsed.previousHistoriesCompressed) { parsed.previousHistories = JSON.parse(LZString.decompressFromBase64(parsed.previousHistoriesCompressed)); }
@@ -2619,7 +2768,10 @@ exportSave = () => {
     return LZString.compressToBase64(JSON.stringify(savedState));
 }
 importSave = saveString => {
-    loadString(saveString);
+    importSaveDecompressed(LZString.decompressFromBase64(string));
+}
+importSaveDecompressed = saveString => {
+    loadDecompressed(saveString);
     loadDefaults();
     initialize();
 }
@@ -2652,6 +2804,8 @@ loadDefaults = () => {
         numKittens: game.village.sim.getKittens(),
         kittensAssigned: game.village.sim.getKittens(),
         leaderAssigned: game.village.leader ? true : false,
+        temporaryFarmers: 0,
+        jobsUnlocked: 1,
         verboseQueue: 0,
         disabledConverters: {},
         tradeMessages: 0,
@@ -2664,8 +2818,10 @@ loadDefaults = () => {
         ignoreSeason: {},
         masterPlanMode: 0,
         smartStorage: 0,
+        disableTimeskip: false,
         autoResetThreshold: 1, //should never be 0
         restrictedRecipes: { timeCrystal: 2, sorrow: 2, relic: 2 },
+        geneticAlgorithm: 0,
     }
     Object.entries(falseyDefaults).forEach(entry => state[entry[0]] = state[entry[0]] || entry[1]);
     if (!state.previousHistoriesCompressed) state.previousHistoriesCompressed = LZString.compressToBase64(JSON.stringify(state.previousHistories));
@@ -2680,9 +2836,24 @@ loadDefaults = () => {
     Object.entries(undefinedDefaults).forEach(entry => { if (state[entry[0]] === undefined) state[entry[0]] = entry[1] });
 }
 initialize = () => {
+    if (state.geneticAlgorithm) {
+        window.confirm = () => true;
+        state.originalJobQueue = state.jobQueue;
+        game.ui.realUpdate = game.ui.update;
+        game.ui.update = game.ui.updateTabs;
+        game.console.filters.hunt.enabled = false;
+        game.console.filters.faith.enabled = false;
+        game.console.filters.craft.enabled = false;
+    }
     state.ticks = game.ticks;
     setSpeed(state.speed);
     createSettingsMenu();
+}
+if (!game.realSave) game.realSave = game.save;
+game.save = () => {
+    if (!state.geneticAlgorithm) {
+        game.realSave();
+    }
 }
 if (!game.console.realSave) game.console.realSave = game.console.save;
 game.console.save = (data) => {
@@ -2700,7 +2871,7 @@ if (!game.real_wipe) game.real_wipe = game._wipe;
 game._wipe = () => {
     if (window.usingBotStarter) {
         //based on _wipe code
-		game.timer.scheduleEvent(dojo.hitch(this, function() {
+        game.timer.scheduleEvent(dojo.hitch(this, function() {
             wipeBotSave();
             game.mobileSaveOnPause = false;
             delete(LCstorage["com.nuclearunicorn.kittengame.savedata"]);
@@ -2746,13 +2917,6 @@ buy script (-> genetic algorithm)
 ------nuclear fission, biochemistry, genetics, telecommunication
 ----optional techs
 ------architecture, acoustics, drama and poetry, biology, combustion, metallurgy, robotics
---run scoring
-----10pt per science, building type
-----5pt per kitten
-----2pt per upgrade
-----1pt per building
-----1pt per %faith bonus
-----2000pt if moon +1pt/day early
 --compare with human performance
 ----human vs. human + bot vs. master plan
 ----human plays 10min/2hr (+10min at start of game?)
