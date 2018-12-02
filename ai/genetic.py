@@ -5,6 +5,7 @@ import numpy
 import pickle
 from worker import run_browser
 import captain
+import sys
 
 # Generalized Beam Search: Based on parameters (see run function), can run GA, SA, HC, or a hybrid of these strategies.
 class GeneralizedBeamSearch:
@@ -175,10 +176,12 @@ def kittensTrial(j):
 #   buildings can be bought (and should be bought) multiple times, so the build length is a multiple of the number of buildings
     build_order_length = len(allQueueables) * 3
     kittensProblem = KittensProblem(allQueueables, build_order_length)
-    populationSize = 60 * 8 * 3 // 2
-    #score population? 
-    unscored_population = [ (True, kittensProblem.randomGenome()) for i in range(populationSize) ]
-    population = kittensProblem.scoreAll(unscored_population)
+    if len(sys.argv <= 1):
+        populationSize = 60 * 8 * 3 // 2
+        unscored_population = [ (True, kittensProblem.randomGenome()) for i in range(populationSize) ]
+        population = kittensProblem.scoreAll(unscored_population)
+    else:
+        population = pickle.load(open(sys.argv[1], 'rb'))
     return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 100, j == 0)
 
 # Turns a genome into a save file that Simba can understand and import
