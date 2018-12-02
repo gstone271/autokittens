@@ -1499,7 +1499,7 @@ calculateFitness = () => {
     if (goalAchieved()) {
         return 2000 + 4000 * (gaTimeLimit - game.calendar.year) + Math.round(10 * (400 - game.calendar.day));
     } else {
-        return 10 * Object.values(game.science.metaCache).filter(x => x.researched).length
+        return 20 * Object.values(game.science.metaCache).filter(x => x.researched).length
             + 5 * game.village.sim.getKittens()
             + 2 * game.workshop.upgrades.filter(x => x.researched).length
             + 1 * game.bld.buildingsData.map(bld => bld.val).reduce((a, b) => a+b)
