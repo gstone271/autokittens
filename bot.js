@@ -640,8 +640,10 @@ manageConverters = () => {
         var productions = getProductionsPerTick(converter.effects);
         if (converter.on && productions.length && productions.every(isUselessProduction)) {
             console.log("Disabling " + converter.name);
-            enableConverter(converter, -1);
-            state.disabledConverters[converter.name] = Math.min(converter.val, 1 + (state.disabledConverters[converter.name] || 0));
+            while (converter.on && productions.every(isUselessProduction)) {
+                enableConverter(converter, -1);
+                state.disabledConverters[converter.name] = Math.min(converter.val, 1 + (state.disabledConverters[converter.name] || 0));
+            }
         } else if (state.disabledConverters[converter.name] && productions.some(production => !isUselessProduction(production, true))) {
             console.log("Re-enabling " + converter.name);
             enableConverter(converter, 1);
@@ -1768,7 +1770,8 @@ Trade = class extends DataListQueueable(game.diplomacy.races, "Merchant") {
         return quantityTraded;
     }
     isEnabled() {
-        return (this.needProduct(1) || this.overrideNeeds())
+        return this.data.unlocked
+            && (this.needProduct(1) || this.overrideNeeds())
             && (this.bestSeason() || this.ignoreSeason())
             && (this.name !== "Leviathans" || game.diplomacy.get("leviathans").duration);
     }
