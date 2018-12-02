@@ -2044,7 +2044,16 @@ slowDown = () => setSpeed(state.speed / 2);
 if (!game.realUpdateModel) game.realUpdateModel = game.updateModel;
 game.updateModel = () => {
     if (!(state.disableTimeskip && game.isRendering)) {
-        for (var i = 0; i < Math.min(state.speed, state.ticksPerLoop); i++) { 
+        var speed = Math.min(state.speed, state.ticksPerLoop);
+        var realTimerUpdate = null;
+        if (speed >= 8) {
+			game.village.updateResourceProduction();
+            game.updateCaches();
+            realTimerUpdate = game.timer.update;
+            //patch out this most expensive function
+            game.timer.update = () => undefined;
+        }
+        for (var i = 0; i < speed; i++) { 
             if (i !== 0) {
                 game.calendar.tick();
                 //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
@@ -2054,6 +2063,10 @@ game.updateModel = () => {
             }
             game.realUpdateModel(); 
         }
+        if (realTimerUpdate) {
+            game.timer.update = realTimerUpdate;
+            game.timer.update();
+        } 
     }
 }
 if (!game.realRender) game.realRender = game.render;
