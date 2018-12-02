@@ -38,17 +38,17 @@ def runOneComputer(hostname, genomes):
     hostF = "./compFitness/" + hostname
     with open(hostG, 'wb') as genome_file:
         pickle.dump(genomes, genome_file)
+    thisCompStartTime = time.time()
     try:
-        subprocess.run(["ssh", "-q", hostname, f"bash -c '. ~/cs541ve/bin/activate; nice -n 5 python3 ~/simba/ai/scotty.py {hostname} 2>>~/simba/ai/logs/{startTime}/errors.log'"], stderr=DEVNULL, check=True, timeout=(60 * 30))
+        subprocess.run(["ssh", "-q", hostname, f"bash -c '. ~/cs541ve/bin/activate; nice -n 5 python3 ~/simba/ai/scotty.py {hostname} 2>>~/simba/ai/logs/{startTime}/errors.log'"], stderr=DEVNULL, check=True, timeout=(60 * 25))
         fitness_file = open(hostF, 'rb')
         fitnesses = pickle.load(fitness_file)
         return fitnesses
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
-        if hostname == backupComputer:
-            print("Warning: Backup computer job failed:", err)
+        print(f"Warning: {hostname} job failed:", err)
+        if hostname == backupComputer or (time.time() - thisCompStartTime) > 300:
             return [0] * len(genomes)
         else:
-            print(f"Warning: {hostname} job failed:", err)
             return runOneComputer(backupComputer, genomes)
 
 #list node has 1 computer (string of name/address) and many genomes 
