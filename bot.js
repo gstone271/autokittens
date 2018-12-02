@@ -864,7 +864,7 @@ getEnoughResource = res => {
 }
 getEnoughCraft = res =>
     state.queue
-        .filter((x, i, a) => x.isEnabled() && a.findIndex(o => o.name == x.name) == i)
+        .filter((x, i, a) => x.isUnlocked() && a.findIndex(o => o.name == x.name) == i)
         .map(bld => bld.getPrices())
         .concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched) //save some compendiums midgame
             .map(tech => tech.prices))
@@ -1878,8 +1878,11 @@ HoldFestival = class extends Queueable {
     getPrices() {
         return [{ name: "manpower", val: 1500 }, { name: "culture", val: 5000 }, { name: "parchment", val: 2500 }];
     }
+    isUnlocked() {
+        return game.science.get("drama").researched;
+    }
     isEnabled() {
-        return game.calendar.festivalDays <= 10 * game.prestige.getPerk("carnivals").researched;
+        return this.isUnlocked() && game.calendar.festivalDays <= 10 * game.prestige.getPerk("carnivals").researched;
     }
 }
 SendExplorers = class extends Queueable {
