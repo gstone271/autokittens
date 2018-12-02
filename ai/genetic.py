@@ -213,6 +213,7 @@ def toSimbaSettings(genome):
                         seen.add(name)
                 blds.append(f'{{"name":"{name}","tab":"{tab}","panel":"{panel}"}}')
                 break
+    blds.append(f'{{"name":"Praise the sun!","tab":"Religion","panel":"Order of the Sun"}}')
     queue = ",".join(blds)
     jobQueue = ",".join([f'"{job}"' for job in genome if job in jobsSet])
     return f'{{"queue": [{queue}], "jobQueue": [{jobQueue}], "geneticAlgorithm": true, "speed": 4096, "disableTimeskip": true, "desiredTicksPerLoop": 32, "running": true, "autoHunt": true, "autoSteel": true}}'
