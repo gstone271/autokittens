@@ -262,7 +262,7 @@ upgrades = [
 
 
 religion = [
-    ("Scholasticism", "Theology"), ("Golden Spire", "Theology"), ("Sun Altar", "Theology"), ("Stained Glass", "Theology"), ("Basilica", "Theology"), ( "Templars", "Theology"), #("Apocrypha", "Theology"), ("Transcendence", "Theology")
+    ("Solar Chant", "Theology"), ("Scholasticism", "Theology"), ("Golden Spire", "Theology"), ("Sun Altar", "Theology"), ("Stained Glass", "Theology"), ("Solar Revolution", "Theology"), ("Basilica", "Theology"), ( "Templars", "Theology"), #("Apocrypha", "Theology"), ("Transcendence", "Theology")
 ]
 
 science = [
