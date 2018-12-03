@@ -2844,6 +2844,7 @@ initialize = () => {
         game.console.filters.hunt.enabled = false;
         game.console.filters.faith.enabled = false;
         game.console.filters.craft.enabled = false;
+        game.console.filters.astronomicalEvent.enabled = false;
     }
     state.ticks = game.ticks;
     setSpeed(state.speed);
