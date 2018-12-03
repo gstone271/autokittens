@@ -2840,10 +2840,12 @@ loadDefaults = () => {
 }
 initialize = () => {
     if (state.geneticAlgorithm) {
+        if (!game.ui.realUpdate) {
+            game.ui.realUpdate = game.ui.update;
+            game.ui.update = game.ui.updateTabs;
+            state.originalJobQueue = state.jobQueue;
+        }
         window.confirm = () => true;
-        state.originalJobQueue = state.jobQueue;
-        game.ui.realUpdate = game.ui.update;
-        game.ui.update = game.ui.updateTabs;
         game.console.filters.hunt.enabled = false;
         game.console.filters.faith.enabled = false;
         game.console.filters.craft.enabled = false;
