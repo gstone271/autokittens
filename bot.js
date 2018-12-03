@@ -1694,6 +1694,9 @@ Space = class extends DataListQueueable(Object.values(game.space.metaCache)) {
     constructor(name, tab, panel, maxPriority, masterPlan) {
         super(name, tab, panel, maxPriority, masterPlan);
     }
+    isUnlocked() {
+        return super.isUnlocked() && game.science.get("rocketry").researched;
+    }
     getPrices() { 
         return classes.ui.space.PlanetBuildingBtnController.prototype.getPrices.call(game.space, {metadata: this.data});
     }
