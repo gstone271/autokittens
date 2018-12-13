@@ -419,7 +419,7 @@ findPriorities = (queue, reserved) => {
     queue.forEach(found => {
         var prices = found.getPrices();
         if (!seen[found.name] && found.isEnabled() && haveEnoughStorage(prices, reserved)) {
-            seen[found.name] = true;
+            seen[found.name] = !canAfford(prices, reserved); //allow buying more than one copy in a single loop
             var unavailableResources = prices.map(price => price.name).filter(res => reserved.get(res).current > getResourceOwned(res));
             var viable = unavailableResources.length ? false : true;
             var effectivePrices = getEffectivePrices(prices, reserved);
