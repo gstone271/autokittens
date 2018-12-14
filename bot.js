@@ -542,14 +542,19 @@ getTotalDemand = (res, craftOnly) => {
         .map(price => price.val)
         .reduce((acc, item) => acc + item, 0)
 }
-getSafeStorage = (res, autoCraftLevel, additionalProduction) => {
+getSafeStorage = (res, autoCraftLevel, additionalProduction, forPurchase) => {
     if (autoCraftLevel === undefined) autoCraftLevel = state.autoCraftLevel;
     if (!additionalProduction) additionalProduction = 0;
     var max = getResourceMax(res);
-    return max === Infinity ? max : max - autoCraftLevel * state.ticksPerLoop * (getEffectiveResourcePerTick(res, state.ticksPerLoop) + additionalProduction);
+    //missing: expected unused storage when resource is about to be crafted away
+    //only relevant for purchases
+    var expectedMissing = forPurchase && reverseCraftMap[res] ? reverseCraftMap[res] * 2/3 : Infinity;
+    //production: amount of spare storage needed after resources is crafted away
+    var expectedProduction = autoCraftLevel * state.ticksPerLoop * (getEffectiveResourcePerTick(res, state.ticksPerLoop) + additionalProduction);
+    return max === Infinity ? max : max - Math.min(expectedProduction, expectedMissing);
 }
 haveEnoughStorage = (prices, reserved) => {
-    return prices.every(price => getSafeStorage(price.name, state.autoCraftLevel * 2/3) >= price.val + (reserved ? reserved.get(price.name).current : 0))
+    return prices.every(price => getSafeStorage(price.name, state.autoCraftLevel * 2/3, undefined, true) >= price.val + (reserved ? reserved.get(price.name).current : 0))
         || canAfford(prices, reserved)
 }
 isResourceFull = (res, additionalProduction) => getResourceOwned(res) >= getSafeStorage(res, Math.max(state.autoCraftLevel, 1), additionalProduction);
@@ -923,6 +928,18 @@ getEnoughCraft = res =>
 autoCrafts = game.workshop.crafts
     //parchment is needed to spend culture and science autocrafting, and there's no other craft for furs
     .filter(craft => craft.prices.some(price => getResourceMax(price.name) < Infinity || craft.name === "parchment"))
+getReverseCraftMap = autoCrafts => {
+    var result = {
+        gold: 15
+    };
+    Object.values(autoCrafts).forEach(craft => {
+        craft.prices.forEach(price => {
+            result[price.name] = Math.min(price.val, result[price.name] || Infinity)
+        });
+    });
+    return result;
+}
+reverseCraftMap = getReverseCraftMap(autoCrafts);
 preferSteelCrafting = () => {
     //prefer steel over plate
     var steelIndex = autoCrafts.findIndex(craft => craft.name === "steel")
