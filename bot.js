@@ -2167,7 +2167,7 @@ startLoop = () => {
 if (!game.realTick) game.realTick = game.tick;
 game.tick = () => {
     var runLoop = state.running && state.runInGameLoop;
-    var ticks = runLoop ? state.speed / state.ticksPerLoop : 1;
+    var ticks = state.speed / state.ticksPerLoop;
     for (var tick = 0; tick < ticks; tick++) {
         game.realTick();
         if (runLoop) {
