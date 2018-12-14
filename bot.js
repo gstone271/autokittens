@@ -1041,6 +1041,7 @@ getTrueResourcePerTick = (res, season) => {
 }
 ticksPerSeason = () => 100 / game.calendar.dayPerTick;
 ticksLeftInSeason = () => (100 - game.calendar.day) / game.calendar.dayPerTick;
+ticksLeftInTemporalParadox = () => (0 - game.calendar.day) / game.calendar.dayPerTick;
 getExpectedCatnipBeforeWinter = () => {
     if (game.calendar.season === 3) return 0;
     return getTrueResourcePerTick("catnip") * ticksLeftInSeason()
@@ -2085,15 +2086,36 @@ speedUp = () => setSpeed(state.speed * 2);
 slowDown = () => setSpeed(state.speed / 2);
 if (!game.realUpdateModel) game.realUpdateModel = game.updateModel;
 fastForwardTicks = ticks => {
-    for (var i = 0; i < ticks; i++) { 
-        if (i !== 0) {
-            game.calendar.tick();
-            //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
-            game.ticks++;
-            //might be going so fast you would miss astro events
-            if (state.autoSeti && game.calendar.observeBtn) game.calendar.observeHandler();
+    var realResPoolUpdate = null;
+    if (ticks >= 8) {
+        //resPool update updates maxes, energy prod, karma, unlocks, then adds 1 tick prod
+        //none of the things it updates will change between cache updates
+        //get the first update, then optimize out the rest
+        game.resPool.update();
+        for (var i in game.resPool.resources) {
+			var res = game.resPool.resources[i];
+            var resPerTick = game.getResourcePerTick(res.name, false);
+            //subtract the 1 tick that the full update() added
+			game.resPool.addResPerTick(res.name, resPerTick * (ticks - 1));
         }
-        game.realUpdateModel(); 
+        realResPoolUpdate = game.resPool.update;
+        game.resPool.update = () => undefined;
+    }
+    try {
+        for (var i = 0; i < ticks; i++) { 
+            if (i !== 0) {
+                game.calendar.tick();
+                //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
+                game.ticks++;
+                //might be going so fast you would miss astro events
+                if (state.autoSeti && game.calendar.observeBtn) game.calendar.observeHandler();
+            }
+            game.realUpdateModel(); 
+        }
+    } finally {
+        if (realResPoolUpdate) {
+            game.resPool.update = realResPoolUpdate;
+        }
     }
 }
 game.updateModel = () => {
@@ -2109,20 +2131,26 @@ game.updateModel = () => {
             //patch out this most expensive function
             game.timer.update = () => undefined;
         }
-        for (var ticksDone = 0; ticksDone < speed;) {
-            if (realTimerUpdate) {
-                //game.timer.update is responsible for updating production/tick
-                //update at the start and at every new season
-                updateProduction();
+        try {
+            for (var ticksDone = 0; ticksDone < speed;) {
+                if (realTimerUpdate) {
+                    //game.timer.update is responsible for updating production/tick
+                    //update at the start and at every new season
+                    updateProduction();
+                }
+                var ticksToSeasonChange = game.calendar.day < 0 ? ticksLeftInTemporalParadox() : ticksLeftInSeason();
+                var ticksToDo = Math.min(ticksToSeasonChange, speed - ticksDone);
+                //fastForwardTicks can give free resources from smelters that have run out of minerals, until the cache is updated
+                //could try to improve this
+                fastForwardTicks(ticksToDo);
+                ticksDone += ticksToDo;
             }
-            var ticksToDo = Math.min(ticksLeftInSeason(), speed - ticksDone);
-            fastForwardTicks(ticksToDo);
-            ticksDone += ticksToDo;
+        } finally {
+            if (realTimerUpdate) {
+                game.timer.update = realTimerUpdate;
+                game.timer.update();
+            }
         }
-        if (realTimerUpdate) {
-            game.timer.update = realTimerUpdate;
-            game.timer.update();
-        } 
     }
 }
 if (!game.realRender) game.realRender = game.render;
