@@ -2109,8 +2109,13 @@ speedUp = () => setSpeed(state.speed * 2);
 slowDown = () => setSpeed(state.speed / 2);
 if (!game.realUpdateModel) game.realUpdateModel = game.updateModel;
 fastForwardTicks = ticks => {
+    var realWorkshopUpdate = null;
     var realResPoolUpdate = null;
+    var realBldUpdate = null;
     if (ticks >= 8) {
+        //workshop update handles engineers, resource max bonus from compendium/etc
+        game.workshop.update(ticks);
+        realWorkshopUpdate = game.workshop.update;
         //resPool update updates maxes, energy prod, karma, unlocks, then adds 1 tick prod
         //none of the things it updates will change between cache updates
         //get the first update, then optimize out the rest
@@ -2122,7 +2127,15 @@ fastForwardTicks = ticks => {
 			game.resPool.addResPerTick(res.name, resPerTick * (ticks - 1));
         }
         realResPoolUpdate = game.resPool.update;
+        //bld.update is only responsible for updating caches and turning off magnetos/reactors with not enough oil/uranium
+        //do it once at the end of the loop
+        //could improve magnetos/reactor handling (deactivate all magnetos, be able to reactivate magentos/reactors)
+        realBldUpdate = game.bld.update;
+        //don't fast forward bld; that just does automation and jams it
+        //don't fast forward village; kittens can't die, skill learning is wrong, misc housekeeping is not done
+        game.workshop.update = () => undefined;
         game.resPool.update = () => undefined;
+        game.bld.update = () => undefined;
     }
     try {
         for (var i = 0; i < ticks; i++) { 
@@ -2136,8 +2149,11 @@ fastForwardTicks = ticks => {
             game.realUpdateModel(); 
         }
     } finally {
-        if (realResPoolUpdate) {
+        if (realWorkshopUpdate) {
+            game.workshop.update = realWorkshopUpdate;
             game.resPool.update = realResPoolUpdate;
+            game.bld.update = realBldUpdate;
+            game.bld.update();
         }
     }
 }
@@ -3073,4 +3089,9 @@ allow buying stuff with cost between safe storage and actual storage
 --when all resources are close to full, allow them to become completely full
 can't get religion bonus while on religion tab
 selling buildings isn't noticed
+
+performance:
+preventStarvation: fix starvation detection
+do bld.update only once, at end of tick
+use kittens.update.fastforward?
 */
