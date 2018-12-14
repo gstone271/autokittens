@@ -31,25 +31,25 @@ def getWorkingComputers(computerList):
 
 backupComputer = "babbage.cs.pdx.edu"
 
-def runOneComputer(hostname, genomes):
+def runOneComputer(hostname, genomes, postfix=""):
     if len(genomes) == 0:
         return []
-    hostG = "./compGenomes/" + hostname
-    hostF = "./compFitness/" + hostname
+    hostG = "./compGenomes/" + hostname + postfix
+    hostF = "./compFitness/" + hostname + postfix
     with open(hostG, 'wb') as genome_file:
         pickle.dump(genomes, genome_file)
     thisCompStartTime = time.time()
     try:
-        subprocess.run(["ssh", "-q", hostname, f"bash -c '. ~/cs541ve/bin/activate; nice -n 5 python3 ~/simba/ai/scotty.py {hostname} 2>>~/simba/ai/logs/{startTime}/errors.log'"], stderr=DEVNULL, check=True, timeout=(60 * 25))
+        subprocess.run(["ssh", "-q", hostname, f"bash -c '. ~/cs541ve/bin/activate; nice -n 5 python3 ~/simba/ai/scotty.py {hostname}{postfix} 2>>~/simba/ai/logs/{startTime}/errors.log'"], stderr=DEVNULL, check=True, timeout=(60 * 25))
         fitness_file = open(hostF, 'rb')
         fitnesses = pickle.load(fitness_file)
         return fitnesses
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
         print(f"Warning: {hostname} job failed:", err)
-        if hostname == backupComputer or (time.time() - thisCompStartTime) > 300:
+        if hostname == backupComputer or (time.time() - thisCompStartTime) > 100:
             return [0] * len(genomes)
         else:
-            return runOneComputer(backupComputer, genomes)
+            return runOneComputer(backupComputer, genomes, hostname)
 
 #list node has 1 computer (string of name/address) and many genomes 
 def start(computerList, genomeList):
