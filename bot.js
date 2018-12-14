@@ -2084,26 +2084,40 @@ setSpeed = spd => {
 speedUp = () => setSpeed(state.speed * 2);
 slowDown = () => setSpeed(state.speed / 2);
 if (!game.realUpdateModel) game.realUpdateModel = game.updateModel;
+fastForwardTicks = ticks => {
+    for (var i = 0; i < ticks; i++) { 
+        if (i !== 0) {
+            game.calendar.tick();
+            //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
+            game.ticks++;
+            //might be going so fast you would miss astro events
+            if (state.autoSeti && game.calendar.observeBtn) game.calendar.observeHandler();
+        }
+        game.realUpdateModel(); 
+    }
+}
 game.updateModel = () => {
     if (!(state.disableTimeskip && game.isRendering)) {
         var speed = Math.min(state.speed, state.ticksPerLoop);
         var realTimerUpdate = null;
-        if (speed >= 8) {
-			game.village.updateResourceProduction();
+        var updateProduction = () => {
+            game.village.updateResourceProduction();
             game.updateCaches();
+        }
+        if (speed >= 8) {
             realTimerUpdate = game.timer.update;
             //patch out this most expensive function
             game.timer.update = () => undefined;
         }
-        for (var i = 0; i < speed; i++) { 
-            if (i !== 0) {
-                game.calendar.tick();
-                //speed must not be a multiple of 5; otherwise this will cause the tooltips to never update (ui.js uses ticks % 5)
-                game.ticks++;
-                //might be going so fast you would miss astro events
-                if (state.autoSeti && game.calendar.observeBtn) game.calendar.observeHandler();
+        for (var ticksDone = 0; ticksDone < speed;) {
+            if (realTimerUpdate) {
+                //game.timer.update is responsible for updating production/tick
+                //update at the start and at every new season
+                updateProduction();
             }
-            game.realUpdateModel(); 
+            var ticksToDo = Math.min(ticksLeftInSeason(), speed - ticksDone);
+            fastForwardTicks(ticksToDo);
+            ticksDone += ticksToDo;
         }
         if (realTimerUpdate) {
             game.timer.update = realTimerUpdate;
