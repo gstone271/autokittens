@@ -2173,15 +2173,17 @@ fastForwardTicks = ticks => {
         //none of the things it updates will change between cache updates
         //get the first update, then optimize out the rest
         game.resPool.update();
+        game.bld.update();
         for (var i in game.resPool.resources) {
-			var res = game.resPool.resources[i];
-            var resPerTick = game.getResourcePerTick(res.name, false);
+            var res = game.resPool.resources[i];
+            //include conversion; normally bld.update's job
+            var resPerTick = game.getResourcePerTick(res.name, true);
             //subtract the 1 tick that the full update() added
 			game.resPool.addResPerTick(res.name, resPerTick * (ticks - 1));
         }
         realResPoolUpdate = game.resPool.update;
-        //bld.update is only responsible for updating caches and turning off magnetos/reactors with not enough oil/uranium
-        //do it once at the end of the loop
+        //bld.update is responsible for updating caches, turning off magnetos/reactors with not enough oil/uranium, and fine-tuned convertion
+        //do it once, and factor in the convertion in the resource adding loop
         //could improve magnetos/reactor handling (deactivate all magnetos, be able to reactivate magentos/reactors)
         realBldUpdate = game.bld.update;
         //don't fast forward bld; that just does automation and jams it
@@ -2206,7 +2208,6 @@ fastForwardTicks = ticks => {
             game.workshop.update = realWorkshopUpdate;
             game.resPool.update = realResPoolUpdate;
             game.bld.update = realBldUpdate;
-            game.bld.update();
         }
     }
 }
