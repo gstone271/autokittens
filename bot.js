@@ -1606,11 +1606,18 @@ calculateFitness = () => {
         var totalTicks = 4000 * game.calendar.year + Math.round((100 * game.calendar.season + game.calendar.day) / game.calendar.dayPerTick)
         return 3000 + timeLimitTicks - totalTicks;
     } else {
+        //don't pointlessly overbuild storage
+        bldScore = {
+            "harbor": 2/3,
+            "warehouse": 1/2,
+            "barn": 1/2,
+        }
         return 20 * Object.values(game.science.metaCache).filter(x => x.researched).length
-            + 5 * game.village.sim.getKittens()
+            + 4 * game.village.sim.getKittens()
             + 2 * game.workshop.upgrades.filter(x => x.researched).length
-            + 1 * game.bld.buildingsData.map(bld => bld.val).reduce((a, b) => a+b)
+            + 1 * Math.round(game.bld.buildingsData.map(bld => bld.val * (bldScore[bld.name] || 1)).reduce((a, b) => a+b))
             + 1 * Math.floor(game.religion.getProductionBonus())
+            + 115 //adjust for change in fitness function
     }
 }
 reportFitness = () => {
