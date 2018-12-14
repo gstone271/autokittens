@@ -344,7 +344,8 @@ bufferTicksNeeded = ticksNeeded => Math.max(0, ticksNeeded - reserveBufferTime);
 canAffordOne = (price, reserved) => price.val <= 0 || getResourceOwned(price.name) - (reserved ? reserved.get(price.name).current : 0) >= price.val;
 canAfford = (prices, reserved) => prices.every(price => canAffordOne(price, reserved));
 //ticks until you have enough. May be infinite.
-getTicksToEnough = (price, reserved, owned, forSteel) => {
+getTicksToEnough = (price, reserved, owned, forSteel, timeLimit) => {
+    if (timeLimit === undefined) timeLimit = Infinity;
     if (owned === undefined) {
         if (price.name === "iron" && state.autoSteel) {
             //this might be negative; that's ok
@@ -367,7 +368,7 @@ getTicksToEnough = (price, reserved, owned, forSteel) => {
             }
             //more accurate calculation for crafted resources with no production
             //still inaccurate for manuscript once you have printing press, but at least this special case is the common case for crafts
-            return Math.max(...ingredients.map(ingredientPrice => getTicksToEnough(ingredientPrice, reserved, getResourceOwned(ingredientPrice.name), ingredientForSteel)))
+            return Math.max(...ingredients.map(ingredientPrice => getTicksToEnough(ingredientPrice, reserved, getResourceOwned(ingredientPrice.name), ingredientForSteel, timeLimit)))
         } else {
             //just a performance improvement
             return Infinity;
@@ -390,17 +391,18 @@ getTicksToEnough = (price, reserved, owned, forSteel) => {
     }
     if (freeProduction <= 0) {
         //all production is reserved
-        if (timeToChange === Infinity) return Infinity;
-        return timeToChange + getTicksToEnough(price, getFutureReservations(reserved, timeToChange), owned + reservedForShortageProduction * timeToChange);
+        if (timeToChange >= timeLimit) return Infinity;
+        return timeToChange + getTicksToEnough(price, getFutureReservations(reserved, timeToChange), owned + reservedForShortageProduction * timeToChange, forSteel, timeLimit - timeToChange);
     } else if (freeProduction * timeToChange + owned - reserved.get(price.name).current >= price.val) {
         return Math.ceil((price.val + reserved.get(price.name).current - owned) / freeProduction);
     } else {
         if (timeToChange === Infinity) throw new Error("Infinite price???");
-        return timeToChange + getTicksToEnough(price, getFutureReservations(reserved, timeToChange), owned + freeProduction * timeToChange)
+        if (timeToChange >= timeLimit) return Infinity;
+        return timeToChange + getTicksToEnough(price, getFutureReservations(reserved, timeToChange), owned + freeProduction * timeToChange, forSteel, timeLimit - timeToChange)
     }
 }
 getResourcesToReserve = (effectivePrices, ticksNeeded, reserved) => {
-    var isLimitingResource = price => !canAffordOne(price, reserved) && getTicksToEnough(price, reserved) >= ticksNeeded;
+    var isLimitingResource = price => !canAffordOne(price, reserved) && getTicksToEnough(price, reserved, undefined, undefined, ticksNeeded) >= ticksNeeded;
 
     //this is probably wrong in the case of items costing steel + iron/plate, but atm this is just some upgrades so don't bother
     var needSteel = effectivePrices.some(price => price.name === "steel");
