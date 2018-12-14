@@ -2165,6 +2165,7 @@ fastForwardTicks = ticks => {
     var realWorkshopUpdate = null;
     var realResPoolUpdate = null;
     var realBldUpdate = null;
+    var realResConsHack = null;
     if (ticks >= 8) {
         //workshop update handles engineers, resource max bonus from compendium/etc
         game.workshop.update(ticks);
@@ -2186,11 +2187,15 @@ fastForwardTicks = ticks => {
         //do it once, and factor in the convertion in the resource adding loop
         //could improve magnetos/reactor handling (deactivate all magnetos, be able to reactivate magentos/reactors)
         realBldUpdate = game.bld.update;
+        //brings the resources' values up to their maxima
+        //need to not do this to prevent resources going above their maxima; correct value already factored into resources added
+        realResConsHack = game.resPool.resConsHackForResTable;
         //don't fast forward bld; that just does automation and jams it
         //don't fast forward village; kittens can't die, skill learning is wrong, misc housekeeping is not done
         game.workshop.update = () => undefined;
         game.resPool.update = () => undefined;
         game.bld.update = () => undefined;
+        game.resPool.resConsHackForResTable = () => undefined;
     }
     try {
         for (var i = 0; i < ticks; i++) { 
@@ -2208,6 +2213,7 @@ fastForwardTicks = ticks => {
             game.workshop.update = realWorkshopUpdate;
             game.resPool.update = realResPoolUpdate;
             game.bld.update = realBldUpdate;
+            game.resPool.resConsHackForResTable = realResConsHack;
         }
     }
 }
