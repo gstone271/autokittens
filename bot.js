@@ -195,11 +195,8 @@ getNextQueuedJob = () => {
 }
 assignNewKittenJob = () => {
     var job = getNextQueuedJob();
-    //it's actually possible to cheat and click on a button that hasn't been revealed yet
-    withTab("Village", () => {
-        getJobButton(job).click();
-        log("Assigned new kitten to " + job);
-    });
+    increaseJob(job);
+    log("Assigned new kitten to " + job);
     recountKittens(job);
 }
 reassignAllJobs = () => {
@@ -208,8 +205,8 @@ reassignAllJobs = () => {
         var job = getNextQueuedJob();
         goalJobs[job] = (goalJobs[job] || 0) + 1;
     }
-    console.log(goalJobs)
-    withTab("Village", () => {
+    console.log(goalJobs);
+    doReassignment = () => {
         Object.keys(goalJobs).forEach(jobName => {
             var toReduce = getJobCounts().find(job => job.name == jobName).val - goalJobs[jobName];
             for (var i = 0; i < toReduce; i++) {
@@ -217,8 +214,6 @@ reassignAllJobs = () => {
                 decreaseJob(jobName);
             }
         });
-    })
-    withTab("Village", () => {
         Object.keys(goalJobs).forEach(jobName => {
             var toIncrease = goalJobs[jobName] - getJobCounts().find(job => job.name == jobName).val;
             for (var i = 0; i < toIncrease; i++) {
@@ -226,7 +221,12 @@ reassignAllJobs = () => {
                 increaseJob(jobName);
             }
         });
-    })
+    }
+    if (state.api) {
+        doReassignment();
+    } else {
+        withTab("Village", doReassignment);
+    }
 }
 countTicks = () => {
     var ticksPassed = game.ticks - state.ticks;
@@ -1106,9 +1106,7 @@ preventStarvation = () => {
         state.temporaryFarmers++;
     } else if (state.temporaryFarmers > 0 && getResourceOwned("catnip") > getWinterCatnipStockNeeded(true, -game.village.catnipPerKitten + getResourcePerTickPerKitten("catnip", "farmer") * 1.65, false)) {
         log("Returning a farmer to work");
-        withTab("Village", () => {
-            decreaseJob("farmer");
-        });
+        decreaseJob("farmer");
         state.temporaryFarmers--;
         assignNewKittenJob();
     }
@@ -1120,9 +1118,10 @@ setAutoFarmer = auto => {
 /************** 
  * Jobs
 **************/
+//could simply use the 'value' field in the job, which is the cached count
 getJobCounts = () => {
     return game.village.jobs.map(job => ({
-        name: job.name, 
+        name: job.name,
         val: game.village.sim.kittens.filter(kitten => kitten.job === job.name).length
     }));
 }
@@ -1130,14 +1129,37 @@ getJobLongName = jobName => jobName && game.village.jobs.find(job => job.name ==
 getJobShortName = jobLongName => game.village.jobs.find(job => job.title === jobLongName).name;
 getJobButton = jobName => findButton(getJobLongName(jobName));
 //decrease button uses en dash (–), not hyphen (-)
-decreaseJob = jobName => getJobButton(jobName).find('a:contains("[–]")')[0].click();
+decreaseJob = jobName => {
+    if (state.api) {
+        if (game.village.jobs.find(job => job.name === jobName).value > 0) {
+            game.village.sim.removeJob(jobName);
+        }
+    } else {
+        withTab("Village", () => getJobButton(jobName).find('a:contains("[–]")')[0].click());
+    }
+}
 //when we decrease a job, other job big buttons don't become immediately enabled; instead click the +
-increaseJob = jobName => getJobButton(jobName).find('a:contains("[+]")')[0].click();
+increaseJob = jobName => {
+    if (state.api) {
+        game.village.assignJob(game.village.jobs.find(job => job.name === jobName));
+    } else {
+        withTab("Village", () => getJobButton(jobName).find('a:contains("[+]")')[0].click());
+    }
+}
+optimizeJobs = () => {
+    if (game.workshop.get("register").researched) {
+        if (state.api) {
+            game.village.optimizeJobs();
+        } else {
+            withTab("Village", () => findButton("Manage Jobs").click());
+        }
+    }
+}
 isJobEnabled = jobName => game.village.jobs.find(job => job.name === jobName).unlocked;
 switchToJob = jobName => {
     var jobReduced = null;
     if (isJobEnabled(jobName)) {
-        withTab("Village", () => {
+        performSwitch = () => {
             if (game.village.isFreeKittens() && state.populationIncrease) {
                 recountKittens(jobName);
             }
@@ -1150,11 +1172,14 @@ switchToJob = jobName => {
             }
             if (game.village.isFreeKittens()) {
                 increaseJob(jobName);
-                if (game.workshop.get("register").researched) {
-                    findButton("Manage Jobs").click();
-                }
+                optimizeJobs();
             }
-        });
+        }
+        if (state.api) {
+            performSwitch();
+        } else {
+            withTab("Village", performSwitch);
+        }
     } else {
         console.error("Job " + jobName + " not unlocked yet!");
     }
@@ -3026,8 +3051,6 @@ buy script (-> genetic algorithm)
 --master plan mode
 ----separate state and config variables
 ----goals: concrete, moon, eludium, beyond
-----big queue of jobs, techs, upgrades
-------techs and upgrades built from (queue slots since unlock, isBought)
 ----handle queued items whose resources have no production
 ------require effective production > 0 || enough supply already
 --------might need to improve effective production calculation
@@ -3089,9 +3112,4 @@ allow buying stuff with cost between safe storage and actual storage
 --when all resources are close to full, allow them to become completely full
 can't get religion bonus while on religion tab
 selling buildings isn't noticed
-
-performance:
-preventStarvation: fix starvation detection
-do bld.update only once, at end of tick
-use kittens.update.fastforward?
 */
