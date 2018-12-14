@@ -1062,6 +1062,10 @@ getExpectedCatnipBeforeWinter = () => {
     return getTrueResourcePerTick("catnip") * ticksLeftInSeason()
         + (2 - game.calendar.season) * getSeasonalCatnipProduction(1) * ticksPerSeason();
 }
+getExpectedAnnualCatnip = (additionalConsumption) => {
+    if (!additionalConsumption) additionalConsumption = 0;
+    return (getSeasonalCatnipProduction(1.5) + 2 * getSeasonalCatnipProduction(1) + getSeasonalCatnipProduction(.25) - 4 * additionalConsumption) * ticksPerSeason()
+}
 getWinterCatnipStockNeeded = (isCold, additionalConsumption, ignorePopulationIncrease) => {
     if (!additionalConsumption) additionalConsumption = 0;
     //we could base this off actual kitten capacity, but if the kittens have already starved we might just need to let them starve
@@ -1104,11 +1108,16 @@ preventStarvation = () => {
             state.jobQueue.unshift(jobReduced);
         }
         state.temporaryFarmers++;
-    } else if (state.temporaryFarmers > 0 && getResourceOwned("catnip") > getWinterCatnipStockNeeded(true, -game.village.catnipPerKitten + getResourcePerTickPerKitten("catnip", "farmer") * 1.65, false)) {
-        log("Returning a farmer to work");
-        decreaseJob("farmer");
-        state.temporaryFarmers--;
-        assignNewKittenJob();
+    } else if (state.temporaryFarmers > 0) {
+        //unassign farmers once you can accommodate an additional kitten and still not need a farmer
+        var additionalConsumption = -game.village.catnipPerKitten + getResourcePerTickPerKitten("catnip", "farmer") * baseSkillRatioAtMaxLevel;
+        if (getResourceOwned("catnip") > getWinterCatnipStockNeeded(true, additionalConsumption, false)
+            && getExpectedAnnualCatnip(additionalConsumption) > 0) {
+                log("Returning a farmer to work");
+                decreaseJob("farmer");
+                state.temporaryFarmers--;
+                assignNewKittenJob();
+        }
     }
 }
 setAutoFarmer = auto => {
