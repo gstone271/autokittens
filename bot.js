@@ -1533,7 +1533,9 @@ goalAchieved = () => {
 }
 calculateFitness = () => {
     if (goalAchieved()) {
-        return 3000 + 4000 * (gaTimeLimit - game.calendar.year) + Math.round(10 * (400 - game.calendar.day));
+        var timeLimitTicks = 4000 * gaTimeLimit;
+        var totalTicks = 4000 * game.calendar.year + Math.round((100 * game.calendar.season + game.calendar.day) / game.calendar.dayPerTick)
+        return 3000 + timeLimitTicks - totalTicks;
     } else {
         return 20 * Object.values(game.science.metaCache).filter(x => x.researched).length
             + 5 * game.village.sim.getKittens()
