@@ -112,6 +112,7 @@ removeOne = (arr, match) => {
         }
     });
 }
+setAddAll = (dest, src) => src.forEach(dest.add.bind(dest));
 
 /************** 
  * Main Loop
@@ -284,13 +285,20 @@ Reservations = class {
     }
     clone() { return new Reservations(this.reserved) }
 };
-getTimeToChange = reservations => {
-    return Math.ceil(Math.min(...Object.entries(reservations.reserved).map(entry => {
-        var resource = entry[0];
-        var reservation = entry[1];
-        if (reservation.total <= reservation.current) return Infinity;
-        return (reservation.total - reservation.current) / reservation.production;
-    })))
+getTimeToChange = (resource, reservations) => {
+    var ingredients = ingredientsMap[resource] || new Set();
+    return Math.ceil(Math.min(
+        ...Object.entries(reservations.reserved)
+            .filter(entry => {
+                var reservedResource = entry[0];
+                return reservedResource == resource || ingredients.has(reservedResource);
+            })
+            .map(entry => {
+                var reservation = entry[1];
+                if (reservation.total <= reservation.current) return Infinity;
+                return (reservation.total - reservation.current) / reservation.production;
+            })
+    ))
 }
 getFutureReservations = (reservations, ticksPassed) => {
     return new Reservations(Object.fromEntries(Object.entries(reservations.reserved).map(entry => {
@@ -366,7 +374,7 @@ getTicksToEnough = (price, reserved, owned, forSteel) => {
         }
     }
     //maybe optimize this to reduce the total number of calls to getFutureReservations (easily cached)
-    var timeToChange = getTimeToChange(reserved);
+    var timeToChange = getTimeToChange(price.name, reserved);
     var baseProduction = getCraftingResourcePerTick(price.name, reserved, forSteel);
     var freeProduction; //production not reserved at all
     var reservedForShortageProduction; //production reserved for a "current" reservation
@@ -775,6 +783,30 @@ buyItemMultiple = (button, amount) => {
 sacrificeMultiple = (button, amount) => button.controller.sacrifice(button.model, amount)
 refineMultiple = (button, amount) => button.controller._refine(button.model, amount)
 recipeMap = arrayToObject(game.workshop.crafts.map(data => new Recipe(data)), "name");
+getIngredientsMap = (recipeMap) => {
+    var ingredientsMap = {};
+    Object.values(recipeMap).forEach(recipe => {
+        ingredientsMap[recipe.name] = ingredientsMap[recipe.name] || new Set();
+        //add child ingredients
+        recipe.prices.forEach(price => {
+            var ingredient = price.name;
+            ingredientsMap[recipe.name].add(ingredient);
+            if (ingredientsMap[ingredient]) {
+                setAddAll(ingredientsMap[recipe.name], ingredientsMap[ingredient])
+            }
+        })
+        //add ingredients to parents
+        Object.values(ingredientsMap).forEach(ingredients => {
+            if (ingredients.has(recipe.name)) {
+                setAddAll(ingredients, ingredientsMap[recipe.name]);
+            }
+        })
+    })
+    return ingredientsMap;
+}
+//maps resources to all the resources needed to craft them
+//could extend this to include the total price of those ingredients, but would need to be updated if prices change
+ingredientsMap = getIngredientsMap(recipeMap);
 loadUnicornRecipes = () => {
     if (!recipeMap["tears"] && game.bld.get("ziggurat").val) {
         withTab("Religion", () => {
@@ -790,6 +822,7 @@ loadUnicornRecipes = () => {
                     () => 1 + game.getEffect("relicRefineRatio") * game.religion.getZU("blackPyramid").val, refineMultiple),
             ], "name");
             Object.assign(recipeMap, unicornRecipes);
+            ingredientsMap = getIngredientsMap(recipeMap);
         });
     }
 }
