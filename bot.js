@@ -449,24 +449,39 @@ subtractUnreserved = (reserved, bought) => {
 tryBuy = (priorities) => {
     var bought = [];
     var reservationsBought = {};
-    priorities.forEach(plan => {
-        var bld = plan.bld;
-        var reserved = subtractUnreserved(plan.reserved, reservationsBought);
-        var prices = bld.getPrices();
-        craftAdditionalNeeded(prices, reserved);
-        if (canAfford(prices, reserved)) {
-            var numBought = bld.buy(reserved);
-            if (numBought === undefined) numBought = 1;
-            if (numBought) {
-                if (!bld.silent) log("Buying " + bld.name, bld.quiet);
-                if (!bld.noLog) logBuy(bld, numBought);
-                bought = bought.concat([bld]);
-                //unreserve resources -- makes trading not have as many log entries
-                prices.forEach(price => reservationsBought[price.name] = (reservationsBought[price.name] || 0) + price.val);
+    var realRender = null;
+    if (state.api) {
+        realRender = game.render;
+        game.render = () => undefined;
+    }
+    try {
+        priorities.forEach(plan => {
+            var bld = plan.bld;
+            var reserved = subtractUnreserved(plan.reserved, reservationsBought);
+            var prices = bld.getPrices();
+            craftAdditionalNeeded(prices, reserved);
+            if (canAfford(prices, reserved)) {
+                var numBought = bld.buy(reserved);
+                if (numBought === undefined) numBought = 1;
+                if (numBought) {
+                    if (!bld.silent) log("Buying " + bld.name, bld.quiet);
+                    if (!bld.noLog) logBuy(bld, numBought);
+                    bought = bought.concat([bld]);
+                    //unreserve resources -- makes trading not have as many log entries
+                    prices.forEach(price => reservationsBought[price.name] = (reservationsBought[price.name] || 0) + price.val);
+                }
+            }
+        });
+        return bought;
+    } finally {
+        if (realRender) {
+            game.render = realRender;
+            if (state.renderNeeded) {
+                state.renderNeeded = false;
+                game.render();
             }
         }
-    });
-    return bought;
+    }
 }
 updateQueue = (queue, bought) => {
     return queue.filter(bld => !bought.includes(bld)).concat(bought.filter(bld => !bld.once));
@@ -1642,6 +1657,14 @@ DataQueable = class extends Queueable {
     }
     getData() {
         throw new Error("Needs to be overridden");
+    }
+    buy(reserved) {
+        var result = super.buy(reserved);
+        if (result && (!this.data.val || this.data.val <= 1) && state.api) {
+            //first buy might create new tabs; do a full render
+            state.renderNeeded = true;
+        }
+        return result;
     }
     getPrices() {
         return multiplyPrices(this.data.prices, Math.pow(this.data.priceRatio || 1, this.data.val || 0));
