@@ -40,12 +40,13 @@ def runOneComputer(hostname, genomes, postfix=""):
         pickle.dump(genomes, genome_file)
     thisCompStartTime = time.time()
     try:
-        subprocess.run(["ssh", "-q", hostname, f"bash -c '. ~/cs541ve/bin/activate; nice -n 5 python3 ~/simba/ai/scotty.py {hostname}{postfix} 2>>~/simba/ai/logs/{startTime}/errors.log'"], stderr=DEVNULL, check=True, timeout=(60 * 25))
+        subprocess.run(["ssh", "-4", hostname, f"bash -c '. ~/cs541ve/bin/activate; nice -n 5 python3 ~/simba/ai/scotty.py {hostname}{postfix} 2>>~/simba/ai/logs/{startTime}/errors.log'"], check=True, timeout=(60 * 25))
         fitness_file = open(hostF, 'rb')
         fitnesses = pickle.load(fitness_file)
         return fitnesses
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
-        print(f"Warning: {hostname} job failed:", err)
+        if (isinstance(err, subprocess.TimeoutExpired)):
+            print(f"Warning: {hostname} timed out")
         if hostname == backupComputer or (time.time() - thisCompStartTime) > 100:
             return [0] * len(genomes)
         else:
