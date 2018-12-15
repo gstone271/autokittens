@@ -9,6 +9,7 @@ import os
 import os.path
 import re
 import selenium
+from urllib3.exceptions import HTTPError
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
@@ -63,14 +64,14 @@ def run_browser(simbaSettings, displayPage=False): #Runs the chrome browser
         if displayPage:
             print(re.sub(r'\n[\s]*\n', '\n', driver.find_element_by_tag_name('html').text))
         return result
-    except WebDriverException as ex:
+    except (WebDriverException, HTTPError) as ex:
         print("Warning: Selenium run failed:", ex, file=sys.stderr)
         return 0
     finally:
         try:
             if driver:
                 driver.close() #Closes everything: Simba and kittens game
-        except WebDriverException:
+        except (WebDriverException, HTTPError):
             print("Warning: Chrome did not close promptly", file=sys.stderr)
 
 def main(argv): #Used for testing. Import file as a module and call run browser
