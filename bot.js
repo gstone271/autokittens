@@ -1611,6 +1611,7 @@ calculateFitness = () => {
             "harbor": 2/3,
             "warehouse": 1/2,
             "barn": 1/2,
+            "mansion": 0, //already get points for more kittens, don't overbuild these
             "oilWell": game.space.getProgram("orbitalLaunch").val ? 4 : 1,
         }
         return 20 * Object.values(game.science.metaCache).filter(x => x.researched).length
