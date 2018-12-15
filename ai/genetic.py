@@ -95,6 +95,8 @@ class GeneralizedBeamSearch:
             print("Value:", scored[0][0])
             self.printInfo(scored[0][2])
             print(scored[0][2])
+        with open(f'./logs/{captain.startTime}/gen_{iterations}', 'wb') as genomeDump:
+            pickle.dump(scored, genomeDump)
         return scored[0][0]
 
     def printInfo(self, gen): pass
@@ -191,7 +193,7 @@ def kittensTrial(j):
         if len(sys.argv) > 2 and sys.argv[2] == "rescore":
             unscored_population = [ (fresh, gen) for (fitness, fresh, gen) in population ]
             population = kittensProblem.scoreAll(unscored_population)
-    return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 100, j == 0)
+    return kittensProblem.run(population, temperatureSchedule0, mutationSchedule, 1/3, 0/2, 2000, j == 0)
 
 # Turns a genome into a save file that Simba can understand and import
 # Call Simba's importSaveDecompressed on the return value of this function
