@@ -348,9 +348,14 @@ getTicksNeededPerPrice = (effectivePrices, reserved) => {
         var price = pricesToCalculate.splice(priceIdx, 1)[0];
         if (getEffectiveResourcePerTick(price.name) === 0) {
             if (canCraft(price.name)) {
-                ticksNeededPerPrice[price.name] = Math.max(
+                var worstIngredientTicks = Math.max(
                     ...getCraftPrices(price.name).map(subPrice => ticksNeededPerPrice[subPrice.name])
                 );
+                if (isNaN(worstIngredientTicks)) {
+                    console.error([effectivePrices, pricesToCalculate, price]);
+                    throw new Error("Got NaN ticks needed");
+                }
+                ticksNeededPerPrice[price.name] = worstIngredientTicks;
             } else {
                 ticksNeededPerPrice[price.name] = Infinity;
             }
