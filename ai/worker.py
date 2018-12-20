@@ -77,9 +77,16 @@ def run_browser(simbaSettings, displayPage=False): #Runs the chrome browser
 def main(argv): #Used for testing. Import file as a module and call run browser
     #defaultSettings = '{"queue": [{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Hut","tab":"Bonfire","panel":""},{"name":"Barn","tab":"Bonfire","panel":""},{"name":"Library","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Hut","tab":"Bonfire","panel":""},{"name":"Barn","tab":"Bonfire","panel":""},{"name":"Library","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Hut","tab":"Bonfire","panel":""},{"name":"Barn","tab":"Bonfire","panel":""},{"name":"Library","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Hut","tab":"Bonfire","panel":""},{"name":"Barn","tab":"Bonfire","panel":""},{"name":"Library","tab":"Bonfire","panel":""},{"name":"Catnip field","tab":"Bonfire","panel":""},{"name":"Hut","tab":"Bonfire","panel":""},{"name":"Barn","tab":"Bonfire","panel":""},{"name":"Library","tab":"Bonfire","panel":""}], "jobQueue": [], "geneticAlgorithm": true, "speed": 8192, "disableTimeskip": true, "desiredTicksPerLoop": 16, "running": true}'
     import genetic
-    defaultSettings = genetic.toSimbaSettings(genetic.KittensProblem(genetic.allQueueables, len(genetic.allQueueables) * 3).randomGenome())
-    print(defaultSettings)
-    print(run_browser(defaultSettings, True))
+    if (len(argv) >= 2):
+        import pickle
+        generation = pickle.load(open(argv[1], "rb"))
+        genome = generation[0][2]
+    else:
+        genome = genetic.KittensProblem(genetic.allQueueables, len(genetic.allQueueables) * 3).randomGenome()
+    defaultSettings = genetic.toSimbaSettings(genome)
+    if (len(argv) < 2):
+        print(defaultSettings)
+    print(run_browser(defaultSettings, len(argv) <= 1))
 
 if __name__ == '__main__':
     main(sys.argv)

@@ -3,3 +3,4 @@ ai/compFitness/*
 *.swp
 *.log
 ai/logs/*
+*__pycache__*
