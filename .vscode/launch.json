@@ -10,7 +10,7 @@
             "name": "Launch Chrome against localhost",
             "url": "http://localhost:8080",
             "webRoot": "${workspaceFolder}",
-            "file": "${workspaceRoot}/index.html",
+            "file": "${workspaceRoot}/../kitten-game/index.html",
             "runtimeArgs": [
                 //we want to inject javascript cross-origin
                 "--disable-web-security",

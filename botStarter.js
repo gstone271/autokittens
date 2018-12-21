@@ -1,17 +1,22 @@
 console.log("Waiting for document")
-botAdded = false;
-botInterval = 0;
-botSave = undefined;
-gameSave = undefined;
+var botScript = document.createElement("script");
+botScript.type = "text/javascript";
+botScript.src = location.href + "/../../simba/bot.js";
+var botAdded = false;
+var botInterval = 0;
+var botSave = "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";
+var gameSave = undefined;
+var pause = true;
 addBot = () => {
     if (window.gamePage && !botAdded) {
         if (gameSave) {
             console.log("Importing saved game")
             game.saveImportDropboxText(gameSave, () => {})
         }
+        if (pause) game.togglePause();
         if (botSave) {
             console.log("Importing saved bot state")
-            localStorage.setItem("autokittens.state", botSave)
+            localStorage.setItem("simba.state", botSave)
         }
         console.log("Adding bot")
         document.body.appendChild(botScript);
@@ -22,7 +27,7 @@ addBot = () => {
         clearInterval(botInterval);
     }
 }
-document.body.onload = () => {
+load = () => {
     console.log("Waiting for game loaded")
     botInterval = setInterval(addBot, 100);
     addBot();
@@ -31,4 +36,10 @@ document.body.onload = () => {
         realInitGame();
         addBot();
     }
+}
+if (initGame) {
+    load();
+} else {
+    console.log("readyState: " + document.readyState)
+    document.body.onload = load;
 }
