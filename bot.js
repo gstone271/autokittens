@@ -346,7 +346,9 @@ getTicksNeededPerPrice = (effectivePrices, reserved) => {
             throw new Error("Loop in crafting recipes, or missing effective price for ingredient");
         }
         var price = pricesToCalculate.splice(priceIdx, 1)[0];
-        if (getEffectiveResourcePerTick(price.name) === 0) {
+        if (canAffordOne(price, reserved)) {
+            ticksNeededPerPrice[price.name] = 0;
+        } else if (getEffectiveResourcePerTick(price.name) === 0) {
             if (canCraft(price.name)) {
                 var worstIngredientTicks = Math.max(
                     ...getCraftPrices(price.name).map(subPrice => ticksNeededPerPrice[subPrice.name])
