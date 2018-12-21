@@ -251,6 +251,14 @@ countTicks = () => {
 /************** 
  * Queue Logic
 **************/
+/*
+ * TODO reimagine Reservations:
+ * each reservation is a time in the future, plus the amount of the resource needed at that time
+ * each resource has many reservations
+ * current reservation is the max of the total amounts of resource needed by a time, minus production over that time
+ * production reservation is the max of the rate of produciton needed to produce the difference between current and total reservation by a time
+ * bonus points: separate reservations-for-itself and reservations-for-mixtures to avoid reserving production multiple times
+*/
 Reservations = class {
     constructor(initialReserved) {
         this.reserved = Object.fromEntries(Object.entries(initialReserved).map(entry => [entry[0], Object.assign({}, entry[1])]));
@@ -277,6 +285,9 @@ Reservations = class {
         } else if (maxOverTime >= val) {
             productionNeeded = val / ticks;
             currentNeeded = 0;
+            if (productionNeeded === 0) {
+                val = 0;
+            }
         } else {
             productionNeeded = productionAvailable;
             currentNeeded = val - maxOverTime;
@@ -332,109 +343,79 @@ getEffectivePrices = (prices, reserved) => {
     }
     return Object.entries(totalPricesMap).map(price => ({name: price[0], val: price[1]}))
 }
-getTicksNeededPerPrice = (effectivePrices, reserved) => {
-    var pricesToCalculate = Array.from(effectivePrices);
+getTicksNeededPerPrice = (prices, reserved) => {
+    var pricesToCalculate = Array.from(prices);
+    var pricesLookup = Object.fromEntries(prices.map(price => [price.name, price.val]));
+    var hasSteel = prices.some(price => price.name === "steel");
     var ticksNeededPerPrice = {};
+    var ticksSoFar = 0;
+    var currentReserved = reserved;
+    var resOwned = res => getResourceOwned(res) + ticksSoFar * getEffectiveResourcePerTick(res);
+    var resOwnedForCraftTo = target => (res => resOwned(res) - (res === target ? 0 : (pricesLookup[res] || 0)));
+    var craftAvailable = res => getCraftAvailable(res, currentReserved, resOwnedForCraftTo(res));
     while (pricesToCalculate.length) {
-        var priceIdx = pricesToCalculate.findIndex(price => 
-            !canCraft(price.name)
-            || getCraftPrices(price.name).every(subPrice => ticksNeededPerPrice[subPrice.name] !== undefined)
-        );
-        if (priceIdx === -1) {
-            console.error(pricesToCalculate);
-            console.error(ticksNeededPerPrice);
-            throw new Error("Loop in crafting recipes, or missing effective price for ingredient");
-        }
-        var price = pricesToCalculate.splice(priceIdx, 1)[0];
-        if (canAffordOne(price, reserved)) {
-            ticksNeededPerPrice[price.name] = 0;
-        } else if (getEffectiveResourcePerTick(price.name) === 0) {
-            if (canCraft(price.name)) {
-                var worstIngredientTicks = Math.max(
-                    ...getCraftPrices(price.name).map(subPrice => ticksNeededPerPrice[subPrice.name])
-                );
-                if (isNaN(worstIngredientTicks)) {
-                    console.error([effectivePrices, pricesToCalculate, price]);
-                    throw new Error("Got NaN ticks needed");
-                }
-                ticksNeededPerPrice[price.name] = worstIngredientTicks;
-            } else {
-                ticksNeededPerPrice[price.name] = Infinity;
+        var fastestTimeToChange = Infinity;
+        pricesToCalculate = pricesToCalculate.filter(price => {
+            if (craftAvailable(price.name) >= price.val) {
+                ticksNeededPerPrice[price.name] = ticksSoFar;
+                return false;
             }
+            var timeToChange = getTimeToChange(price.name, currentReserved);
+            var waitForChange = () => {
+                if (timeToChange < Infinity) {
+                    fastestTimeToChange = Math.min(fastestTimeToChange, timeToChange);
+                    return true;
+                } else {
+                    ticksNeededPerPrice[price.name] = Infinity;
+                    return false;
+                }
+            }
+            var forSteel = price.name === "coal" || price.name === "iron" && hasSteel;
+            var baseProduction = getCraftingResourcePerTick(price.name, currentReserved, forSteel);
+            if (baseProduction <= 0) {
+                return waitForChange();
+            }
+            //this seems too complicated, maybe if Reservations was redesigned this would be simpler
+            if (currentReserved.get(price.name).current > resOwned(price.name)) {
+                timeToChange = Math.min(timeToChange,
+                    Math.ceil((currentReserved.get(price.name).current - resOwned(price.name)) / baseProduction));
+                return waitForChange();
+            } else {
+                var freeProduction = Math.max(0, baseProduction - currentReserved.get(price.name).production);
+                var ticksToEnough = (price.val - craftAvailable(price.name)) / freeProduction;
+                if (ticksToEnough <= timeToChange) {
+                    ticksNeededPerPrice[price.name] = ticksSoFar + ticksToEnough;
+                    return false;
+                } else {
+                    return waitForChange();
+                }
+            }
+        });
+        if (fastestTimeToChange === Infinity) {
+            pricesToCalculate.forEach(price => ticksNeededPerPrice[price.name] = Infinity);
+            pricesToCalculate = [];
         } else {
-            var forSteel = price.name === "coal" || price.name === "iron" && effectivePrices.some(price => price.name === "steel");
-            ticksNeededPerPrice[price.name] = getTicksToEnough(price, reserved, undefined, forSteel);
+            ticksSoFar += fastestTimeToChange;
+            currentReserved = getFutureReservations(reserved, fastestTimeToChange);
         }
     }
     return ticksNeededPerPrice;
 }
-getTicksNeeded = (ticksPerPrice, originalPrices) => {
-    return Math.max(0, ...originalPrices.map(price => ticksPerPrice[price.name]));
+getTicksNeeded = (ticksPerPrice) => {
+    return Math.max(0, ...Object.values(ticksPerPrice));
 }
 reserveBufferTime = game.rate * 60 * 5; //5 minutes: reserve enough of non-limiting resources to be this far ahead of the limiting resource
 bufferTicksNeeded = ticksNeeded => Math.max(0, ticksNeeded - reserveBufferTime);
-canAffordOne = (price, reserved) => price.val <= 0 || getResourceOwned(price.name) - (reserved ? reserved.get(price.name).current : 0) >= price.val;
-canAfford = (prices, reserved) => prices.every(price => canAffordOne(price, reserved));
-//ticks until you have enough. May be infinite.
-getTicksToEnough = (price, reserved, owned, forSteel, timeLimit) => {
-    if (timeLimit === undefined) timeLimit = Infinity;
-    if (owned === undefined) {
-        if (price.name === "iron" && state.autoSteel && !forSteel) {
-            //this might be negative; that's ok
-            owned = getResourceOwned(price.name) - getResourceOwned("coal");
-        } else {
-            owned = getResourceOwned(price.name);
-        }
-    }
-    if (owned - reserved.get(price.name).current >= price.val || price.val <= 0) {
-        return 0;
-    }
-    if (getEffectiveResourcePerTick(price.name) === 0) {
-        if (canCraft(price.name)) {
-            var ingredients = getIngredientsNeeded({name: price.name, val: price.val + reserved.get(price.name).current - owned});
-            var ingredientForSteel = state.autoSteel && price.name === "steel";
-            if (ingredientForSteel) {
-                //autoSteel ignores reservations
-                //ugh way too much special case logic for this
-                reserved = new Reservations({});
-            }
-            //more accurate calculation for crafted resources with no production
-            //still inaccurate for manuscript once you have printing press, but at least this special case is the common case for crafts
-            return Math.max(...ingredients.map(ingredientPrice => getTicksToEnough(ingredientPrice, reserved, undefined, ingredientForSteel, timeLimit)))
-        } else {
-            //just a performance improvement
-            return Infinity;
-        }
-    }
-    //maybe optimize this to reduce the total number of calls to getFutureReservations (easily cached)
-    var timeToChange = getTimeToChange(price.name, reserved);
-    var baseProduction = getCraftingResourcePerTick(price.name, reserved, forSteel);
-    var freeProduction; //production not reserved at all
-    var reservedForShortageProduction; //production reserved for a "current" reservation
-    //this seems too complicated, maybe if Reservations was redesigned this would be simpler
-    if (reserved.get(price.name).current > owned) {
-        //just ignore negative production, it won't last forever. needed to prevent infinite loop
-        reservedForShortageProduction = Math.max(0, baseProduction);
-        freeProduction = 0;
-        timeToChange = Math.min(timeToChange, Math.ceil((reserved.get(price.name).current - owned) / reservedForShortageProduction));
-    } else {
-        reservedForShortageProduction = 0;
-        freeProduction = baseProduction - reserved.get(price.name).production;
-    }
-    if (freeProduction <= 0) {
-        //all production is reserved
-        if (timeToChange >= timeLimit) return Infinity;
-        return timeToChange + getTicksToEnough(price, getFutureReservations(reserved, timeToChange), owned + reservedForShortageProduction * timeToChange, forSteel, timeLimit - timeToChange);
-    } else if (freeProduction * timeToChange + owned - reserved.get(price.name).current >= price.val) {
-        return Math.ceil((price.val + reserved.get(price.name).current - owned) / freeProduction);
-    } else {
-        if (timeToChange === Infinity) throw new Error("Infinite price???");
-        if (timeToChange >= timeLimit) return Infinity;
-        return timeToChange + getTicksToEnough(price, getFutureReservations(reserved, timeToChange), owned + freeProduction * timeToChange, forSteel, timeLimit - timeToChange)
-    }
-}
 getResourcesToReserve = (effectivePrices, ticksPerPrice, ticksNeeded, reserved) => {
-    var isLimitingResource = price => ticksPerPrice[price.name] >= ticksNeeded;
+    var isLimitingResource = price => {
+        if (ticksPerPrice[price.name]) {
+            return ticksPerPrice[price.name] >= ticksNeeded;
+        } else {
+            return Object.entries(ticksPerPrice).some(entry => 
+                canCraft(entry[0]) && ingredientsMap[entry[0]].has(price.name) && entry[1] >= ticksNeeded
+            );
+        }
+    }
 
     //this is probably wrong in the case of items costing steel + iron/plate, but atm this is just some upgrades so don't bother
     var needSteel = effectivePrices.some(price => price.name === "steel");
@@ -465,8 +446,8 @@ findPriorities = (queue, reserved) => {
             var unavailableResources = prices.map(price => price.name).filter(res => reserved.get(res).current > getResourceOwned(res));
             var viable = unavailableResources.length ? false : true;
             var effectivePrices = getEffectivePrices(prices, reserved);
-            var ticksPerPrice = getTicksNeededPerPrice(effectivePrices, reserved);
-            var realTicksNeeded = getTicksNeeded(ticksPerPrice, prices);
+            var ticksPerPrice = getTicksNeededPerPrice(prices, reserved);
+            var realTicksNeeded = getTicksNeeded(ticksPerPrice);
             var ticksNeeded = bufferTicksNeeded(realTicksNeeded);
             var toReserve = getResourcesToReserve(effectivePrices, ticksPerPrice, ticksNeeded, reserved);
             priorities.push({bld: found, reserved, viable, unavailable: unavailableResources, limiting: toReserve.limitingResources, ticksNeeded: realTicksNeeded, ticksPerPrice});
@@ -490,7 +471,7 @@ tryBuy = (priorities) => {
         game.render = () => undefined;
     }
     try {
-        priorities.forEach(plan => {
+        priorities.filter(plan => plan.ticksNeeded < Infinity).forEach(plan => {
             var bld = plan.bld;
             var reserved = subtractUnreserved(plan.reserved, reservationsBought);
             var prices = bld.getPrices();
@@ -678,6 +659,20 @@ var getIvoryPerHunt = () => {
     return maxResult / 2;
 }
 
+getResourceAvailable = (res, reserved, resOwned) => {
+    if (resOwned === undefined) resOwned = getResourceOwned;
+    return resOwned(res) - (reserved ? reserved.get(res).current : 0);
+}
+getCraftAvailable = (res, reserved, resOwned) => {
+    var available = getResourceAvailable(res, reserved, resOwned);
+    if (canCraft(res)) {
+        available += getMaxCraftValue(res, ingredient => getCraftAvailable(ingredient, reserved, resOwned));
+    }
+    return available;
+}
+canAffordOne = (price, reserved) => price.val <= 0 || getResourceAvailable(price.name, reserved) >= price.val;
+canAfford = (prices, reserved) => prices.every(price => canAffordOne(price, reserved));
+
 /************** 
  * Conversion
 **************/
@@ -862,6 +857,27 @@ getIngredientsMap = (recipeMap) => {
 //maps resources to all the resources needed to craft them
 //could extend this to include the total price of those ingredients, but would need to be updated if prices change
 ingredientsMap = getIngredientsMap(recipeMap);
+getIngredientsOrder = incredientsMap => {
+    var toOrder = game.resPool.resources.map(res => res.name);
+    var result = {};
+    var nextPlace = 0;
+    while (toOrder.length) {
+        var ingredientIndex = toOrder.findIndex(res => 
+            !incredientsMap[res]
+            || Array.from(incredientsMap[res]).every(subIngredient => result[subIngredient] !== undefined)
+        );
+        if (ingredientIndex === -1) {
+            throw new Error("Loop in crafting recipes");
+        }
+        var ingredient = toOrder.splice(ingredientIndex, 1);
+        result[ingredient] = nextPlace;
+        nextPlace++;
+    }
+    return result;
+}
+ingredientsOrder = getIngredientsOrder(ingredientsMap);
+//Sort prices in-place so that ingredients always come before their mixtures
+sortPrices = prices => prices.sort((a, b) => ingredientsOrder[a.name] - ingredientsOrder[b.name]);
 loadUnicornRecipes = () => {
     if (!recipeMap["tears"] && game.bld.get("ziggurat").val) {
         withTab("Religion", () => {
@@ -878,6 +894,7 @@ loadUnicornRecipes = () => {
             ], "name");
             Object.assign(recipeMap, unicornRecipes);
             ingredientsMap = getIngredientsMap(recipeMap);
+            ingredientsOrder = getIngredientsOrder(ingredientsMap);
         });
     }
 }
@@ -892,7 +909,12 @@ getCraftTableElem = () => {
     }
     return craftTableElem;
 }
-getAffordableAmount = prices => Math.min(...prices.map(price => Math.floor(getResourceOwned(price.name) / price.val)))
+getAffordableAmount = (prices, resOwned) => {
+    if (resOwned === undefined) resOwned = getResourceOwned;
+    return Math.max(0, Math.min(...prices.map(price => Math.floor(resOwned(price.name) / price.val))));
+}
+getMaxCraftTimes = (craft, resOwned) => getAffordableAmount(getCraftPrices(craft), resOwned);
+getMaxCraftValue = (craft, resOwned) => getMaxCraftTimes(craft, resOwned) * getCraftRatio(craft);
 findCraftAllButton = (name) => getCraftTableElem().children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("all")')[0]
 findCraftButtons = (name) => getCraftTableElem().children('div.res-row:contains("' + getResourceTitle(name) + '")').find('div.craft-link:contains("+")');
 craftFirstTime = name => {
@@ -928,7 +950,7 @@ findCraftButtonValues = (craft, craftRatio) => {
         return [{click: () => craftFirstTime(craft), times: 1, amount: craftRatio}]
     } else {
         var craftAllButton = findCraftAllButton(craft);
-        var craftAllTimes = getAffordableAmount(getCraftPrices(craft));
+        var craftAllTimes = getMaxCraftTimes(craft);
         return craftButtonRatios.filter(ratio => craftAllTimes >= ratio.min).map((ratio, idx) => {
             var craftTimes = Math.max(ratio.min, Math.floor(craftAllTimes * ratio.ratio))
             var craftAmount = craftTimes * craftRatio
