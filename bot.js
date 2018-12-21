@@ -113,6 +113,53 @@ removeOne = (arr, match) => {
     });
 }
 setAddAll = (dest, src) => src.forEach(dest.add.bind(dest));
+//cache all inputs/outputs to func until valid returns false, then clear the cache
+cached = (func, valid) => {
+    var caches = new Map();
+    return function() {
+        if (!valid()) {
+            caches = new Map();
+        }
+        //if called with (x, y, undefined), lookup the cache for just (x, y)
+        var definedArguments = arguments.length;
+        for (var i = arguments.length - 1; i >= 0; i--) {
+            if (arguments[i] === undefined) {
+                definedArguments--;
+            } else {
+                break;
+            }
+        }
+        //cache (x, y, z) in caches.get(3).get(x).get(y).get(z)
+        //have the first cache key be the number of defined arguments,
+        // to prevent conflict between cache for (x) and for (x, y)
+        var argValues = Array.of(definedArguments, ...arguments)
+        //lastKey is for the deepest cache, with the actual function value
+        var lastKey = argValues[definedArguments];
+        var cache = caches;
+        for (var i = 0; i < definedArguments; i++) {
+            var val = argValues[i];
+            if (!cache.has(val)) {
+                cache.set(val, new Map());
+            }
+            cache = cache.get(val);
+        }
+        if (cache.has(lastKey)) {
+            return cache.get(lastKey);
+        } else {
+            var result = func.apply(null, arguments);
+            cache.set(lastKey, result);
+            return result;
+        }
+    }
+}
+sameGameTickValidator = () => {
+    var cachedTicks = game.ticks;
+    return () => {
+        var valid = cachedTicks === game.ticks;
+        cachedTicks = game.ticks;
+        return valid;
+    };
+}
 
 /************** 
  * Main Loop
@@ -350,7 +397,7 @@ getTicksNeededPerPrice = (prices, reserved) => {
     var ticksNeededPerPrice = {};
     var ticksSoFar = 0;
     var currentReserved = reserved;
-    var resOwned = res => getResourceOwned(res) + ticksSoFar * getEffectiveResourcePerTick(res);
+    var resOwned = res => getResourceOwned(res) + ticksSoFar * getEffectiveResourcePerTickCached(res);
     var resOwnedForCraftTo = target => (res => resOwned(res) - (res === target ? 0 : (pricesLookup[res] || 0)));
     var craftAvailable = res => getCraftAvailable(res, currentReserved, resOwnedForCraftTo(res));
     while (pricesToCalculate.length) {
@@ -564,7 +611,7 @@ getSafeStorage = (res, autoCraftLevel, additionalProduction, forPurchase) => {
     //only relevant for purchases
     var expectedMissing = forPurchase && reverseCraftMap[res] ? reverseCraftMap[res] * 2/3 : Infinity;
     //production: amount of spare storage needed after resources is crafted away
-    var expectedProduction = autoCraftLevel * state.ticksPerLoop * (getEffectiveResourcePerTick(res, state.ticksPerLoop) + additionalProduction);
+    var expectedProduction = autoCraftLevel * state.ticksPerLoop * (getEffectiveResourcePerTickCached(res, state.ticksPerLoop) + additionalProduction);
     return max === Infinity ? max : max - Math.min(expectedProduction, expectedMissing);
 }
 haveEnoughStorage = (prices, reserved) => {
@@ -574,7 +621,7 @@ haveEnoughStorage = (prices, reserved) => {
 isResourceFull = (res, additionalProduction) => getResourceOwned(res) >= getSafeStorage(res, Math.max(state.autoCraftLevel, 1), additionalProduction);
 
 getCraftingResourcePerTick = (res, reserved, forSteel) => {
-    var resourcePerTick = getEffectiveResourcePerTick(res);
+    var resourcePerTick = getEffectiveResourcePerTickCached(res);
     if (canCraft(res)) {
         //special case steel: we always craft it
         var ignoreReservations = res === "steel" && state.autoSteel || !reserved;
@@ -634,8 +681,8 @@ getEffectiveResourcePerTick = (res, bestCaseTicks) => {
     }
     if ((res === "furs" || res === "ivory") && state.autoHunt) {
         var effectiveCatpowerPerTick = Math.max(0, 
-            getEffectiveResourcePerTick("manpower", bestCaseTicks)
-                - getEffectiveResourcePerTick("gold", bestCaseTicks) * 50 / 15
+            getEffectiveResourcePerTickCached("manpower", bestCaseTicks || undefined)
+                - getEffectiveResourcePerTickCached("gold", bestCaseTicks || undefined) * 50 / 15
         )
         resourcePerTick += (res === "furs" ? getFursPerHunt() : getIvoryPerHunt()) * effectiveCatpowerPerTick / 100;
     }
@@ -658,6 +705,7 @@ var getIvoryPerHunt = () => {
     var maxResult = 50 + 40 * getHuntRatio();
     return maxResult / 2;
 }
+getEffectiveResourcePerTickCached = cached(getEffectiveResourcePerTick, sameGameTickValidator());
 
 getResourceAvailable = (res, reserved, resOwned) => {
     if (resOwned === undefined) resOwned = getResourceOwned;
@@ -2735,7 +2783,7 @@ getIncreasedFaith = (praised, faithBonus, ticks) => {
     //try not to spend too much time on this math
     var maxIterations = 20;
     var ticksPerIteration = ticks / state.ticksPerLoop > maxIterations ? Math.ceil(ticks / maxIterations) : state.ticksPerLoop;
-    var baseFaithProduction = getEffectiveResourcePerTick("faith") / (1 + getFaithProductionBonus(praised));
+    var baseFaithProduction = getEffectiveResourcePerTickCached("faith") / (1 + getFaithProductionBonus(praised));
     var basePraisedProduction = baseFaithProduction * faithBonus;
     var totalPraised = praised;
     var totalIncreasedProduction = 0;
@@ -2762,8 +2810,8 @@ binarySearch = (lessThan, min, max, guess, maxIterations, precision) => {
 }
 displayFaithResetPayoff = () => {
     //TODO double check this
-    if (game.religion.faith >= game.religion.getRU("apocripha").faith && getEffectiveResourcePerTick("faith") > 0) {
-        var timeToMaxFaith = Math.ceil(getResourceMax("faith") / getEffectiveResourcePerTick("faith"))
+    if (game.religion.faith >= game.religion.getRU("apocripha").faith && getEffectiveResourcePerTickCached("faith") > 0) {
+        var timeToMaxFaith = Math.ceil(getResourceMax("faith") / getEffectiveResourcePerTickCached("faith"))
         var getFaithBonus = faithRatio => game.religion.getTriValueReligion(faithRatio);
         var bonusRatioGained = game.religion.getApocryphaResetBonus(1.01);
         var faithBonus = game.religion.getFaithBonus();
