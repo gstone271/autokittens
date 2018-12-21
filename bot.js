@@ -972,14 +972,16 @@ getEnoughResource = res => {
         return getSafeStorage(res);
     }
 }
-getEnoughCraft = res =>
+getEnoughCraft = res => {
+    var seen = new Set();
     state.queue
-        .filter((x, i, a) => x.isUnlocked() && a.findIndex(o => o.name == x.name) == i)
+        .filter(x => x.isUnlocked() && !seen.has(x) && seen.add(x))
         .map(bld => bld.getPrices())
         .concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched) //save some compendiums midgame
             .map(tech => tech.prices))
         .map(prices => getPrice(prices, res))
         .reduce((sum, val) => sum + val, 0)
+}
 autoCrafts = game.workshop.crafts
     //parchment is needed to spend culture and science autocrafting, and there's no other craft for furs
     .filter(craft => craft.prices.some(price => getResourceMax(price.name) < Infinity || craft.name === "parchment"))
