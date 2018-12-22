@@ -390,10 +390,10 @@ getEffectivePrices = (prices, reserved) => {
     }
     return Object.entries(totalPricesMap).map(price => ({name: price[0], val: price[1]}))
 }
-getTicksNeededPerPrice = (prices, reserved) => {
-    var pricesToCalculate = Array.from(prices);
+getTicksNeededPerPrice = (prices, effectivePrices, reserved) => {
     var pricesLookup = Object.fromEntries(prices.map(price => [price.name, price.val]));
-    var hasSteel = prices.some(price => price.name === "steel");
+    var pricesToCalculate = Array.of(...prices, ...effectivePrices.filter(price => pricesLookup[price.name] === undefined));
+    var hasSteel = effectivePrices.some(price => price.name === "steel");
     var ticksNeededPerPrice = {};
     var ticksSoFar = 0;
     var currentReserved = reserved;
@@ -448,8 +448,8 @@ getTicksNeededPerPrice = (prices, reserved) => {
     }
     return ticksNeededPerPrice;
 }
-getTicksNeeded = (ticksPerPrice) => {
-    return Math.max(0, ...Object.values(ticksPerPrice));
+getTicksNeeded = (ticksPerPrice, originalPrices) => {
+    return Math.max(0, ...originalPrices.map(price => ticksPerPrice[price.name]));
 }
 reserveBufferTime = game.rate * 60 * 5; //5 minutes: reserve enough of non-limiting resources to be this far ahead of the limiting resource
 bufferTicksNeeded = ticksNeeded => Math.max(0, ticksNeeded - reserveBufferTime);
@@ -493,8 +493,8 @@ findPriorities = (queue, reserved) => {
             var unavailableResources = prices.map(price => price.name).filter(res => reserved.get(res).current > getResourceOwned(res));
             var viable = unavailableResources.length ? false : true;
             var effectivePrices = getEffectivePrices(prices, reserved);
-            var ticksPerPrice = getTicksNeededPerPrice(prices, reserved);
-            var realTicksNeeded = getTicksNeeded(ticksPerPrice);
+            var ticksPerPrice = getTicksNeededPerPrice(prices, effectivePrices, reserved);
+            var realTicksNeeded = getTicksNeeded(ticksPerPrice, prices);
             var ticksNeeded = bufferTicksNeeded(realTicksNeeded);
             var toReserve = getResourcesToReserve(effectivePrices, ticksPerPrice, ticksNeeded, reserved);
             priorities.push({bld: found, reserved, viable, unavailable: unavailableResources, limiting: toReserve.limitingResources, ticksNeeded: realTicksNeeded, ticksPerPrice});
