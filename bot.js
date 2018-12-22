@@ -277,7 +277,9 @@ reassignAllJobs = () => {
 }
 countTicks = () => {
     var ticksPassed = game.ticks - state.ticks;
-    if (ticksPassed !== state.ticksPerLoop) console.log(ticksPassed + " ticks passed (expected " + state.ticksPerLoop + ")")
+    if (ticksPassed !== state.ticksPerLoop && !game.isPaused) {
+        console.log(ticksPassed + " ticks passed (expected " + state.ticksPerLoop + ")")
+    }
     state.ticks = game.ticks;
     state.blackcoinTimer++;
     state.tradeTimer++;
