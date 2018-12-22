@@ -426,20 +426,13 @@ getTicksNeededPerPrice = (prices, effectivePrices, reserved) => {
             if (baseProduction <= 0) {
                 return waitForChange();
             }
-            //this seems too complicated, maybe if Reservations was redesigned this would be simpler
-            if (currentReserved.get(price.name).current > resOwned(price.name)) {
-                timeToChange = Math.min(timeToChange,
-                    Math.ceil((currentReserved.get(price.name).current - resOwned(price.name)) / baseProduction));
-                return waitForChange();
+            var freeProduction = Math.max(0, baseProduction - currentReserved.get(price.name).production);
+            var ticksToEnough = (price.val - craftAvailable(price.name)) / freeProduction;
+            if (ticksToEnough <= timeToChange) {
+                ticksNeededPerPrice[price.name] = ticksSoFar + ticksToEnough;
+                return false;
             } else {
-                var freeProduction = Math.max(0, baseProduction - currentReserved.get(price.name).production);
-                var ticksToEnough = (price.val - craftAvailable(price.name)) / freeProduction;
-                if (ticksToEnough <= timeToChange) {
-                    ticksNeededPerPrice[price.name] = ticksSoFar + ticksToEnough;
-                    return false;
-                } else {
-                    return waitForChange();
-                }
+                return waitForChange();
             }
         });
         if (fastestTimeToChange === Infinity) {
