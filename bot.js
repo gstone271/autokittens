@@ -402,7 +402,9 @@ getTicksNeededPerPrice = (prices, effectivePrices, reserved) => {
     var resOwned = res => getResourceOwned(res) + ticksSoFar * getEffectiveResourcePerTickCached(res);
     var resOwnedForCraftTo = target => (res => resOwned(res) - (res === target ? 0 : (pricesLookup[res] || 0)));
     var craftAvailable = res => getCraftAvailable(res, currentReserved, resOwnedForCraftTo(res));
+    var loops = 0;
     while (pricesToCalculate.length) {
+        if (loops++ >= 1000) throw new Error("Infinite loop!");
         var fastestTimeToChange = Infinity;
         pricesToCalculate = pricesToCalculate.filter(price => {
             if (craftAvailable(price.name) >= price.val) {
@@ -445,7 +447,7 @@ getTicksNeededPerPrice = (prices, effectivePrices, reserved) => {
             pricesToCalculate = [];
         } else {
             ticksSoFar += fastestTimeToChange;
-            currentReserved = getFutureReservations(reserved, fastestTimeToChange);
+            currentReserved = getFutureReservations(currentReserved, fastestTimeToChange);
         }
     }
     return ticksNeededPerPrice;
