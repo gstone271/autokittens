@@ -1022,7 +1022,7 @@ getEnoughResource = res => {
 }
 getEnoughCraft = res => {
     var seen = new Set();
-    state.queue
+    return state.queue
         .filter(x => x.isUnlocked() && !seen.has(x) && seen.add(x))
         .map(bld => bld.getPrices())
         .concat(game.science.techs.filter(tech => tech.unlocked && !tech.researched) //save some compendiums midgame
